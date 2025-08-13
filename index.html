@@ -12,67 +12,384 @@
         var isLocal = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
         window.BASE_URL =
           window.BASE_URL ||
-          (isLocal ? "http://localhost:3000" : "https://absensi-db.onrender.com");
+          (isLocal
+            ? "http://localhost:3000"
+            : "https://absensi-db.onrender.com");
       })();
     </script>
 
     <!-- Chart.js Library -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js" defer></script>
+    <script
+      src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"
+      defer
+    ></script>
 
     <style>
       /* === CSS tetap seperti versi kamu === */
-      * { margin: 0; padding: 0; box-sizing: border-box; }
-      body { font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif; background: linear-gradient(135deg,#667eea 0%,#764ba2 100%); min-height: 100vh; color:#2c3e50;}
-      .navbar{background:rgba(255,255,255,.95);backdrop-filter:blur(20px);box-shadow:0 8px 32px rgba(0,0,0,.1);position:sticky;top:0;z-index:1000;padding:0}
-      .nav-container{max-width:1400px;margin:0 auto;display:flex;justify-content:space-between;align-items:center;padding:0 20px;height:70px}
-      .nav-logo{font-size:1.8rem;font-weight:700;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;text-decoration:none}
-      .nav-menu{display:flex;list-style:none;gap:0;margin:0;padding:0}
-      .nav-item{position:relative}
-      .nav-link{display:block;padding:25px 20px;text-decoration:none;color:#2c3e50;font-weight:600;font-size:.95rem;transition:.3s;border-bottom:3px solid transparent;white-space:nowrap}
-      .nav-link:hover,.nav-link.active{color:#667eea;border-bottom-color:#667eea;background:rgba(102,126,234,.05)}
-      .nav-toggle{display:none;flex-direction:column;cursor:pointer;padding:5px}
-      .nav-toggle span{width:25px;height:3px;background:#2c3e50;margin:3px 0;transition:.3s;border-radius:2px}
-      .main-container{max-width:1400px;margin:0 auto;padding:30px 20px}
-      .dashboard-header{background:rgba(255,255,255,.95);backdrop-filter:blur(20px);border-radius:20px;padding:40px;margin-bottom:30px;box-shadow:0 20px 60px rgba(0,0,0,.1);text-align:center}
-      .dashboard-header h1{font-size:3rem;font-weight:700;margin-bottom:10px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-      .dashboard-header p{font-size:1.2rem;color:#6c757d;margin-bottom:20px}
-      .last-update{background:rgba(102,126,234,.1);color:#667eea;padding:10px 20px;border-radius:25px;font-weight:600;display:inline-block}
-      .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:25px;margin-bottom:30px}
-      .kpi-card{background:rgba(255,255,255,.95);backdrop-filter:blur(20px);border-radius:16px;padding:30px;box-shadow:0 10px 40px rgba(0,0,0,.1);transition:.3s;position:relative;overflow:hidden}
-      .kpi-card::before{content:"";position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,#667eea,#764ba2)}
-      .kpi-card:hover{transform:translateY(-5px);box-shadow:0 20px 60px rgba(0,0,0,.15)}
-      .kpi-header{display:flex;align-items:center;gap:15px;margin-bottom:20px}
-      .kpi-icon{width:50px;height:50px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.5rem;color:#fff;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%)}
-      .kpi-info h3{font-size:.9rem;color:#6c757d;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
-      .kpi-value{font-size:2.5rem;font-weight:700;color:#2c3e50;margin-bottom:10px}
-      .kpi-change{font-size:.9rem;font-weight:600;display:flex;align-items:center;gap:5px}
-      .kpi-change.positive{color:#28a745}.kpi-change.negative{color:#dc3545}.kpi-change.neutral{color:#6c757d}
-      .charts-grid{display:grid;grid-template-columns:2fr 1fr;gap:25px;margin-bottom:30px}
-      .chart-container{background:rgba(255,255,255,.95);backdrop-filter:blur(20px);border-radius:16px;padding:30px;box-shadow:0 10px 40px rgba(0,0,0,.1)}
-      .chart-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:25px}
-      .chart-title{font-size:1.3rem;font-weight:700;color:#2c3e50}
-      .chart-period{padding:8px 16px;background:rgba(102,126,234,.1);color:#667eea;border-radius:20px;font-size:.85rem;font-weight:600}
-      .chart-canvas{position:relative;height:300px}
-      .summary-section{background:rgba(255,255,255,.95);backdrop-filter:blur(20px);border-radius:16px;padding:30px;box-shadow:0 10px 40px rgba(0,0,0,.1);margin-bottom:30px}
-      .section-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:25px}
-      .section-title{font-size:1.4rem;font-weight:700;color:#2c3e50}
-      .refresh-btn{padding:10px 20px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;border:none;border-radius:10px;font-weight:600;cursor:pointer;transition:.3s;display:flex;align-items:center;gap:8px}
-      .refresh-btn:hover{transform:translateY(-2px);box-shadow:0 8px 25px rgba(102,126,234,.4)}
-      .summary-table{width:100%;border-collapse:collapse;overflow:hidden;border-radius:12px}
-      .summary-table th{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;padding:15px;text-align:left;font-weight:600;font-size:.9rem}
-      .summary-table td{padding:15px;border-bottom:1px solid #e9ecef;font-size:.9rem}
-      .summary-table tr:hover{background:rgba(102,126,234,.05)}
-      .loading{display:flex;justify-content:center;align-items:center;height:200px;color:#667eea;font-size:1.1rem;font-weight:600}
-      .loading-spinner{width:40px;height:40px;border:4px solid #f3f3f3;border-top:4px solid #667eea;border-radius:50%;animation:spin 1s linear infinite;margin-right:15px}
-      @keyframes spin{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}
-      @media (max-width:1024px){.charts-grid{grid-template-columns:1fr}.kpi-grid{grid-template-columns:repeat(auto-fit,minmax(250px,1fr))}}
-      @media (max-width:768px){
-        .nav-menu{position:fixed;left:-100%;top:70px;flex-direction:column;background:rgba(255,255,255,.98);backdrop-filter:blur(20px);width:100%;text-align:center;transition:.3s;box-shadow:0 10px 30px rgba(0,0,0,.1)}
-        .nav-menu.active{left:0}.nav-toggle{display:flex}.nav-toggle.active span:nth-child(2){opacity:0}
-        .nav-toggle.active span:nth-child(1){transform:translateY(8px) rotate(45deg)}
-        .nav-toggle.active span:nth-child(3){transform:translateY(-8px) rotate(-45deg)}
-        .dashboard-header h1{font-size:2.2rem}.main-container{padding:20px 15px}.kpi-grid{grid-template-columns:1fr}.chart-canvas{height:250px}
-        .section-header{flex-direction:column;gap:15px;align-items:stretch}
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          "Helvetica Neue", Arial, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        color: #2c3e50;
+      }
+      .navbar {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(20px);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        position: sticky;
+        top: 0;
+        z-index: 1000;
+        padding: 0;
+      }
+      .nav-container {
+        max-width: 1400px;
+        margin: 0 auto;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0 20px;
+        height: 70px;
+      }
+      .nav-logo {
+        font-size: 1.8rem;
+        font-weight: 700;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        text-decoration: none;
+      }
+      .nav-menu {
+        display: flex;
+        list-style: none;
+        gap: 0;
+        margin: 0;
+        padding: 0;
+      }
+      .nav-item {
+        position: relative;
+      }
+      .nav-link {
+        display: block;
+        padding: 25px 20px;
+        text-decoration: none;
+        color: #2c3e50;
+        font-weight: 600;
+        font-size: 0.95rem;
+        transition: 0.3s;
+        border-bottom: 3px solid transparent;
+        white-space: nowrap;
+      }
+      .nav-link:hover,
+      .nav-link.active {
+        color: #667eea;
+        border-bottom-color: #667eea;
+        background: rgba(102, 126, 234, 0.05);
+      }
+      .nav-toggle {
+        display: none;
+        flex-direction: column;
+        cursor: pointer;
+        padding: 5px;
+      }
+      .nav-toggle span {
+        width: 25px;
+        height: 3px;
+        background: #2c3e50;
+        margin: 3px 0;
+        transition: 0.3s;
+        border-radius: 2px;
+      }
+      .main-container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 30px 20px;
+      }
+      .dashboard-header {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(20px);
+        border-radius: 20px;
+        padding: 40px;
+        margin-bottom: 30px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+        text-align: center;
+      }
+      .dashboard-header h1 {
+        font-size: 3rem;
+        font-weight: 700;
+        margin-bottom: 10px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+      .dashboard-header p {
+        font-size: 1.2rem;
+        color: #6c757d;
+        margin-bottom: 20px;
+      }
+      .last-update {
+        background: rgba(102, 126, 234, 0.1);
+        color: #667eea;
+        padding: 10px 20px;
+        border-radius: 25px;
+        font-weight: 600;
+        display: inline-block;
+      }
+      .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 25px;
+        margin-bottom: 30px;
+      }
+      .kpi-card {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(20px);
+        border-radius: 16px;
+        padding: 30px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+        transition: 0.3s;
+        position: relative;
+        overflow: hidden;
+      }
+      .kpi-card::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: linear-gradient(90deg, #667eea, #764ba2);
+      }
+      .kpi-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+      }
+      .kpi-header {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        margin-bottom: 20px;
+      }
+      .kpi-icon {
+        width: 50px;
+        height: 50px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        color: #fff;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      }
+      .kpi-info h3 {
+        font-size: 0.9rem;
+        color: #6c757d;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      .kpi-value {
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: #2c3e50;
+        margin-bottom: 10px;
+      }
+      .kpi-change {
+        font-size: 0.9rem;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+      .kpi-change.positive {
+        color: #28a745;
+      }
+      .kpi-change.negative {
+        color: #dc3545;
+      }
+      .kpi-change.neutral {
+        color: #6c757d;
+      }
+      .charts-grid {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: 25px;
+        margin-bottom: 30px;
+      }
+      .chart-container {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(20px);
+        border-radius: 16px;
+        padding: 30px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+      }
+      .chart-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 25px;
+      }
+      .chart-title {
+        font-size: 1.3rem;
+        font-weight: 700;
+        color: #2c3e50;
+      }
+      .chart-period {
+        padding: 8px 16px;
+        background: rgba(102, 126, 234, 0.1);
+        color: #667eea;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 600;
+      }
+      .chart-canvas {
+        position: relative;
+        height: 300px;
+      }
+      .summary-section {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(20px);
+        border-radius: 16px;
+        padding: 30px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+        margin-bottom: 30px;
+      }
+      .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 25px;
+      }
+      .section-title {
+        font-size: 1.4rem;
+        font-weight: 700;
+        color: #2c3e50;
+      }
+      .refresh-btn {
+        padding: 10px 20px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: #fff;
+        border: none;
+        border-radius: 10px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: 0.3s;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .refresh-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+      }
+      .summary-table {
+        width: 100%;
+        border-collapse: collapse;
+        overflow: hidden;
+        border-radius: 12px;
+      }
+      .summary-table th {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: #fff;
+        padding: 15px;
+        text-align: left;
+        font-weight: 600;
+        font-size: 0.9rem;
+      }
+      .summary-table td {
+        padding: 15px;
+        border-bottom: 1px solid #e9ecef;
+        font-size: 0.9rem;
+      }
+      .summary-table tr:hover {
+        background: rgba(102, 126, 234, 0.05);
+      }
+      .loading {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 200px;
+        color: #667eea;
+        font-size: 1.1rem;
+        font-weight: 600;
+      }
+      .loading-spinner {
+        width: 40px;
+        height: 40px;
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #667eea;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-right: 15px;
+      }
+      @keyframes spin {
+        0% {
+          transform: rotate(0);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+      @media (max-width: 1024px) {
+        .charts-grid {
+          grid-template-columns: 1fr;
+        }
+        .kpi-grid {
+          grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        }
+      }
+      @media (max-width: 768px) {
+        .nav-menu {
+          position: fixed;
+          left: -100%;
+          top: 70px;
+          flex-direction: column;
+          background: rgba(255, 255, 255, 0.98);
+          backdrop-filter: blur(20px);
+          width: 100%;
+          text-align: center;
+          transition: 0.3s;
+          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+        .nav-menu.active {
+          left: 0;
+        }
+        .nav-toggle {
+          display: flex;
+        }
+        .nav-toggle.active span:nth-child(2) {
+          opacity: 0;
+        }
+        .nav-toggle.active span:nth-child(1) {
+          transform: translateY(8px) rotate(45deg);
+        }
+        .nav-toggle.active span:nth-child(3) {
+          transform: translateY(-8px) rotate(-45deg);
+        }
+        .dashboard-header h1 {
+          font-size: 2.2rem;
+        }
+        .main-container {
+          padding: 20px 15px;
+        }
+        .kpi-grid {
+          grid-template-columns: 1fr;
+        }
+        .chart-canvas {
+          height: 250px;
+        }
+        .section-header {
+          flex-direction: column;
+          gap: 15px;
+          align-items: stretch;
+        }
       }
     </style>
   </head>
@@ -80,17 +397,37 @@
     <!-- Navigation Bar -->
     <nav class="navbar">
       <div class="nav-container">
-        <a href="#" class="nav-logo">📊 DaengBilu</a>
+        <a href="#" class="nav-logo">📊 Pelayanan HC</a>
         <ul class="nav-menu" id="navMenu">
-          <li class="nav-item"><a href="#" class="nav-link active">Dashboard</a></li>
-          <li class="nav-item"><a href="alldata.html" class="nav-link">📋 All Data</a></li>
-          <li class="nav-item"><a href="halamanrekap.html" class="nav-link">📊 Rekap Absensi</a></li>
-          <li class="nav-item"><a href="hitungjkp.html" class="nav-link">🧮 Hitung JKP</a></li>
-          <li class="nav-item"><a href="input_data.html" class="nav-link">📝 Input Data</a></li>
-          <li class="nav-item"><a href="pilih-data-ganda-sticky.html" class="nav-link">🔄 Data Ganda</a></li>
-          <li class="nav-item"><a href="pilih-shift-ganda-modifikasi.html" class="nav-link">⏰ Shift Ganda</a></li>
+          <li class="nav-item">
+            <a href="#" class="nav-link active">Dashboard</a>
+          </li>
+          <li class="nav-item">
+            <a href="alldata.html" class="nav-link">📋 All Data</a>
+          </li>
+          <li class="nav-item">
+            <a href="halamanrekap.html" class="nav-link">📊 Rekap Absensi</a>
+          </li>
+          <li class="nav-item">
+            <a href="hitungjkp.html" class="nav-link">🧮 Hitung JKP</a>
+          </li>
+          <li class="nav-item">
+            <a href="input_data.html" class="nav-link">📝 Input Data</a>
+          </li>
+          <li class="nav-item">
+            <a href="pilih-data-ganda-sticky.html" class="nav-link"
+              >🔄 Data Ganda</a
+            >
+          </li>
+          <li class="nav-item">
+            <a href="pilih-shift-ganda-modifikasi.html" class="nav-link"
+              >⏰ Shift Ganda</a
+            >
+          </li>
         </ul>
-        <div class="nav-toggle" id="navToggle"><span></span><span></span><span></span></div>
+        <div class="nav-toggle" id="navToggle">
+          <span></span><span></span><span></span>
+        </div>
       </div>
     </nav>
 
@@ -99,26 +436,68 @@
       <div class="dashboard-header">
         <h1>🎯 Management Dashboard</h1>
         <p>Real-time Analytics & Performance Monitoring</p>
-        <div class="last-update" id="lastUpdate">📅 Last Updated: Loading...</div>
+        <div class="last-update" id="lastUpdate">
+          📅 Last Updated: Loading...
+        </div>
       </div>
 
       <!-- KPI Cards -->
       <div class="kpi-grid">
-        <div class="kpi-card"><div class="kpi-header"><div class="kpi-icon">👥</div><div class="kpi-info"><h3>Total Pegawai</h3></div></div><div class="kpi-value" id="totalPegawai">-</div><div class="kpi-change neutral"><span>📊</span> Pegawai Aktif</div></div>
-        <div class="kpi-card"><div class="kpi-header"><div class="kpi-icon">⏱️</div><div class="kpi-info"><h3>Rata-rata JKP</h3></div></div><div class="kpi-value" id="avgJKP">-</div><div class="kpi-change" id="jkpChange"><span>📈</span> vs Target 85%</div></div>
-        <div class="kpi-card"><div class="kpi-header"><div class="kpi-icon">✅</div><div class="kpi-info"><h3>Tingkat Kehadiran</h3></div></div><div class="kpi-value" id="tingkatKehadiran">-</div><div class="kpi-change positive"><span>↗️</span> +2.3% dari bulan lalu</div></div>
-        <div class="kpi-card"><div class="kpi-header"><div class="kpi-icon">🕐</div><div class="kpi-info"><h3>Total Jam Kerja</h3></div></div><div class="kpi-value" id="totalJamKerja">-</div><div class="kpi-change neutral"><span>⏰</span> Jam bulan ini</div></div>
+        <div class="kpi-card">
+          <div class="kpi-header">
+            <div class="kpi-icon">👥</div>
+            <div class="kpi-info"><h3>Total Pegawai</h3></div>
+          </div>
+          <div class="kpi-value" id="totalPegawai">-</div>
+          <div class="kpi-change neutral"><span>📊</span> Pegawai Aktif</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-header">
+            <div class="kpi-icon">⏱️</div>
+            <div class="kpi-info"><h3>Rata-rata JKP</h3></div>
+          </div>
+          <div class="kpi-value" id="avgJKP">-</div>
+          <div class="kpi-change" id="jkpChange">
+            <span>📈</span> vs Target 85%
+          </div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-header">
+            <div class="kpi-icon">✅</div>
+            <div class="kpi-info"><h3>Tingkat Kehadiran</h3></div>
+          </div>
+          <div class="kpi-value" id="tingkatKehadiran">-</div>
+          <div class="kpi-change positive">
+            <span>↗️</span> +2.3% dari bulan lalu
+          </div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-header">
+            <div class="kpi-icon">🕐</div>
+            <div class="kpi-info"><h3>Total Jam Kerja</h3></div>
+          </div>
+          <div class="kpi-value" id="totalJamKerja">-</div>
+          <div class="kpi-change neutral"><span>⏰</span> Jam bulan ini</div>
+        </div>
       </div>
 
       <!-- Charts Section -->
       <div class="charts-grid">
         <div class="chart-container">
-          <div class="chart-header"><h3 class="chart-title">📈 Trend JKP Bulanan</h3><div class="chart-period">6 Bulan Terakhir</div></div>
+          <div class="chart-header">
+            <h3 class="chart-title">📈 Trend JKP Bulanan</h3>
+            <div class="chart-period">6 Bulan Terakhir</div>
+          </div>
           <div class="chart-canvas"><canvas id="jkpTrendChart"></canvas></div>
         </div>
         <div class="chart-container">
-          <div class="chart-header"><h3 class="chart-title">🏢 Distribusi Shift</h3><div class="chart-period">Bulan Ini</div></div>
-          <div class="chart-canvas"><canvas id="shiftDistributionChart"></canvas></div>
+          <div class="chart-header">
+            <h3 class="chart-title">🏢 Distribusi Shift</h3>
+            <div class="chart-period">Bulan Ini</div>
+          </div>
+          <div class="chart-canvas">
+            <canvas id="shiftDistributionChart"></canvas>
+          </div>
         </div>
       </div>
 
@@ -126,10 +505,15 @@
       <div class="summary-section">
         <div class="section-header">
           <h3 class="section-title">🎯 Performance Summary</h3>
-          <button class="refresh-btn" onclick="refreshDashboard()"><span>🔄</span> Refresh Data</button>
+          <button class="refresh-btn" onclick="refreshDashboard()">
+            <span>🔄</span> Refresh Data
+          </button>
         </div>
         <div id="summaryTableContainer">
-          <div class="loading"><div class="loading-spinner"></div>Loading performance data...</div>
+          <div class="loading">
+            <div class="loading-spinner"></div>
+            Loading performance data...
+          </div>
         </div>
       </div>
     </div>
@@ -140,17 +524,28 @@
       const navToggle = document.getElementById("navToggle");
       const navMenu = document.getElementById("navMenu");
       navToggle.addEventListener("click", () => {
-        navMenu.classList.toggle("active"); navToggle.classList.toggle("active");
+        navMenu.classList.toggle("active");
+        navToggle.classList.toggle("active");
       });
       document.addEventListener("click", (e) => {
         if (!navToggle.contains(e.target) && !navMenu.contains(e.target)) {
-          navMenu.classList.remove("active"); navToggle.classList.remove("active");
+          navMenu.classList.remove("active");
+          navToggle.classList.remove("active");
         }
       });
 
       // Data dan chart state
-      let dashboardData = { totalPegawai:0, avgJKP:0, tingkatKehadiran:0, totalJamKerja:0, jkpTrend:[], shiftDistribution:[], performanceSummary:[] };
-      let jkpTrendChart = null, shiftDistributionChart = null;
+      let dashboardData = {
+        totalPegawai: 0,
+        avgJKP: 0,
+        tingkatKehadiran: 0,
+        totalJamKerja: 0,
+        jkpTrend: [],
+        shiftDistribution: [],
+        performanceSummary: [],
+      };
+      let jkpTrendChart = null,
+        shiftDistributionChart = null;
 
       // Matikan fetch API dashboard jika endpoint belum dibuat (agar tidak ada 404)
       const USE_DASHBOARD_API = false;
@@ -163,7 +558,7 @@
           const [r1, r2, r3] = await Promise.all([
             fetch(`${window.BASE_URL}/dashboard-stats`),
             fetch(`${window.BASE_URL}/dashboard-trend`),
-            fetch(`${window.BASE_URL}/dashboard-summary`)
+            fetch(`${window.BASE_URL}/dashboard-summary`),
           ]);
           if (r1.ok) {
             const stats = await r1.json();
@@ -174,7 +569,9 @@
           }
           if (r2.ok) {
             const trend = await r2.json();
-            dashboardData.jkpTrend = trend.jkpTrend ?? [82.1,84.5,86.2,85.8,87.1,87.5];
+            dashboardData.jkpTrend = trend.jkpTrend ?? [
+              82.1, 84.5, 86.2, 85.8, 87.1, 87.5,
+            ];
           }
           if (r3.ok) {
             dashboardData.performanceSummary = await r3.json();
@@ -206,41 +603,129 @@
       function updateLastUpdate() {
         const now = new Date();
         document.getElementById("lastUpdate").innerHTML =
-          "📅 Last Updated: " + now.toLocaleString("id-ID", { day:"2-digit", month:"long", year:"numeric", hour:"2-digit", minute:"2-digit" });
+          "📅 Last Updated: " +
+          now.toLocaleString("id-ID", {
+            day: "2-digit",
+            month: "long",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+          });
       }
 
       function updateKPICards() {
-        document.getElementById("totalPegawai").textContent = dashboardData.totalPegawai.toLocaleString();
-        document.getElementById("avgJKP").textContent = `${dashboardData.avgJKP.toFixed(1)}%`;
-        document.getElementById("tingkatKehadiran").textContent = `${dashboardData.tingkatKehadiran.toFixed(1)}%`;
-        document.getElementById("totalJamKerja").textContent = `${(dashboardData.totalJamKerja/1000).toFixed(0)}K`;
+        document.getElementById("totalPegawai").textContent =
+          dashboardData.totalPegawai.toLocaleString();
+        document.getElementById(
+          "avgJKP"
+        ).textContent = `${dashboardData.avgJKP.toFixed(1)}%`;
+        document.getElementById(
+          "tingkatKehadiran"
+        ).textContent = `${dashboardData.tingkatKehadiran.toFixed(1)}%`;
+        document.getElementById("totalJamKerja").textContent = `${(
+          dashboardData.totalJamKerja / 1000
+        ).toFixed(0)}K`;
         const jkpChange = document.getElementById("jkpChange");
         const jkpDiff = dashboardData.avgJKP - 85;
-        if (jkpDiff > 0) { jkpChange.className="kpi-change positive"; jkpChange.innerHTML = `<span>↗️</span> +${jkpDiff.toFixed(1)}% vs Target`; }
-        else { jkpChange.className="kpi-change negative"; jkpChange.innerHTML = `<span>↘️</span> ${jkpDiff.toFixed(1)}% vs Target`; }
+        if (jkpDiff > 0) {
+          jkpChange.className = "kpi-change positive";
+          jkpChange.innerHTML = `<span>↗️</span> +${jkpDiff.toFixed(
+            1
+          )}% vs Target`;
+        } else {
+          jkpChange.className = "kpi-change negative";
+          jkpChange.innerHTML = `<span>↘️</span> ${jkpDiff.toFixed(
+            1
+          )}% vs Target`;
+        }
       }
 
       function initializeCharts() {
         const ctx1 = document.getElementById("jkpTrendChart").getContext("2d");
         if (jkpTrendChart) jkpTrendChart.destroy();
         jkpTrendChart = new Chart(ctx1, {
-          type:"line",
-          data:{ labels:["Jan","Feb","Mar","Apr","Mei","Jun"], datasets:[{ label:"JKP (%)", data:dashboardData.jkpTrend, borderColor:"#667eea", backgroundColor:"rgba(102,126,234,.1)", borderWidth:3, fill:true, tension:.4, pointBackgroundColor:"#667eea", pointBorderColor:"#fff", pointBorderWidth:2, pointRadius:6, pointHoverRadius:8 }]},
-          options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } }, scales:{ y:{ beginAtZero:false, min:75, max:95, grid:{ color:"rgba(0,0,0,.1)" }, ticks:{ callback:v=>v+"%" } }, x:{ grid:{ display:false } } } }
+          type: "line",
+          data: {
+            labels: ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun"],
+            datasets: [
+              {
+                label: "JKP (%)",
+                data: dashboardData.jkpTrend,
+                borderColor: "#667eea",
+                backgroundColor: "rgba(102,126,234,.1)",
+                borderWidth: 3,
+                fill: true,
+                tension: 0.4,
+                pointBackgroundColor: "#667eea",
+                pointBorderColor: "#fff",
+                pointBorderWidth: 2,
+                pointRadius: 6,
+                pointHoverRadius: 8,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              y: {
+                beginAtZero: false,
+                min: 75,
+                max: 95,
+                grid: { color: "rgba(0,0,0,.1)" },
+                ticks: { callback: (v) => v + "%" },
+              },
+              x: { grid: { display: false } },
+            },
+          },
         });
 
-        const ctx2 = document.getElementById("shiftDistributionChart").getContext("2d");
+        const ctx2 = document
+          .getElementById("shiftDistributionChart")
+          .getContext("2d");
         if (shiftDistributionChart) shiftDistributionChart.destroy();
         shiftDistributionChart = new Chart(ctx2, {
-          type:"doughnut",
-          data:{ labels:dashboardData.shiftDistribution.map(i=>i.label), datasets:[{ data:dashboardData.shiftDistribution.map(i=>i.value), backgroundColor:dashboardData.shiftDistribution.map(i=>i.color), borderWidth:0, hoverOffset:4 }]},
-          options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:"bottom", labels:{ padding:20, usePointStyle:true, font:{ size:12, weight:"600" } } }, tooltip:{ callbacks:{ label:c=>`${c.label}: ${c.parsed}%` } } }, cutout:"65%" }
+          type: "doughnut",
+          data: {
+            labels: dashboardData.shiftDistribution.map((i) => i.label),
+            datasets: [
+              {
+                data: dashboardData.shiftDistribution.map((i) => i.value),
+                backgroundColor: dashboardData.shiftDistribution.map(
+                  (i) => i.color
+                ),
+                borderWidth: 0,
+                hoverOffset: 4,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                position: "bottom",
+                labels: {
+                  padding: 20,
+                  usePointStyle: true,
+                  font: { size: 12, weight: "600" },
+                },
+              },
+              tooltip: {
+                callbacks: { label: (c) => `${c.label}: ${c.parsed}%` },
+              },
+            },
+            cutout: "65%",
+          },
         });
       }
 
       function updatePerformanceTable() {
         const container = document.getElementById("summaryTableContainer");
-        const rows = dashboardData.performanceSummary.map(u => `
+        const rows = dashboardData.performanceSummary
+          .map(
+            (u) => `
           <tr>
             <td><strong>${u.unit}</strong></td>
             <td>${u.pegawai} orang</td>
@@ -248,11 +733,15 @@
             <td>${u.kehadiran.toFixed(1)}%</td>
             <td>
               <span style="padding:4px 12px;border-radius:12px;font-size:.8rem;font-weight:600;
-                background:${u.jkp>=85?'rgba(40,167,69,.1)':'rgba(220,53,69,.1)'};color:${u.jkp>=85?'#28a745':'#dc3545'};">
-                ${u.jkp>=85?'✅ Good':'⚠️ Need Attention'}
+                background:${
+                  u.jkp >= 85 ? "rgba(40,167,69,.1)" : "rgba(220,53,69,.1)"
+                };color:${u.jkp >= 85 ? "#28a745" : "#dc3545"};">
+                ${u.jkp >= 85 ? "✅ Good" : "⚠️ Need Attention"}
               </span>
             </td>
-          </tr>`).join("");
+          </tr>`
+          )
+          .join("");
         container.innerHTML = `
           <table class="summary-table">
             <thead><tr><th>Unit</th><th>Pegawai</th><th>Rata-rata JKP</th><th>Tingkat Kehadiran</th><th>Status</th></tr></thead>
@@ -262,20 +751,35 @@
 
       async function refreshDashboard() {
         const btn = document.querySelector(".refresh-btn");
-        btn.innerHTML = '<div class="loading-spinner" style="width:20px;height:20px;margin-right:8px;"></div> Refreshing...';
-        await loadDashboardData(); updateKPICards(); updateLastUpdate(); initializeCharts(); updatePerformanceTable();
+        btn.innerHTML =
+          '<div class="loading-spinner" style="width:20px;height:20px;margin-right:8px;"></div> Refreshing...';
+        await loadDashboardData();
+        updateKPICards();
+        updateLastUpdate();
+        initializeCharts();
+        updatePerformanceTable();
         btn.innerHTML = "<span>🔄</span> Refresh Data";
-        const last = document.getElementById("lastUpdate"); last.style.background="rgba(40,167,69,.1)"; last.style.color="#28a745";
-        setTimeout(()=>{ last.style.background="rgba(102,126,234,.1)"; last.style.color="#667eea"; }, 2000);
+        const last = document.getElementById("lastUpdate");
+        last.style.background = "rgba(40,167,69,.1)";
+        last.style.color = "#28a745";
+        setTimeout(() => {
+          last.style.background = "rgba(102,126,234,.1)";
+          last.style.color = "#667eea";
+        }, 2000);
       }
 
       document.addEventListener("DOMContentLoaded", () => {
         console.log("🚀 Dashboard initialized with BASE_URL:", window.BASE_URL);
-        updateLastUpdate(); loadDashboardData().then(()=>{ updateKPICards(); initializeCharts(); updatePerformanceTable(); });
+        updateLastUpdate();
+        loadDashboardData().then(() => {
+          updateKPICards();
+          initializeCharts();
+          updatePerformanceTable();
+        });
       });
 
       setInterval(refreshDashboard, 300000);
-      // ======= END DASHBOARD SCRIPT =======
+      // ======= END DASHBOARD SCRIPT ===== perubahan====
     </script>
 
     <!-- script.js milik aplikasi (berisi helper BASE_URL untuk halaman lain) -->
