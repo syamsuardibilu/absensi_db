@@ -1,0 +1,1891 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Data Olah Absensi - Database Viewer (with Dropdown Filters)</title>
+    <style>
+      /* ... (CSS Anda yang sudah ada) ... */
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        color: #333;
+        line-height: 1.6;
+        margin: 15px;
+        min-height: calc(100vh - 30px);
+      }
+
+      .container {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        overflow: hidden;
+        max-width: calc(100vw - 30px);
+        margin: 0 auto;
+      }
+
+      /* Header */
+      .header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 20px 25px;
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        border-bottom: 3px solid #5a67d8;
+      }
+
+      /* Controls Section */
+      .controls {
+        background: white;
+        padding: 20px 25px;
+        border-bottom: 1px solid #e2e8f0;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 15px;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .search-section {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+        flex: 1;
+        min-width: 300px;
+      }
+
+      .search-input {
+        flex: 1;
+        min-width: 200px;
+        padding: 10px 15px;
+        border: 2px solid #e2e8f0;
+        border-radius: 8px;
+        font-size: 14px;
+        transition: all 0.2s ease;
+      }
+
+      .search-input:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+      }
+
+      .search-select {
+        padding: 10px 12px;
+        border: 2px solid #e2e8f0;
+        border-radius: 8px;
+        font-size: 14px;
+        background: white;
+        cursor: pointer;
+        min-width: 120px;
+      }
+
+      .clear-btn {
+        padding: 10px 15px;
+        background: #e53e3e;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        transition: all 0.2s ease;
+      }
+
+      .clear-btn:hover {
+        background: #c53030;
+        transform: translateY(-1px);
+      }
+
+      .export-section {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+
+      .export-btn {
+        padding: 10px 15px;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+
+      .export-csv {
+        background: #48bb78;
+        color: white;
+      }
+
+      .export-csv:hover {
+        background: #38a169;
+        transform: translateY(-1px);
+      }
+
+      .export-excel {
+        background: #38b2ac;
+        color: white;
+      }
+
+      .export-excel:hover {
+        background: #319795;
+        transform: translateY(-1px);
+      }
+
+      .results-info {
+        background: #f0f8f0;
+        padding: 10px 15px;
+        margin: 0 25px;
+        border-radius: 6px;
+        font-size: 14px;
+        color: #2f855a;
+        border-left: 4px solid #48bb78;
+      }
+
+      .header h1 {
+        font-size: 24px;
+        font-weight: 600;
+        margin-bottom: 8px;
+      }
+
+      .header-info {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 15px;
+        font-size: 14px;
+        opacity: 0.9;
+      }
+
+      .db-info {
+        display: flex;
+        gap: 20px;
+        flex-wrap: wrap;
+      }
+
+      .loading {
+        text-align: center;
+        padding: 40px;
+        font-size: 18px;
+        color: #666;
+      }
+
+      .loading::after {
+        content: "";
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 2px solid #ddd;
+        border-radius: 50%;
+        border-top-color: #667eea;
+        animation: spin 1s ease-in-out infinite;
+        margin-left: 10px;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      /* Table Container dengan Scrolling */
+      .table-container {
+        overflow: auto;
+        max-height: calc(100vh - 200px);
+        border: 1px solid #e2e8f0;
+        margin: 0;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        min-width: 1200px; /* Minimum width for landscape */
+        font-size: 13px;
+      }
+
+      /* Header Table yang Sticky */
+      thead th {
+        background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%);
+        color: white;
+        padding: 0;
+        text-align: left;
+        font-weight: 600;
+        border-right: 1px solid #718096;
+        position: sticky;
+        top: 0;
+        z-index: 50;
+        white-space: nowrap;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        vertical-align: top;
+      }
+
+      thead th:hover {
+        background: linear-gradient(135deg, #2d3748 0%, #1a202c 100%);
+      }
+
+      thead th:first-child {
+        width: 50px;
+        text-align: center;
+        cursor: default;
+      }
+
+      thead th:first-child:hover {
+        background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%);
+      }
+
+      /* Header Content Structure */
+      .header-content {
+        display: flex;
+        flex-direction: column;
+        min-height: 80px; /* Adjusted for dropdown */
+      }
+
+      .header-title {
+        padding: 8px;
+        cursor: pointer;
+        user-select: none;
+        transition: background-color 0.2s ease;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-height: 40px;
+      }
+
+      .header-title:hover {
+        background-color: rgba(255, 255, 255, 0.1);
+      }
+
+      .sort-icon {
+        margin-left: 5px;
+        font-size: 10px;
+        opacity: 0.7;
+      }
+
+      .sort-asc .sort-icon::after {
+        content: "▲";
+        opacity: 1;
+      }
+
+      .sort-desc .sort-icon::after {
+        content: "▼";
+        opacity: 1;
+      }
+
+      /* Column Filter Input & Select */
+      .column-filter {
+        padding: 4px;
+        background: rgba(255, 255, 255, 0.1);
+        border-top: 1px solid rgba(255, 255, 255, 0.2);
+        display: flex; /* To stack input and select */
+        flex-direction: column;
+        gap: 4px; /* Space between input and select */
+      }
+
+      .column-filter input,
+      .column-filter select {
+        width: 100%;
+        padding: 4px 6px;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        border-radius: 3px;
+        background: rgba(255, 255, 255, 0.9);
+        color: #2d3748;
+        font-size: 11px;
+        box-sizing: border-box;
+        transition: all 0.2s ease;
+      }
+
+      .column-filter input::placeholder {
+        color: #718096;
+        font-style: italic;
+      }
+
+      .column-filter input:focus,
+      .column-filter select:focus {
+        outline: none;
+        background: white;
+        border-color: #667eea;
+        box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+      }
+
+      .column-filter input:not(:placeholder-shown) {
+        background: #fef08a;
+        border-color: #f59e0b;
+        font-weight: 600;
+      }
+
+      .column-filter select:not([value=""]) {
+        background: #d1fae5; /* Light green for active select filter */
+        border-color: #38a169;
+        font-weight: 600;
+      }
+
+      /* Active Filter Indicator */
+      .header-title.has-filter {
+        background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+      }
+
+      .header-title.has-filter:hover {
+        background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
+      }
+
+      /* Filter Clear Button (for text input) */
+      .filter-clear {
+        position: absolute;
+        right: 2px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: none;
+        border: none;
+        color: #e53e3e;
+        cursor: pointer;
+        font-size: 10px;
+        padding: 0 2px;
+        line-height: 1;
+        border-radius: 2px;
+        transition: all 0.2s ease;
+      }
+
+      .filter-clear:hover {
+        background: rgba(229, 62, 62, 0.2);
+        color: #c53030;
+      }
+
+      /* Column filter wrapper for relative positioning */
+      .filter-wrapper {
+        position: relative;
+        display: flex;
+        align-items: center;
+      }
+
+      tbody td {
+        padding: 10px 8px;
+        border-bottom: 1px solid #e2e8f0;
+        border-right: 1px solid #f1f5f9;
+        vertical-align: top;
+        word-wrap: break-word;
+        max-width: 150px;
+      }
+
+      tbody td:first-child {
+        text-align: center;
+        font-weight: 600;
+        color: #667eea;
+        background: #f8fafc;
+        position: sticky;
+        left: 0;
+        z-index: 10;
+        border-right: 2px solid #e2e8f0;
+      }
+
+      tbody tr:nth-child(even) {
+        background-color: #f8fafc;
+      }
+
+      tbody tr:hover {
+        background-color: #edf2f7;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        transition: all 0.2s ease;
+      }
+
+      /* Pagination */
+      .pagination-container {
+        background: #f8fafc;
+        padding: 20px 25px;
+        border-top: 1px solid #e2e8f0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 15px;
+        position: sticky;
+        bottom: 0;
+        z-index: 100;
+      }
+
+      .pagination {
+        display: flex;
+        gap: 5px;
+        align-items: center;
+      }
+
+      .pagination button {
+        padding: 8px 12px;
+        border: 1px solid #cbd5e0;
+        background: white;
+        color: #4a5568;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        min-width: 40px;
+      }
+
+      .pagination button:hover:not(:disabled) {
+        background: #667eea;
+        color: white;
+        border-color: #667eea;
+        transform: translateY(-1px);
+      }
+
+      .pagination button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        background: #f1f5f9;
+      }
+
+      .pagination button.active {
+        background: #667eea;
+        color: white;
+        border-color: #667eea;
+        font-weight: 600;
+      }
+
+      .pagination-info {
+        color: #718096;
+        font-size: 14px;
+        font-weight: 500;
+      }
+
+      .pagination-controls {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+      }
+
+      .page-jump {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .page-jump input {
+        width: 60px;
+        padding: 6px 8px;
+        border: 1px solid #cbd5e0;
+        border-radius: 4px;
+        text-align: center;
+        font-size: 14px;
+      }
+
+      .page-jump button {
+        padding: 6px 12px;
+        background: #48bb78;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 500;
+        transition: all 0.2s ease;
+      }
+
+      .page-jump button:hover {
+        background: #38a169;
+        transform: translateY(-1px);
+      }
+
+      /* Responsive Design */
+      @media (max-width: 768px) {
+        body {
+          margin: 10px;
+        }
+
+        .header {
+          padding: 15px 20px;
+        }
+
+        .header h1 {
+          font-size: 20px;
+        }
+
+        .header-info {
+          font-size: 12px;
+        }
+
+        .table-container {
+          max-height: calc(100vh - 180px);
+        }
+
+        table {
+          font-size: 12px;
+          min-width: 1000px;
+        }
+
+        thead th {
+          padding: 10px 6px;
+          font-size: 11px;
+        }
+
+        tbody td {
+          padding: 8px 6px;
+          max-width: 120px;
+        }
+
+        .pagination-container {
+          padding: 15px 20px;
+          flex-direction: column;
+          gap: 10px;
+        }
+
+        .pagination {
+          flex-wrap: wrap;
+          justify-content: center;
+        }
+      }
+
+      /* Utility Classes */
+      .text-center {
+        text-align: center;
+      }
+      .text-right {
+        text-align: right;
+      }
+      .font-mono {
+        font-family: "Courier New", monospace;
+      }
+
+      /* Field-specific styling */
+      td[data-field="tanggal"],
+      td[data-field="daily_in"],
+      td[data-field="daily_out"],
+      td[data-field="daily_in_cleansing"],
+      td[data-field="daily_out_cleansing"] {
+        font-family: "Courier New", monospace;
+        color: #2d3748;
+        font-weight: 500;
+      }
+
+      td[data-field="jam_kerja_pegawai"],
+      td[data-field="jam_kerja_pegawai_cleansing"] {
+        text-align: right;
+        font-weight: 600;
+        color: #38a169;
+      }
+
+      td[data-field="perner"] {
+        font-weight: 600;
+        color: #667eea;
+      }
+
+      td[data-field="jenis_hari"] {
+        font-size: 11px;
+        text-transform: uppercase;
+        font-weight: 500;
+        color: #ed8936;
+      }
+
+      /* Error State */
+      .error {
+        text-align: center;
+        padding: 40px;
+        color: #e53e3e;
+        font-size: 16px;
+        background: #fed7d7;
+        border-radius: 8px;
+        margin: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <!-- Header -->
+      <div class="header">
+        <h1>📊 Data Olah Absensi</h1>
+        <div class="header-info">
+          <div class="db-info">
+            <span><strong>Database:</strong> absensi_db</span>
+            <span><strong>Tabel:</strong> olah_absensi</span>
+            <span id="totalRecords"
+              ><strong>Total Records:</strong> Loading...</span
+            >
+          </div>
+          <div id="lastUpdated">
+            <strong>Last Updated:</strong> <span id="updateTime">-</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Controls -->
+      <div class="controls">
+        <div class="search-section">
+          <input
+            type="text"
+            id="searchInput"
+            class="search-input"
+            placeholder="🔍 Cari data... (ketik untuk filter otomatis)"
+            autocomplete="off"
+          />
+          <select id="searchColumn" class="search-select">
+            <option value="">Semua Kolom</option>
+          </select>
+          <button id="clearSearch" class="clear-btn" onclick="clearSearch()">
+            🗑️ Clear Global Search
+          </button>
+          <button
+            class="clear-btn"
+            onclick="clearAllColumnFilters()"
+            title="Clear all column filters"
+            style="background: #ed8936"
+          >
+            🔄 Clear Column Filters
+          </button>
+        </div>
+        <div class="export-section">
+          <button class="export-btn export-csv" onclick="exportData('csv')">
+            📊 CSV
+          </button>
+          <button class="export-btn export-excel" onclick="exportData('excel')">
+            📈 Excel
+          </button>
+        </div>
+      </div>
+
+      <!-- Search Results Info -->
+      <div id="searchResults" class="results-info" style="display: none">
+        <span id="searchResultsText"></span>
+      </div>
+
+      <!-- Loading State -->
+      <div id="loading" class="loading">Memuat data dari database...</div>
+
+      <!-- Error State -->
+      <div id="error" class="error" style="display: none">
+        <strong>Error:</strong> <span id="errorMessage"></span> <br /><br />
+        <button
+          onclick="loadData()"
+          style="
+            padding: 8px 16px;
+            background: #e53e3e;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+          "
+        >
+          🔄 Retry
+        </button>
+      </div>
+
+      <!-- Table Container -->
+      <div id="tableContainer" class="table-container" style="display: none">
+        <table id="dataTable">
+          <thead id="tableHead"></thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+
+      <!-- Pagination - ALWAYS VISIBLE -->
+      <div id="paginationContainer" class="pagination-container">
+        <div class="pagination-info">
+          <span id="pageInfo">Memuat data...</span>
+        </div>
+        <div class="pagination-controls">
+          <div class="pagination">
+            <button id="firstBtn" onclick="goToPage(1)" disabled>⟪</button>
+            <button id="prevBtn" onclick="goToPage(currentPage - 1)" disabled>
+              ‹
+            </button>
+            <div id="pageNumbers"></div>
+            <button id="nextBtn" onclick="goToPage(currentPage + 1)" disabled>
+              ›
+            </button>
+            <button id="lastBtn" onclick="goToPage(totalPages)" disabled>
+              ⟫
+            </button>
+          </div>
+          <div class="page-jump">
+            <span>Halaman:</span>
+            <input
+              type="number"
+              id="pageJump"
+              min="1"
+              max="1"
+              value="1"
+              disabled
+            />
+            <button onclick="jumpToPage()" disabled>Go</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // BASE URL untuk API calls
+      const PROD_API = "https://absensi-db.onrender.com";
+      const isLocal = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
+      const BASE_URL =
+        (window.BASE_URL && window.BASE_URL.trim()) ||
+        (isLocal ? "http://localhost:3000" : PROD_API);
+
+      // Global Variables
+      let allData = [];
+      let filteredData = []; // For search results
+      let currentPage = 1;
+      const recordsPerPage = 100;
+      let totalPages = 0;
+      let totalRecords = 0;
+      let currentSortColumn = "";
+      let currentSortDirection = "asc";
+      let currentSearchTerm = "";
+      let currentSearchColumn = "";
+      let tableColumns = [];
+      let columnFilters = {}; // Store individual column filters (text input)
+      let columnDropdownFilters = {}; // Store individual column filters (dropdown select)
+
+      // Load data from API
+      async function loadData() {
+        try {
+          document.getElementById("loading").style.display = "block";
+          document.getElementById("error").style.display = "none";
+          document.getElementById("tableContainer").style.display = "none";
+          // PAGINATION TETAP TAMPIL - jangan hide
+
+          // Set initial pagination state
+          document.getElementById("pageInfo").textContent = "Memuat data...";
+          disablePaginationControls();
+
+          console.log("🚀 Fetching data from /getAllData...");
+
+          const response = await fetch(`${BASE_URL}/getAllData`);
+
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+
+          const data = await response.json();
+          console.log(`✅ Data loaded: ${data.length} records`);
+
+          allData = data;
+          filteredData = [...data]; // Initialize filtered data
+          totalRecords = data.length;
+          totalPages = Math.ceil(totalRecords / recordsPerPage);
+
+          // Get table columns
+          if (data.length > 0) {
+            tableColumns = Object.keys(data[0]);
+            populateSearchColumns();
+          }
+
+          // Update header info
+          document.getElementById(
+            "totalRecords"
+          ).innerHTML = `<strong>Total Records:</strong> ${totalRecords.toLocaleString()}`;
+          document.getElementById("updateTime").textContent =
+            new Date().toLocaleString("id-ID");
+
+          if (totalRecords === 0) {
+            throw new Error("Tidak ada data yang ditemukan");
+          }
+
+          // Create table structure
+          createTable();
+          populateColumnFilterDropdowns(); // NEW: Populate dropdowns after table creation
+
+          // Show first page
+          currentPage = 1;
+          displayPage(currentPage);
+          setupSearchListeners();
+          enablePaginationControls();
+
+          // Show table
+          document.getElementById("loading").style.display = "none";
+          document.getElementById("tableContainer").style.display = "block";
+          // PAGINATION sudah tampil dari awal
+
+          console.log(
+            `📊 Table created with ${totalPages} pages (${recordsPerPage} records per page)`
+          );
+        } catch (error) {
+          console.error("❌ Error loading data:", error);
+          document.getElementById("loading").style.display = "none";
+          document.getElementById("error").style.display = "block";
+          document.getElementById("errorMessage").textContent = error.message;
+          document.getElementById("tableContainer").style.display = "none";
+
+          // Set error state for pagination
+          document.getElementById("pageInfo").textContent =
+            "Error - tidak ada data";
+          disablePaginationControls();
+        }
+      }
+
+      // Disable pagination controls
+      function disablePaginationControls() {
+        document.getElementById("firstBtn").disabled = true;
+        document.getElementById("prevBtn").disabled = true;
+        document.getElementById("nextBtn").disabled = true;
+        document.getElementById("lastBtn").disabled = true;
+        document.getElementById("pageJump").disabled = true;
+        document.querySelector(".page-jump button").disabled = true;
+        document.getElementById("pageNumbers").innerHTML = "";
+      }
+
+      // Enable pagination controls
+      function enablePaginationControls() {
+        document.getElementById("pageJump").disabled = false;
+        document.querySelector(".page-jump button").disabled = false;
+        // Button states akan diatur oleh updatePaginationControls()
+      }
+
+      // Debounce function
+      function debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+          const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+          };
+          clearTimeout(timeout);
+          timeout = setTimeout(later, wait);
+        };
+      }
+
+      // Apply column filters (both text input and dropdown)
+      function applyColumnFilters() {
+        let hasActiveFilters = false;
+
+        // Get values from text inputs
+        const filterInputs = document.querySelectorAll(".column-filter input");
+        filterInputs.forEach((input) => {
+          const column = input.getAttribute("data-column");
+          const value = input.value.toLowerCase().trim();
+          columnFilters[column] = value;
+          if (value) hasActiveFilters = true;
+        });
+
+        // Get values from dropdown selects
+        const filterSelects = document.querySelectorAll(
+          ".column-filter select"
+        );
+        filterSelects.forEach((select) => {
+          const column = select.getAttribute("data-column");
+          const value = select.value; // Keep original case for exact match
+          columnDropdownFilters[column] = value;
+          if (value) hasActiveFilters = true;
+        });
+
+        console.log("🔍 Column text filters:", columnFilters);
+        console.log("🔍 Column dropdown filters:", columnDropdownFilters);
+
+        // Apply filters to data
+        let currentFilteredData = [...allData];
+
+        if (hasActiveFilters) {
+          currentFilteredData = allData.filter((row) => {
+            const textFilterMatch = Object.keys(columnFilters).every(
+              (column) => {
+                const filterValue = columnFilters[column];
+                if (!filterValue) return true; // No text filter for this column
+
+                const cellValue = row[column];
+                return String(cellValue).toLowerCase().includes(filterValue);
+              }
+            );
+
+            const dropdownFilterMatch = Object.keys(
+              columnDropdownFilters
+            ).every((column) => {
+              const filterValue = columnDropdownFilters[column];
+              if (!filterValue) return true; // No dropdown filter for this column
+
+              const cellValue = row[column];
+              // For dropdown, we want an exact match
+              return String(cellValue) === filterValue;
+            });
+
+            return textFilterMatch && dropdownFilterMatch;
+          });
+
+          showColumnFilterResults();
+        } else {
+          hideColumnFilterResults();
+        }
+
+        // Also apply global search if active
+        if (currentSearchTerm) {
+          currentFilteredData = currentFilteredData.filter((row) => {
+            if (currentSearchColumn) {
+              const value = row[currentSearchColumn];
+              return String(value).toLowerCase().includes(currentSearchTerm);
+            } else {
+              return tableColumns.some((column) => {
+                const value = row[column];
+                return String(value).toLowerCase().includes(currentSearchTerm);
+              });
+            }
+          });
+        }
+
+        filteredData = currentFilteredData; // Update global filteredData
+
+        // Update header visual state for both input and select
+        document.querySelectorAll("thead th").forEach((th) => {
+          const column = th.getAttribute("data-field");
+          if (!column) return; // Skip 'No.' column
+
+          const headerTitle = th.querySelector(".header-title");
+          const textFilterActive =
+            columnFilters[column] && columnFilters[column].length > 0;
+          const dropdownFilterActive =
+            columnDropdownFilters[column] &&
+            columnDropdownFilters[column].length > 0;
+
+          if (textFilterActive || dropdownFilterActive) {
+            headerTitle.classList.add("has-filter");
+          } else {
+            headerTitle.classList.remove("has-filter");
+          }
+        });
+
+        // Reset to first page and display
+        currentPage = 1;
+
+        // Re-sort if there's an active sort
+        if (currentSortColumn) {
+          applySorting();
+        }
+
+        displayPage(currentPage);
+      }
+
+      // Show column filter results info
+      function showColumnFilterResults() {
+        const activeTextFilters = Object.entries(columnFilters)
+          .filter(([column, value]) => value)
+          .map(([column, value]) => `${column}:"${value}" (text)`)
+          .join(", ");
+
+        const activeDropdownFilters = Object.entries(columnDropdownFilters)
+          .filter(([column, value]) => value)
+          .map(([column, value]) => `${column}:"${value}" (select)`)
+          .join(", ");
+
+        let filterParts = [];
+        if (activeTextFilters) filterParts.push(activeTextFilters);
+        if (activeDropdownFilters) filterParts.push(activeDropdownFilters);
+
+        const searchResults = document.getElementById("searchResults");
+        const searchResultsText = document.getElementById("searchResultsText");
+
+        let resultText = `🔍 Filter kolom: ${filteredData.length.toLocaleString()} hasil untuk [${filterParts.join(
+          " & "
+        )}]`;
+
+        if (currentSearchTerm) {
+          const columnText = currentSearchColumn
+            ? `dalam kolom "${currentSearchColumn
+                .toUpperCase()
+                .replace(/_/g, " ")}"`
+            : "dalam semua kolom";
+          resultText += ` + pencarian "${currentSearchTerm}" ${columnText}`;
+        }
+
+        searchResultsText.textContent = resultText;
+        searchResults.style.display = "block";
+      }
+
+      // Hide column filter results
+      function hideColumnFilterResults() {
+        if (!currentSearchTerm) {
+          document.getElementById("searchResults").style.display = "none";
+        }
+        // If there's still a global search active, keep showing search results
+      }
+
+      // Clear all column filters
+      function clearAllColumnFilters() {
+        const filterInputs = document.querySelectorAll(".column-filter input");
+        filterInputs.forEach((input) => {
+          input.value = "";
+          const column = input.getAttribute("data-column");
+          columnFilters[column] = "";
+        });
+
+        const filterSelects = document.querySelectorAll(
+          ".column-filter select"
+        );
+        filterSelects.forEach((select) => {
+          select.value = "";
+          const column = select.getAttribute("data-column");
+          columnDropdownFilters[column] = "";
+        });
+
+        // Remove visual indicator for all headers
+        document
+          .querySelectorAll("thead th .header-title")
+          .forEach((headerTitle) => {
+            headerTitle.classList.remove("has-filter");
+          });
+
+        // Reapply filters (which will now be empty)
+        applyColumnFilters();
+      }
+
+      // Create table header
+      function createTable() {
+        if (allData.length === 0) return;
+
+        const thead = document.getElementById("tableHead");
+        const headerRow = document.createElement("tr");
+
+        // Add row number column
+        const noHeader = document.createElement("th");
+        const noHeaderContent = document.createElement("div");
+        noHeaderContent.classList.add("header-content");
+
+        const noTitleDiv = document.createElement("div");
+        noTitleDiv.classList.add("header-title");
+        noTitleDiv.textContent = "No.";
+        noTitleDiv.style.justifyContent = "center";
+        noHeaderContent.appendChild(noTitleDiv);
+
+        noHeader.appendChild(noHeaderContent);
+        noHeader.style.width = "50px";
+        headerRow.appendChild(noHeader);
+
+        // Add columns from first data row
+        const columns = Object.keys(allData[0]);
+        columns.forEach((column, index) => {
+          const th = document.createElement("th");
+          th.setAttribute("data-field", column);
+
+          // Create header structure
+          const headerContent = document.createElement("div");
+          headerContent.classList.add("header-content");
+
+          // Title section (clickable for sorting)
+          const titleDiv = document.createElement("div");
+          titleDiv.classList.add("header-title");
+          titleDiv.onclick = () => sortTable(column);
+
+          const titleText = document.createElement("span");
+          titleText.textContent = column.toUpperCase().replace(/_/g, " ");
+          titleDiv.appendChild(titleText);
+
+          // Add sort icon
+          const sortIcon = document.createElement("span");
+          sortIcon.classList.add("sort-icon");
+          titleDiv.appendChild(sortIcon);
+
+          headerContent.appendChild(titleDiv);
+
+          // Filter section
+          const filterDiv = document.createElement("div");
+          filterDiv.classList.add("column-filter");
+
+          // Text input filter
+          const filterInput = document.createElement("input");
+          filterInput.type = "text";
+          filterInput.placeholder = `Cari di ${column}...`;
+          filterInput.setAttribute("data-column", column);
+          filterInput.addEventListener(
+            "input",
+            debounce(() => applyColumnFilters(), 300)
+          );
+          filterInput.addEventListener("keydown", (e) => e.stopPropagation()); // Prevent keyboard navigation
+
+          // Dropdown select filter (NEW)
+          const filterSelect = document.createElement("select");
+          filterSelect.setAttribute("data-column", column);
+          filterSelect.innerHTML =
+            '<option value="">-- Pilih Filter --</option>'; // Default option
+          filterSelect.addEventListener("change", () => applyColumnFilters());
+
+          filterDiv.appendChild(filterInput);
+          filterDiv.appendChild(filterSelect); // Add the select element
+          headerContent.appendChild(filterDiv);
+
+          th.appendChild(headerContent);
+          headerRow.appendChild(th);
+        });
+
+        thead.innerHTML = "";
+        thead.appendChild(headerRow);
+
+        // Initialize column filters
+        columnFilters = {};
+        columnDropdownFilters = {};
+        columns.forEach((column) => {
+          columnFilters[column] = "";
+          columnDropdownFilters[column] = "";
+        });
+      }
+
+      // NEW FUNCTION: Populate dropdowns with unique values
+      function populateColumnFilterDropdowns() {
+        tableColumns.forEach((column) => {
+          const selectElement = document.querySelector(
+            `.column-filter select[data-column="${column}"]`
+          );
+          if (selectElement) {
+            // Clear existing options except the default
+            selectElement.innerHTML =
+              '<option value="">-- Pilih Filter --</option>';
+
+            const uniqueValues = new Set();
+            // allData.forEach((row) => {
+            //   let value = row[column];
+            //   if (value === null || value === undefined || value === "") {
+            //     value = "-"; // Standardize null/empty values for dropdown
+            //   } else if (column.includes("tanggal") && value) {
+            //     value = new Date(value).toLocaleDateString("id-ID"); // Format date for dropdown
+            //   } else if (
+            //     (column.includes("jam_kerja") || column.includes("durasi")) &&
+            //     !isNaN(value)
+            //   ) {
+            //     value = parseFloat(value).toFixed(3); // Format numbers for dropdown
+            //   }
+            //   uniqueValues.add(String(value)); // Ensure string for comparison
+            // });
+
+            // Sort unique values (case-insensitive for strings, numeric for numbers)
+
+            // ✅ PERBAIKAN: Format tanggal dengan Manual Date Adjustment (+1 hari)
+            allData.forEach((row) => {
+              let value = row[column];
+
+              if (value === null || value === undefined || value === "") {
+                value = "-"; // Standardize null/empty values for dropdown
+              } else if (column.includes("tanggal") && value) {
+                // 🔧 PERBAIKAN: Manual date parsing untuk avoid timezone shift
+                if (typeof value === "string") {
+                  let dateObj;
+
+                  if (value.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                    // Format YYYY-MM-DD: Manual parsing untuk avoid timezone issue
+                    const [year, month, day] = value.split("-").map(Number);
+                    dateObj = new Date(year, month - 1, day); // month is 0-indexed
+
+                    // 🚨 JIKA MASIH BERMASALAH, UNCOMMENT BARIS INI:
+                    // dateObj.setDate(dateObj.getDate() + 1); // +1 hari adjustment
+                  } else if (value.includes("T")) {
+                    // Format ISO dengan time
+                    dateObj = new Date(value);
+
+                    // Jika hasil masih shift, tambahkan adjustment
+                    // dateObj.setDate(dateObj.getDate() + 1); // +1 hari adjustment
+                  } else {
+                    // Fallback
+                    dateObj = new Date(value);
+                  }
+
+                  // Format ke Indonesia DD/MM/YYYY
+                  if (!isNaN(dateObj.getTime())) {
+                    const day = String(dateObj.getDate()).padStart(2, "0");
+                    const month = String(dateObj.getMonth() + 1).padStart(
+                      2,
+                      "0"
+                    );
+                    const year = dateObj.getFullYear();
+                    value = `${day}/${month}/${year}`;
+                  } else {
+                    value = String(value); // Keep original if unparseable
+                  }
+                }
+              } else if (
+                (column.includes("jam_kerja") || column.includes("durasi")) &&
+                !isNaN(value)
+              ) {
+                value = parseFloat(value).toFixed(3); // Format numbers for dropdown
+              }
+
+              uniqueValues.add(String(value)); // Ensure string for comparison
+            });
+
+            const sortedValues = Array.from(uniqueValues).sort((a, b) => {
+              const numA = parseFloat(a);
+              const numB = parseFloat(b);
+
+              if (!isNaN(numA) && !isNaN(numB)) {
+                return numA - numB;
+              } else {
+                return String(a).localeCompare(String(b), undefined, {
+                  sensitivity: "base",
+                });
+              }
+            });
+
+            sortedValues.forEach((value) => {
+              const option = document.createElement("option");
+              option.value = value;
+              option.textContent = value;
+              selectElement.appendChild(option);
+            });
+          }
+        });
+        console.log("✅ Column filter dropdowns populated.");
+      }
+
+      // Populate search columns dropdown (global search)
+      function populateSearchColumns() {
+        const searchColumn = document.getElementById("searchColumn");
+        searchColumn.innerHTML = '<option value="">Semua Kolom</option>';
+
+        tableColumns.forEach((column) => {
+          const option = document.createElement("option");
+          option.value = column;
+          option.textContent = column.toUpperCase().replace(/_/g, " ");
+          searchColumn.appendChild(option);
+        });
+      }
+
+      // Setup search listeners
+      function setupSearchListeners() {
+        const searchInput = document.getElementById("searchInput");
+        const searchColumn = document.getElementById("searchColumn");
+
+        searchInput.addEventListener("input", debounce(performSearch, 300));
+        searchColumn.addEventListener("change", performSearch);
+      }
+
+      // Perform global search
+      function performSearch() {
+        const searchTerm = document
+          .getElementById("searchInput")
+          .value.toLowerCase()
+          .trim();
+        const searchColumn = document.getElementById("searchColumn").value;
+
+        currentSearchTerm = searchTerm;
+        currentSearchColumn = searchColumn;
+
+        console.log(
+          `🔍 Performing global search: "${searchTerm}" in ${
+            searchColumn || "all columns"
+          }`
+        );
+
+        // Apply column filters first, then global search on the result
+        applyColumnFilters(); // This function now handles the full filtering chain
+      }
+
+      // Show search results info
+      function showSearchResults() {
+        const searchResults = document.getElementById("searchResults");
+        const searchResultsText = document.getElementById("searchResultsText");
+
+        const columnText = currentSearchColumn
+          ? `dalam kolom "${currentSearchColumn
+              .toUpperCase()
+              .replace(/_/g, " ")}"`
+          : "dalam semua kolom";
+
+        let filterInfo = "";
+        const activeTextFilters = Object.entries(columnFilters).filter(
+          ([col, val]) => val
+        ).length;
+        const activeDropdownFilters = Object.entries(
+          columnDropdownFilters
+        ).filter(([col, val]) => val).length;
+
+        if (activeTextFilters > 0 || activeDropdownFilters > 0) {
+          filterInfo = ` (dengan filter kolom)`;
+        }
+
+        searchResultsText.textContent = `🔍 Ditemukan ${filteredData.length.toLocaleString()} hasil untuk "${currentSearchTerm}" ${columnText}${filterInfo}`;
+
+        searchResults.style.display = "block";
+      }
+
+      // Hide search results info
+      function hideSearchResults() {
+        // Only hide if no global search term AND no column filters are active
+        const hasActiveColumnFilters =
+          Object.values(columnFilters).some((val) => val) ||
+          Object.values(columnDropdownFilters).some((val) => val);
+        if (!currentSearchTerm && !hasActiveColumnFilters) {
+          document.getElementById("searchResults").style.display = "none";
+        }
+      }
+
+      // Clear global search
+      function clearSearch() {
+        document.getElementById("searchInput").value = "";
+        document.getElementById("searchColumn").value = "";
+        currentSearchTerm = "";
+        currentSearchColumn = "";
+
+        console.log("🔍 Clearing global search");
+
+        // Reapply column filters (if any)
+        applyColumnFilters();
+      }
+
+      // Sort table
+      function sortTable(column) {
+        if (currentSortColumn === column) {
+          currentSortDirection =
+            currentSortDirection === "asc" ? "desc" : "asc";
+        } else {
+          currentSortColumn = column;
+          currentSortDirection = "asc";
+        }
+
+        applySorting();
+        updateSortIcons();
+        displayPage(currentPage);
+      }
+
+      // Apply sorting
+      function applySorting() {
+        filteredData.sort((a, b) => {
+          let valueA = a[currentSortColumn];
+          let valueB = b[currentSortColumn];
+
+          // Handle null/undefined values
+          if (valueA == null) valueA = "";
+          if (valueB == null) valueB = "";
+
+          // Try to parse as numbers for numeric sorting
+          const numA = parseFloat(valueA);
+          const numB = parseFloat(valueB);
+
+          if (!isNaN(numA) && !isNaN(numB)) {
+            // Numeric sort
+            return currentSortDirection === "asc" ? numA - numB : numB - numA;
+          } else {
+            // String sort
+            const strA = String(valueA).toLowerCase();
+            const strB = String(valueB).toLowerCase();
+
+            if (currentSortDirection === "asc") {
+              return strA.localeCompare(strB);
+            } else {
+              return strB.localeCompare(strA);
+            }
+          }
+        });
+      }
+
+      // Update sort icons
+      function updateSortIcons() {
+        // Clear all sort classes
+        const headers = document.querySelectorAll("thead th");
+        headers.forEach((header) => {
+          header.classList.remove("sort-asc", "sort-desc");
+        });
+
+        // Add sort class to current column
+        const currentHeader = document.querySelector(
+          `thead th[data-field="${currentSortColumn}"]`
+        );
+        if (currentHeader) {
+          currentHeader.classList.add(`sort-${currentSortDirection}`);
+        }
+      }
+
+      // Export data
+      function exportData(format) {
+        const dataToExport = filteredData; // Export filtered data
+
+        if (dataToExport.length === 0) {
+          alert("Tidak ada data untuk diekspor");
+          return;
+        }
+
+        const timestamp = new Date()
+          .toISOString()
+          .replace(/[:.]/g, "-")
+          .slice(0, -5);
+        const filename = `olah_absensi_${timestamp}`;
+
+        if (format === "csv") {
+          exportCSV(dataToExport, filename);
+        } else if (format === "excel") {
+          exportExcel(dataToExport, filename);
+        }
+      }
+
+      // Helper function to format date for export
+      function formatExportDate(dateString) {
+        if (!dateString) return "";
+        try {
+          let dateObj;
+          // If the date string is in YYYY-MM-DD format, parse it manually to avoid timezone issues
+          if (dateString.match(/^\d{4}-\d{2}-\d{2}$/)) {
+            const [year, month, day] = dateString.split("-").map(Number);
+            dateObj = new Date(year, month - 1, day); // Month is 0-indexed
+          } else {
+            // For other formats (e.g., ISO strings with time), parse normally
+            dateObj = new Date(dateString);
+          }
+
+          // Check if the date is valid
+          if (isNaN(dateObj.getTime())) {
+            return dateString; // Return original string if invalid date
+          }
+
+          // Format to DD/MM/YYYY
+          const day = String(dateObj.getDate()).padStart(2, "0");
+          const month = String(dateObj.getMonth() + 1).padStart(2, "0"); // Month is 0-indexed
+          const year = dateObj.getFullYear();
+          return `${day}/${month}/${year}`;
+        } catch (e) {
+          console.error("Error formatting date for export:", e);
+          return dateString; // Fallback to original string on error
+        }
+      }
+
+      // Export to CSV
+      function exportCSV(data, filename) {
+        const headers = tableColumns.map((col) =>
+          col.toUpperCase().replace(/_/g, " ")
+        );
+
+        // Create CSV content
+        let csvContent = headers.join(",") + "\n";
+
+        data.forEach((row) => {
+          const values = tableColumns.map((column) => {
+            let value = row[column];
+            if (value == null) value = "";
+
+            // Apply specific formatting for 'tanggal' column
+            if (column.includes("tanggal")) {
+              value = formatExportDate(value);
+            } else if (
+              (column.includes("jam_kerja") || column.includes("durasi")) &&
+              !isNaN(value)
+            ) {
+              value = parseFloat(value).toFixed(3);
+            }
+
+            // Escape quotes and wrap in quotes if contains comma or newline
+            value = String(value).replace(/"/g, '""');
+            if (
+              value.includes(",") ||
+              value.includes("\n") ||
+              value.includes('"')
+            ) {
+              value = `"${value}"`;
+            }
+            return value;
+          });
+          csvContent += values.join(",") + "\n";
+        });
+
+        // Download
+        const blob = new Blob([csvContent], {
+          type: "text/csv;charset=utf-8;",
+        });
+        const link = document.createElement("a");
+        if (link.download !== undefined) {
+          const url = URL.createObjectURL(blob);
+          link.setAttribute("href", url);
+          link.setAttribute("download", filename + ".csv");
+          link.style.visibility = "hidden";
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        }
+      }
+
+      // Export to Excel (simple HTML table method)
+      function exportExcel(data, filename) {
+        const headers = tableColumns.map((col) =>
+          col.toUpperCase().replace(/_/g, " ")
+        );
+
+        // Create HTML table
+        let htmlContent = "<table><thead><tr>";
+        headers.forEach((header) => {
+          htmlContent += `<th>${header}</th>`;
+        });
+        htmlContent += "</tr></thead><tbody>";
+
+        data.forEach((row) => {
+          htmlContent += "<tr>";
+          tableColumns.forEach((column) => {
+            let value = row[column];
+            if (value == null) value = "";
+
+            // Apply specific formatting for 'tanggal' column
+            if (column.includes("tanggal")) {
+              value = formatExportDate(value);
+            } else if (
+              (column.includes("jam_kerja") || column.includes("durasi")) &&
+              !isNaN(value)
+            ) {
+              value = parseFloat(value).toFixed(3);
+            }
+
+            htmlContent += `<td>${value}</td>`;
+          });
+          htmlContent += "</tr>";
+        });
+        htmlContent += "</tbody></table>";
+
+        // Download as Excel
+        const blob = new Blob([htmlContent], {
+          type: "application/vnd.ms-excel;charset=utf-8;",
+        });
+        const link = document.createElement("a");
+        if (link.download !== undefined) {
+          const url = URL.createObjectURL(blob);
+          link.setAttribute("href", url);
+          link.setAttribute("download", filename + ".xls");
+          link.style.visibility = "hidden";
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        }
+      }
+
+      // Display specific page
+      function displayPage(page) {
+        const tbody = document.getElementById("tableBody");
+        tbody.innerHTML = "";
+
+        // PERBAIKAN: Gunakan pagination pada filteredData
+        const startIndex = (page - 1) * recordsPerPage;
+        const endIndex = Math.min(
+          startIndex + recordsPerPage,
+          filteredData.length
+        );
+        const pageData = filteredData.slice(startIndex, endIndex); // HANYA 100 records per halaman
+
+        console.log(
+          `📄 Displaying page ${page}: showing ${pageData.length} records (${
+            startIndex + 1
+          } - ${endIndex} of ${filteredData.length})`
+        );
+
+        pageData.forEach((row, index) => {
+          const tr = document.createElement("tr");
+
+          // Row number (based on original position in filtered results)
+          const noCell = document.createElement("td");
+          noCell.textContent = startIndex + index + 1;
+          noCell.style.fontWeight = "600";
+          tr.appendChild(noCell);
+
+          // Data columns
+          const columns = Object.keys(row);
+          columns.forEach((column) => {
+            const td = document.createElement("td");
+            let value = row[column];
+
+            // Handle null/undefined values
+            if (value === null || value === undefined) {
+              value = "-";
+              td.style.color = "#a0aec0";
+              td.style.fontStyle = "italic";
+            } else {
+              // Format specific field types
+              if (column.includes("tanggal") && value) {
+                // Use the same robust date formatting as for dropdowns
+                if (typeof value === "string") {
+                  let dateObj;
+                  if (value.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                    const [year, month, day] = value.split("-").map(Number);
+                    dateObj = new Date(year, month - 1, day);
+                  } else if (value.includes("T")) {
+                    dateObj = new Date(value);
+                  } else {
+                    dateObj = new Date(value);
+                  }
+
+                  if (!isNaN(dateObj.getTime())) {
+                    const day = String(dateObj.getDate()).padStart(2, "0");
+                    const month = String(dateObj.getMonth() + 1).padStart(
+                      2,
+                      "0"
+                    );
+                    const year = dateObj.getFullYear();
+                    value = `${day}/${month}/${year}`;
+                  } else {
+                    value = String(value);
+                  }
+                }
+              } else if (
+                (column.includes("jam_kerja") || column.includes("durasi")) &&
+                !isNaN(value)
+              ) {
+                value = parseFloat(value).toFixed(3);
+              } else if (value === "") {
+                value = "-";
+                td.style.color = "#a0aec0";
+                td.style.fontStyle = "italic";
+              }
+            }
+
+            // Highlight search term and column filters
+            let displayValue = String(value);
+            let hasHighlight = false;
+
+            // Highlight global search
+            if (
+              currentSearchTerm &&
+              (!currentSearchColumn || currentSearchColumn === column)
+            ) {
+              const regex = new RegExp(
+                `(${escapeRegExp(currentSearchTerm)})`,
+                "gi"
+              );
+              if (regex.test(displayValue)) {
+                displayValue = displayValue.replace(
+                  regex,
+                  '<mark style="background: #fef08a; padding: 1px 2px; border-radius: 2px;">$1</mark>'
+                );
+                hasHighlight = true;
+              }
+            }
+
+            // Highlight column text filter
+            const columnTextFilter = columnFilters[column];
+            if (columnTextFilter && !hasHighlight) {
+              const regex = new RegExp(
+                `(${escapeRegExp(columnTextFilter)})`,
+                "gi"
+              );
+              if (regex.test(String(value))) {
+                displayValue = displayValue.replace(
+                  regex,
+                  '<mark style="background: #fed7d7; padding: 1px 2px; border-radius: 2px;">$1</mark>'
+                );
+                hasHighlight = true;
+              }
+            }
+
+            // Highlight column dropdown filter (exact match)
+            const columnDropdownFilter = columnDropdownFilters[column];
+            if (
+              columnDropdownFilter &&
+              String(value) === columnDropdownFilter &&
+              !hasHighlight
+            ) {
+              displayValue = `<mark style="background: #d1fae5; padding: 1px 2px; border-radius: 2px;">${displayValue}</mark>`;
+              hasHighlight = true;
+            }
+
+            if (hasHighlight) {
+              td.innerHTML = displayValue;
+            } else {
+              td.textContent = value;
+            }
+
+            td.setAttribute("data-field", column);
+            td.title = `${column}: ${value}`; // Tooltip
+            tr.appendChild(td);
+          });
+
+          tbody.appendChild(tr);
+        });
+
+        // Update page info
+        updatePaginationControls();
+      }
+
+      // Escape regex special characters
+      function escapeRegExp(string) {
+        return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      }
+
+      // Update pagination controls
+      function updatePaginationControls() {
+        // PERBAIKAN: Gunakan filteredData.length sebagai basis
+        const totalFilteredRecords = filteredData.length;
+        const totalFilteredPages = Math.ceil(
+          totalFilteredRecords / recordsPerPage
+        );
+
+        // Update global variables
+        totalRecords = totalFilteredRecords;
+        totalPages = totalFilteredPages;
+
+        const startRecord =
+          totalRecords > 0 ? (currentPage - 1) * recordsPerPage + 1 : 0;
+        const endRecord = Math.min(currentPage * recordsPerPage, totalRecords);
+
+        console.log(
+          `📊 Pagination: Page ${currentPage} of ${totalPages}, showing ${startRecord}-${endRecord} of ${totalRecords} records`
+        );
+
+        document.getElementById(
+          "pageInfo"
+        ).textContent = `Menampilkan ${startRecord.toLocaleString()}-${endRecord.toLocaleString()} dari ${totalRecords.toLocaleString()} records`;
+
+        // Update navigation buttons
+        document.getElementById("firstBtn").disabled =
+          currentPage === 1 || totalPages === 0;
+        document.getElementById("prevBtn").disabled =
+          currentPage === 1 || totalPages === 0;
+        document.getElementById("nextBtn").disabled =
+          currentPage === totalPages || totalPages === 0;
+        document.getElementById("lastBtn").disabled =
+          currentPage === totalPages || totalPages === 0;
+
+        // Update page jump input
+        const pageJumpInput = document.getElementById("pageJump");
+        pageJumpInput.max = totalPages > 0 ? totalPages : 1;
+        pageJumpInput.value = totalPages > 0 ? currentPage : 1;
+
+        // Create page numbers
+        createPageNumbers();
+      }
+
+      // Create page number buttons
+      function createPageNumbers() {
+        const pageNumbersDiv = document.getElementById("pageNumbers");
+        pageNumbersDiv.innerHTML = "";
+
+        if (totalPages === 0) {
+          return; // Don't show page numbers if no data
+        }
+
+        // Calculate visible page range
+        const maxVisiblePages = 7;
+        let startPage, endPage;
+
+        if (totalPages <= maxVisiblePages) {
+          startPage = 1;
+          endPage = totalPages;
+        } else {
+          const halfVisible = Math.floor(maxVisiblePages / 2);
+          if (currentPage <= halfVisible) {
+            startPage = 1;
+            endPage = maxVisiblePages;
+          } else if (currentPage + halfVisible >= totalPages) {
+            startPage = totalPages - maxVisiblePages + 1;
+            endPage = totalPages;
+          } else {
+            startPage = currentPage - halfVisible;
+            endPage = currentPage + halfVisible;
+          }
+        }
+
+        // Add ellipsis if needed
+        if (startPage > 1) {
+          addPageButton(1);
+          if (startPage > 2) {
+            const ellipsis = document.createElement("span");
+            ellipsis.textContent = "...";
+            ellipsis.style.padding = "8px 4px";
+            ellipsis.style.color = "#718096";
+            pageNumbersDiv.appendChild(ellipsis);
+          }
+        }
+
+        // Add visible page numbers
+        for (let i = startPage; i <= endPage; i++) {
+          addPageButton(i);
+        }
+
+        // Add ellipsis if needed
+        if (endPage < totalPages) {
+          if (endPage < totalPages - 1) {
+            const ellipsis = document.createElement("span");
+            ellipsis.textContent = "...";
+            ellipsis.style.padding = "8px 4px";
+            ellipsis.style.color = "#718096";
+            pageNumbersDiv.appendChild(ellipsis);
+          }
+          addPageButton(totalPages);
+        }
+      }
+
+      // Add page button
+      function addPageButton(pageNumber) {
+        const pageNumbersDiv = document.getElementById("pageNumbers");
+        const button = document.createElement("button");
+        button.textContent = pageNumber;
+        button.onclick = () => goToPage(pageNumber);
+
+        if (pageNumber === currentPage) {
+          button.classList.add("active");
+        }
+
+        pageNumbersDiv.appendChild(button);
+      }
+
+      // Go to specific page
+      function goToPage(page) {
+        if (
+          page < 1 ||
+          page > totalPages ||
+          page === currentPage ||
+          totalPages === 0
+        )
+          return;
+
+        currentPage = page;
+        displayPage(currentPage);
+
+        // Smooth scroll to top of table
+        document.getElementById("tableContainer").scrollTop = 0;
+      }
+
+      // Jump to page from input
+      function jumpToPage() {
+        const pageInput = document.getElementById("pageJump");
+        const page = parseInt(pageInput.value);
+
+        if (totalPages === 0) {
+          pageInput.value = 1;
+          return;
+        }
+
+        if (page >= 1 && page <= totalPages) {
+          goToPage(page);
+        } else {
+          pageInput.value = currentPage;
+          alert(`Halaman harus antara 1 dan ${totalPages}`);
+        }
+      }
+
+      // Keyboard navigation
+      document.addEventListener("keydown", function (e) {
+        if (
+          e.target.tagName.toLowerCase() === "input" ||
+          e.target.tagName.toLowerCase() === "select"
+        )
+          return;
+        if (totalPages === 0) return; // No navigation if no data
+
+        switch (e.key) {
+          case "ArrowLeft":
+            if (currentPage > 1) goToPage(currentPage - 1);
+            break;
+          case "ArrowRight":
+            if (currentPage < totalPages) goToPage(currentPage + 1);
+            break;
+          case "Home":
+            goToPage(1);
+            break;
+          case "End":
+            goToPage(totalPages);
+            break;
+        }
+      });
+
+      // Initialize when page loads
+      document.addEventListener("DOMContentLoaded", function () {
+        console.log("🚀 Database Table Viewer initialized");
+        console.log(`📍 Using BASE_URL: ${BASE_URL}`);
+        loadData();
+      });
+
+      // Auto-refresh every 5 minutes
+      setInterval(loadData, 5 * 60 * 1000);
+    </script>
+    <script src="script.js?v=20250812"></script>
+  </body>
+</html>

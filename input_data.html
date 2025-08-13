@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Aplikasi Pengolahan Data Absensi</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Aplikasi Pengolahan Data Absensi</h1>
+      <p>Kelola berbagai jenis data absensi dengan mudah.</p>
+    </header>
+
+    <main>
+      <section class="global-actions">
+        <h2>Aksi Global</h2>
+        <button class="btn danger" onclick="hapusSeluruhData()">
+          🗑 Hapus Seluruh Data (Olah Absensi)
+        </button>
+        <button
+          class="btn primary"
+          id="prosesGandaNormalBtn"
+          onclick="prosesStatusGandaNormal()"
+        >
+          ⚙️ Proses Status Ganda/Normal
+        </button>
+      </section>
+
+      <section id="form-container" class="form-grid">
+        <!-- Form blocks will be injected here by script.js -->
+      </section>
+    </main>
+
+    <footer>
+      <p>&copy; 2023 Aplikasi Pengolahan Data Absensi. All rights reserved.</p>
+    </footer>
+
+    <script src="script.js?v=20250812"></script>
+  </body>
+</html>

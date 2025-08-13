@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Status In Out Manager</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        padding: 20px;
+      }
+
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        background: white;
+        border-radius: 15px;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        overflow: hidden;
+      }
+
+      .header {
+        background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
+        color: white;
+        padding: 30px;
+        text-align: center;
+      }
+
+      .header h1 {
+        font-size: 2.5rem;
+        margin-bottom: 10px;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+      }
+
+      .header p {
+        font-size: 1.1rem;
+        opacity: 0.9;
+      }
+
+      .content {
+        padding: 40px;
+      }
+
+      .controls {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+      }
+
+      .control-card {
+        background: #f8f9fa;
+        border-radius: 12px;
+        padding: 25px;
+        border: 1px solid #e9ecef;
+        transition: all 0.3s ease;
+      }
+
+      .control-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+      }
+
+      .control-card h3 {
+        color: #2c3e50;
+        margin-bottom: 10px;
+        font-size: 1.3rem;
+      }
+
+      .control-card p {
+        color: #6c757d;
+        margin-bottom: 20px;
+        line-height: 1.6;
+      }
+
+      .btn {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 1rem;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        width: 100%;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+      }
+
+      .btn:active {
+        transform: translateY(0);
+      }
+
+      .btn:disabled {
+        background: #6c757d;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+      }
+
+      .btn.reset {
+        background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+      }
+
+      .btn.reset:hover {
+        box-shadow: 0 8px 20px rgba(231, 76, 60, 0.4);
+      }
+
+      .btn.update {
+        background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+      }
+
+      .btn.update:hover {
+        box-shadow: 0 8px 20px rgba(46, 204, 113, 0.4);
+      }
+
+      .loading {
+        display: none;
+        text-align: center;
+        padding: 20px;
+        background: #fff3cd;
+        border: 1px solid #ffeaa7;
+        border-radius: 8px;
+        margin: 20px 0;
+      }
+
+      .loading.show {
+        display: block;
+      }
+
+      .spinner {
+        width: 40px;
+        height: 40px;
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #667eea;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 10px;
+      }
+
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+
+      .results {
+        background: #f8f9fa;
+        border-radius: 12px;
+        padding: 25px;
+        border: 1px solid #e9ecef;
+      }
+
+      .results h3 {
+        color: #2c3e50;
+        margin-bottom: 20px;
+        font-size: 1.4rem;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .log-container {
+        background: #2c3e50;
+        color: #ecf0f1;
+        border-radius: 8px;
+        padding: 20px;
+        font-family: "Courier New", monospace;
+        font-size: 0.9rem;
+        line-height: 1.6;
+        max-height: 500px;
+        overflow-y: auto;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+      }
+
+      .log-container:empty::before {
+        content: "Hasil eksekusi akan ditampilkan di sini...";
+        color: #95a5a6;
+        font-style: italic;
+      }
+
+      .clear-btn {
+        background: #6c757d;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 0.9rem;
+        margin-top: 15px;
+        transition: all 0.3s ease;
+      }
+
+      .clear-btn:hover {
+        background: #5a6268;
+      }
+
+      .status-badge {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        margin-left: 10px;
+      }
+
+      .status-success {
+        background: #d4edda;
+        color: #155724;
+      }
+
+      .status-error {
+        background: #f8d7da;
+        color: #721c24;
+      }
+
+      .status-info {
+        background: #d1ecf1;
+        color: #0c5460;
+      }
+
+      .progress-bar {
+        width: 100%;
+        height: 6px;
+        background: #e9ecef;
+        border-radius: 3px;
+        overflow: hidden;
+        margin: 10px 0;
+      }
+
+      .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #667eea, #764ba2);
+        transition: width 0.3s ease;
+        width: 0%;
+      }
+
+      @media (max-width: 768px) {
+        .container {
+          margin: 10px;
+          border-radius: 10px;
+        }
+
+        .content {
+          padding: 20px;
+        }
+
+        .header {
+          padding: 20px;
+        }
+
+        .header h1 {
+          font-size: 2rem;
+        }
+
+        .controls {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>🕐 Status In Out Manager</h1>
+        <p>Kelola status masuk dan pulang berdasarkan perbandingan waktu</p>
+      </div>
+
+      <div class="content">
+        <div class="controls">
+          <div class="control-card">
+            <h3>🧮 Hitung JKP</h3>
+            <p>
+              Menghitung jam kerja pegawai berdasarkan data absensi dan
+              menyimpan hasil ke database.
+            </p>
+            <button class="btn" onclick="prosesHitungJKP()">Hitung JKP</button>
+          </div>
+
+          <div class="control-card">
+            <h3>📋 Update Status Absen</h3>
+            <p>
+              Mengupdate status absen berdasarkan data daily_in_cleansing dan
+              daily_out_cleansing.
+            </p>
+            <button class="btn update" onclick="updateStatusAbsen()">
+              Update Status Absen
+            </button>
+          </div>
+
+          <div class="control-card">
+            <h3>🕐 Update Status In Out</h3>
+            <p>
+              Menghitung dan mengisi status_in_out berdasarkan perbandingan
+              waktu masuk/pulang dengan jadwal.
+            </p>
+            <button class="btn" onclick="updateStatusInOutOnly()">
+              Update Status In Out
+            </button>
+          </div>
+
+          <div class="control-card">
+            <h3>🚀 Proses Lengkap Sequential</h3>
+            <p>
+              Menjalankan 3 proses secara berurutan: Hitung JKP → Update Status
+              Absen → Update Status In Out.
+            </p>
+            <button
+              class="btn"
+              onclick="runCompleteSequentialProcess()"
+              style="
+                background: linear-gradient(135deg, #e67e22 0%, #d35400 100%);
+              "
+            >
+              Jalankan Semua Berurutan
+            </button>
+          </div>
+        </div>
+
+        <div class="loading" id="loading">
+          <div class="spinner"></div>
+          <p><strong>Sedang memproses...</strong></p>
+          <p id="loadingText">Mohon tunggu sebentar</p>
+          <div class="progress-bar">
+            <div class="progress-fill" id="progressFill"></div>
+          </div>
+        </div>
+
+        <div class="results">
+          <h3>
+            📊 Hasil Eksekusi
+            <span id="statusBadge"></span>
+          </h3>
+          <div class="log-container" id="logContainer"></div>
+          <button class="clear-btn" onclick="clearLog()">
+            🗑️ Bersihkan Log
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // BASE URL untuk API calls - Dinamis berdasarkan environment
+      const PROD_API = "https://absensi-db.onrender.com";
+      const isLocal = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
+      const BASE_URL =
+        (window.BASE_URL && window.BASE_URL.trim()) ||
+        (isLocal ? "http://localhost:3000" : PROD_API);
+
+      // Untuk backward compatibility
+      const baseURL = BASE_URL;
+
+      console.log("🔧 BASE_URL:", BASE_URL);
+      console.log("🔧 baseURL (legacy):", baseURL);
+      console.log("🌐 Current hostname:", location.hostname);
+      console.log("🌐 Current page URL:", window.location.href);
+      console.log(
+        "🎯 Environment:",
+        location.hostname.includes("onrender.com")
+          ? "PRODUCTION"
+          : "DEVELOPMENT"
+      );
+
+      let logContainer = document.getElementById("logContainer");
+      let loading = document.getElementById("loading");
+      let statusBadge = document.getElementById("statusBadge");
+      let progressFill = document.getElementById("progressFill");
+      let loadingText = document.getElementById("loadingText");
+
+      // Utility functions
+      function showLoading(text = "Sedang memproses...") {
+        loading.classList.add("show");
+        loadingText.textContent = text;
+        disableButtons(true);
+      }
+
+      function hideLoading() {
+        loading.classList.remove("show");
+        progressFill.style.width = "0%";
+        disableButtons(false);
+      }
+
+      function disableButtons(disabled) {
+        const buttons = document.querySelectorAll(".btn");
+        buttons.forEach((btn) => (btn.disabled = disabled));
+      }
+
+      function updateProgress(percentage) {
+        progressFill.style.width = percentage + "%";
+      }
+
+      function appendLog(message, type = "info") {
+        const timestamp = new Date().toLocaleTimeString();
+        const logMessage = `[${timestamp}] ${message}\n`;
+        logContainer.textContent += logMessage;
+        logContainer.scrollTop = logContainer.scrollHeight;
+
+        // Update status badge
+        if (type === "success") {
+          statusBadge.innerHTML =
+            '<span class="status-badge status-success">✅ Berhasil</span>';
+        } else if (type === "error") {
+          statusBadge.innerHTML =
+            '<span class="status-badge status-error">❌ Gagal</span>';
+        } else {
+          statusBadge.innerHTML =
+            '<span class="status-badge status-info">ℹ️ Sedang Proses</span>';
+        }
+      }
+
+      function clearLog() {
+        logContainer.textContent = "";
+        statusBadge.innerHTML = "";
+      }
+
+      // API call function
+      async function callAPI(endpoint, description) {
+        appendLog(`🎯 ${description}`);
+        appendLog(`📡 Memanggil: ${BASE_URL}${endpoint}`);
+
+        try {
+          const startTime = Date.now();
+
+          const response = await fetch(`${BASE_URL}${endpoint}`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({}),
+          });
+
+          const responseData = await response.json();
+          const endTime = Date.now();
+          const duration = ((endTime - startTime) / 1000).toFixed(2);
+
+          if (response.ok) {
+            appendLog(`✅ BERHASIL (${duration}s)`, "success");
+            appendLog(`📤 ${responseData.message}`);
+            return { success: true, data: responseData, duration };
+          } else {
+            appendLog(`❌ GAGAL (${duration}s)`, "error");
+            appendLog(`📤 Error: ${responseData.message}`);
+            return { success: false, data: responseData, duration };
+          }
+        } catch (error) {
+          let errorMessage = `❌ ERROR: ${error.message}`;
+
+          // Enhanced error messages with BASE_URL context
+          if (
+            error.message.includes("Failed to fetch") ||
+            error.message.includes("NetworkError")
+          ) {
+            errorMessage = `❌ Server tidak dapat diakses. Pastikan server sudah berjalan di ${BASE_URL}`;
+          } else if (error.message.includes("404")) {
+            errorMessage = `❌ Endpoint tidak ditemukan di ${BASE_URL}${endpoint}`;
+          } else if (error.message.includes("500")) {
+            errorMessage = `❌ Kesalahan server internal di ${BASE_URL}`;
+          }
+
+          appendLog(errorMessage, "error");
+          return { success: false, error: errorMessage };
+        }
+      }
+
+      // New functions based on your requirements
+      async function prosesHitungJKP() {
+        appendLog("🧮 === HITUNG JAM KERJA PEGAWAI (JKP) ===");
+        appendLog("📝 Memulai kalkulasi JKP di server...");
+
+        try {
+          const startTime = Date.now();
+          appendLog(
+            `📡 Mengirim permintaan ke ${BASE_URL}/proses-kalkulasi-jkp-backend-selective`
+          );
+
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 menit timeout
+
+          const res = await fetch(
+            `${BASE_URL}/proses-kalkulasi-jkp-backend-selective`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              signal: controller.signal,
+            }
+          );
+
+          clearTimeout(timeoutId);
+
+          if (!res.ok) {
+            throw new Error(`HTTP error! status: ${res.status}`);
+          }
+
+          const json = await res.json();
+          const endTime = Date.now();
+          const duration = ((endTime - startTime) / 1000).toFixed(2);
+
+          appendLog(`✅ BERHASIL (${duration}s)`, "success");
+          appendLog(
+            `📤 ${json.message || "JKP berhasil dihitung dan disimpan."}`
+          );
+
+          // Display log if available
+          if (json.log) {
+            const barisLog = json.log.split("\\n");
+            barisLog.forEach((baris) => {
+              if (baris.trim()) {
+                if (baris.includes("✅")) {
+                  appendLog(baris, "success");
+                } else if (baris.includes("❌")) {
+                  appendLog(baris, "error");
+                } else {
+                  appendLog(baris);
+                }
+              }
+            });
+          }
+
+          return { success: true, data: json, duration };
+        } catch (err) {
+          let errorMessage = "";
+          if (err.name === "AbortError") {
+            errorMessage =
+              "❌ Timeout: Proses di server terlalu lama. Data terlalu besar, coba lagi atau periksa server.";
+          } else if (err.message.includes("fetch")) {
+            errorMessage = `❌ Tidak dapat terhubung ke server. Pastikan server Node.js berjalan di ${BASE_URL}`;
+          } else {
+            errorMessage = "❌ Gagal menghitung JKP: " + err.message;
+          }
+
+          appendLog(errorMessage, "error");
+          return { success: false, error: errorMessage };
+        }
+      }
+
+      async function updateStatusAbsen() {
+        appendLog("📋 === UPDATE STATUS ABSEN ===");
+        appendLog("📝 Mengupdate status absen berdasarkan data cleansing...");
+
+        try {
+          const startTime = Date.now();
+          appendLog(
+            `📡 Mengirim permintaan ke ${BASE_URL}/update-status-absen-cleansing`
+          );
+
+          const res = await fetch(`${BASE_URL}/update-status-absen-cleansing`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({}),
+          });
+
+          const data = await res.json();
+          const endTime = Date.now();
+          const duration = ((endTime - startTime) / 1000).toFixed(2);
+
+          if (res.ok) {
+            appendLog(`✅ BERHASIL (${duration}s)`, "success");
+            appendLog(
+              `📤 ${data.message || "Status absen berhasil diperbarui."}`
+            );
+            return { success: true, data: data, duration };
+          } else {
+            appendLog(`❌ GAGAL (${duration}s)`, "error");
+            appendLog(`📤 Error: ${data.message}`);
+            return { success: false, data: data, duration };
+          }
+        } catch (err) {
+          let errorMessage = "❌ Gagal update status absen: " + err.message;
+
+          // Enhanced error messages
+          if (err.message.includes("Failed to fetch")) {
+            errorMessage = `❌ Tidak dapat terhubung ke server di ${BASE_URL}. Periksa koneksi dan pastikan server running.`;
+          }
+
+          appendLog(errorMessage, "error");
+          return { success: false, error: errorMessage };
+        }
+      }
+
+      // Complete sequential process
+      async function runCompleteSequentialProcess() {
+        showLoading("Menjalankan proses lengkap berurutan...");
+
+        appendLog("🚀 === PROSES LENGKAP SEQUENTIAL ===");
+        appendLog(`🕒 Waktu mulai: ${new Date().toISOString()}`);
+        appendLog(`🌐 Server: ${BASE_URL}`);
+        appendLog(
+          "📋 Urutan: Hitung JKP → Update Status Absen → Update Status In Out"
+        );
+        appendLog("");
+
+        let totalSuccessful = 0;
+        let totalFailed = 0;
+        const results = [];
+
+        // Step 1: Hitung JKP
+        updateProgress(10);
+        loadingText.textContent = "Step 1/3: Hitung JKP...";
+        appendLog("📍 [1/3] Hitung Jam Kerja Pegawai (JKP)");
+
+        const jkpResult = await prosesHitungJKP();
+        results.push({ step: 1, name: "Hitung JKP", result: jkpResult });
+
+        if (jkpResult.success) {
+          totalSuccessful++;
+          appendLog("✅ Step 1 selesai dengan sukses");
+        } else {
+          totalFailed++;
+          appendLog("❌ Step 1 gagal - melanjutkan ke step berikutnya");
+        }
+
+        appendLog("");
+
+        // Step 2: Update Status Absen
+        updateProgress(40);
+        loadingText.textContent = "Step 2/3: Update Status Absen...";
+        appendLog("📍 [2/3] Update Status Absen");
+
+        const absenResult = await updateStatusAbsen();
+        results.push({
+          step: 2,
+          name: "Update Status Absen",
+          result: absenResult,
+        });
+
+        if (absenResult.success) {
+          totalSuccessful++;
+          appendLog("✅ Step 2 selesai dengan sukses");
+        } else {
+          totalFailed++;
+          appendLog("❌ Step 2 gagal - melanjutkan ke step berikutnya");
+        }
+
+        appendLog("");
+
+        // Step 3: Update Status In Out
+        updateProgress(70);
+        loadingText.textContent = "Step 3/3: Update Status In Out...";
+        appendLog("📍 [3/3] Update Status In Out");
+
+        const statusResult = await callAPI(
+          "/update-status-in-out",
+          "Menghitung dan mengisi status_in_out"
+        );
+        results.push({
+          step: 3,
+          name: "Update Status In Out",
+          result: statusResult,
+        });
+
+        if (statusResult.success) {
+          totalSuccessful++;
+          appendLog("✅ Step 3 selesai dengan sukses");
+        } else {
+          totalFailed++;
+          appendLog("❌ Step 3 gagal");
+        }
+
+        // Summary
+        updateProgress(100);
+        appendLog("");
+        appendLog("=".repeat(60));
+        appendLog("📊 === LAPORAN PROSES LENGKAP SEQUENTIAL ===");
+        appendLog("=".repeat(60));
+        appendLog(`🕒 Waktu selesai: ${new Date().toISOString()}`);
+        appendLog(`🌐 Server: ${BASE_URL}`);
+        appendLog(`✅ Berhasil: ${totalSuccessful}/3`);
+        appendLog(`❌ Gagal: ${totalFailed}/3`);
+        appendLog(
+          `📈 Success Rate: ${((totalSuccessful / 3) * 100).toFixed(1)}%`
+        );
+
+        appendLog("");
+        appendLog("📋 Detail Results:");
+        results.forEach((item) => {
+          const icon = item.result.success ? "✅" : "❌";
+          const status = item.result.success ? "SUCCESS" : "FAILED";
+          const duration = item.result.duration || "N/A";
+          appendLog(
+            `${icon} [${item.step}] ${item.name} - ${status} (${duration})`
+          );
+
+          if (!item.result.success && item.result.error) {
+            appendLog(`    └─ ${item.result.error}`);
+          }
+        });
+
+        if (totalSuccessful === 3) {
+          appendLog("");
+          appendLog("🎉 SEMUA PROSES BERHASIL!");
+          appendLog("📊 Data siap digunakan untuk analisis lebih lanjut");
+          statusBadge.innerHTML =
+            '<span class="status-badge status-success">🎉 Semua Selesai</span>';
+        } else {
+          appendLog("");
+          appendLog(
+            `⚠️ ${totalFailed} proses gagal - silakan periksa log untuk detail`
+          );
+          statusBadge.innerHTML =
+            '<span class="status-badge status-error">⚠️ Ada Error</span>';
+        }
+
+        hideLoading();
+        return results;
+      }
+
+      // Main functions (updated for individual calls)
+      async function updateStatusInOutOnly() {
+        showLoading("Mengupdate status in out...");
+        updateProgress(25);
+
+        appendLog("✅ === UPDATE STATUS IN OUT ===");
+        appendLog("📝 Menghitung status berdasarkan perbandingan waktu...");
+
+        updateProgress(50);
+        const result = await callAPI(
+          "/update-status-in-out",
+          "Update Status In Out"
+        );
+        updateProgress(100);
+
+        if (result.success) {
+          appendLog(`🎉 Update selesai dalam ${result.duration}s`);
+        } else {
+          appendLog("❌ Update gagal");
+        }
+
+        appendLog("=".repeat(50));
+        hideLoading();
+      }
+
+      // Initialize page
+      appendLog("🚀 Status In Out Manager siap digunakan!");
+      appendLog(`🌐 Server: ${BASE_URL}`);
+      appendLog(
+        `🎯 Environment: ${
+          location.hostname.includes("onrender.com")
+            ? "PRODUCTION (Render)"
+            : "DEVELOPMENT (Local)"
+        }`
+      );
+      appendLog("📋 Pilih proses individual atau jalankan semua berurutan");
+      appendLog(
+        "🔄 Urutan recommended: Hitung JKP → Update Status Absen → Update Status In Out"
+      );
+      appendLog("=".repeat(70));
+    </script>
+    <script src="script.js?v=20250812"></script>
+  </body>
+</html>
