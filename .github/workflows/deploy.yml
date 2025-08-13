@@ -8,7 +8,7 @@
     port: 21
     local-dir: ./
     server-dir: ${{ secrets.REMOTE_DIR }}/
-    dangerous-clean-slate: true # <— hapus isi remote dir lalu upload ulang
+    dangerous-clean-slate: false # <— hapus isi remote dir lalu upload ulang
     exclude: |
       **/.git*
       .github/**
