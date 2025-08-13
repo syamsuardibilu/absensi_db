@@ -20,8 +20,8 @@ jobs:
           password: ${{ secrets.FTP_PASSWORD }}
           protocol: ftp
           port: 21
-          local-dir: .
-          server-dir: ${{ secrets.REMOTE_DIR }}
+          local-dir: ./ # <— penting: ada slash
+          server-dir: ${{ secrets.REMOTE_DIR }}/ # <— tambahkan slash juga
           exclude: |
             **/.git*
             .github/**
