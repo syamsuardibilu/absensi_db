@@ -1,21 +1,36 @@
-- name: FTP Deploy
-  uses: SamKirkland/FTP-Deploy-Action@v4.3.4
-  with:
-    server: ${{ secrets.HOST }}
-    username: ${{ secrets.FTP_USERNAME }}
-    password: ${{ secrets.FTP_PASSWORD }}
-    protocol: ftp
-    port: 21
-    local-dir: ./
-    server-dir: domains/daengbilu.com/public_html/
-    dangerous-clean-slate: false # <— hapus isi remote dir lalu upload ulang
-    exclude: |
-      **/.git*
-      .github/**
-      node_modules/**
-      package*.json
-      server.js
-      fungsiJKP.js
-      **/*.map
-      logs/**
-    log-level: verbose
+name: Deploy to daengbilu.com (FTP)
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: FTP Deploy
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.4
+        with:
+          server: ${{ secrets.HOST }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftp
+          port: 21
+          local-dir: ./ # folder lokal yang diupload
+          server-dir: ./ # root akun FTP = domains/daengbilu.com/public_html
+          exclude: |
+            **/.git*/**
+            **/.git*
+            .github/**
+            node_modules/**
+            package*.json
+            server.js
+            fungsiJKP.js
+            **/*.map
+            logs/**
+          log-level: verbose
+          dangerous-clean-slate: false
