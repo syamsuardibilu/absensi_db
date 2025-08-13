@@ -1,0 +1,54 @@
+# =========================
+# Node & OS
+# =========================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+package-lock.json.lock
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*.tmp
+.tmp/
+temp/
+tmp/
+
+# =========================
+# Env & credentials
+# =========================
+.env
+.env.*
+!.env.example
+.npmrc
+
+# =========================
+# Logs & debug outputs
+# =========================
+logs/
+*.log
+*.log.*
+# Log khusus proyek JKP
+log_jkp*.txt
+log_sql_debug.txt
+log_jkp_debug.txt
+
+# =========================
+# Build artifacts / caches
+# (kalau nanti pakai bundler)
+# =========================
+dist/
+build/
+.cache/
+.parcel-cache/
+.nyc_output/
+coverage/
+.eslintcache
+
+# =========================
+# Editor/IDE
+# =========================
+.vscode/
+.idea/
