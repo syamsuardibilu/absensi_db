@@ -18,8 +18,10 @@ jobs:
           server: ${{ secrets.HOST }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
-          server-dir: ${{ secrets.REMOTE_DIR }}
+          protocol: ftp
+          port: 21
           local-dir: .
+          server-dir: ${{ secrets.REMOTE_DIR }}
           exclude: |
             **/.git*
             .github/**
@@ -29,3 +31,5 @@ jobs:
             fungsiJKP.js
             **/*.map
             logs/**
+          log-level: verbose
+          dangerous-clean-slate: false
