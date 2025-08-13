@@ -7,7 +7,7 @@
     protocol: ftp
     port: 21
     local-dir: ./
-    server-dir: ${{ secrets.REMOTE_DIR }}/
+    server-dir: domains/daengbilu.com/public_html/
     dangerous-clean-slate: false # <— hapus isi remote dir lalu upload ulang
     exclude: |
       **/.git*
