@@ -34,6 +34,7 @@ logs/
 log_jkp*.txt
 log_sql_debug.txt
 log_jkp_debug.txt
+deploy_bu.yml
 
 # =========================
 # Build artifacts / caches
