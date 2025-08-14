@@ -50,7 +50,7 @@ app.use(
 
 app.use(express.json({ limit: "100mb" }));
 
-// DB Pool
+// DB Pool - MySQL2 Compatible Configuration
 const conn = mysql.createPool({
   host: process.env.DB_HOST || "127.0.0.1",
   port: Number(process.env.DB_PORT || 3306),
@@ -58,8 +58,12 @@ const conn = mysql.createPool({
   password: process.env.DB_PASS || "",
   database: process.env.DB_NAME || "absensi_db",
   waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0,
+  connectionLimit: 20, // ✅ Maximum connections in pool
+  queueLimit: 0, // ✅ Unlimited queue
+  maxIdle: 10, // ✅ Maximum idle connections
+  idleTimeout: 60000, // ✅ Close idle connections after 60s
+  enableKeepAlive: true, // ✅ Keep connections alive
+  keepAliveInitialDelay: 0, // ✅ No delay for keep-alive
 });
 
 // Health + DB Ping
@@ -213,45 +217,102 @@ app.post("/update-hari-libur", (req, res) => {
   if (!Array.isArray(liburData))
     return res.status(400).json({ message: "❌ Data tidak valid" });
 
-  const tasks = [];
-  const tanggalLiburSet = new Set(liburData.map((d) => d.tanggal)); // untuk pengecekan "bukan libur"
+  if (liburData.length === 0) {
+    return res.status(400).json({ message: "❌ Data hari libur kosong" });
+  }
 
-  // Update tanggal libur
-  liburData.forEach((item) => {
-    const sql = `UPDATE olah_absensi SET jenis_hari = ? WHERE tanggal = ?`;
+  console.log(
+    `🔄 Processing ${liburData.length} hari libur records with BATCH method...`
+  );
+  const startTime = Date.now();
+
+  const tasks = [];
+
+  // STEP 1: Batch update hari libur
+  if (liburData.length > 0) {
+    const batchLiburSQL = `
+      UPDATE olah_absensi 
+      SET jenis_hari = CASE 
+        ${liburData.map(() => `WHEN tanggal = ? THEN ?`).join(" ")}
+        ELSE jenis_hari
+      END
+      WHERE tanggal IN (${liburData.map(() => "?").join(", ")})
+    `;
+
+    const liburParams = [];
+    // Build parameters for CASE statement
+    liburData.forEach((item) => {
+      liburParams.push(item.tanggal, item.jenis_hari);
+    });
+    // Build parameters for WHERE clause
+    liburData.forEach((item) => {
+      liburParams.push(item.tanggal);
+    });
+
     tasks.push(
       new Promise((resolve, reject) => {
-        conn.query(sql, [item.jenis_hari, item.tanggal], (err, result) => {
+        conn.query(batchLiburSQL, liburParams, (err, result) => {
           if (err) return reject(err);
-          resolve();
+          console.log(`✅ Batch LIBUR: ${result.affectedRows} rows updated`);
+          resolve({ type: "libur", affectedRows: result.affectedRows });
         });
       })
     );
-  });
+  }
 
-  // Tanggal lain → "HARI KERJA"
-  const sqlHariKerja = `
+  // STEP 2: Update tanggal lain jadi "HARI KERJA"
+  // Hanya update yang belum ada jenis_hari atau kosong
+  const updateHariKerjaSQL = `
     UPDATE olah_absensi
     SET jenis_hari = 'HARI KERJA'
-    WHERE (jenis_hari IS NULL OR jenis_hari = '')
+    WHERE (jenis_hari IS NULL OR jenis_hari = '' OR jenis_hari = 'HARI KERJA')
       AND tanggal IS NOT NULL
+      AND tanggal NOT IN (${liburData.map(() => "?").join(", ")})
   `;
+
+  const hariKerjaParams = liburData.map((item) => item.tanggal);
 
   tasks.push(
     new Promise((resolve, reject) => {
-      conn.query(sqlHariKerja, (err, result) => {
+      conn.query(updateHariKerjaSQL, hariKerjaParams, (err, result) => {
         if (err) return reject(err);
-        resolve();
+        console.log(`✅ Batch HARI KERJA: ${result.affectedRows} rows updated`);
+        resolve({ type: "hari_kerja", affectedRows: result.affectedRows });
       });
     })
   );
 
   Promise.all(tasks)
-    .then(() => {
-      res.json({ message: `✅ Hari libur dan hari kerja berhasil diproses.` });
+    .then((results) => {
+      const endTime = Date.now();
+      const duration = endTime - startTime;
+
+      const liburResult = results.find((r) => r.type === "libur");
+      const hariKerjaResult = results.find((r) => r.type === "hari_kerja");
+
+      const totalAffected =
+        (liburResult?.affectedRows || 0) + (hariKerjaResult?.affectedRows || 0);
+
+      console.log(`⚡ Hari Libur Batch completed in ${duration}ms`);
+      console.log(`   - Hari libur: ${liburResult?.affectedRows || 0} rows`);
+      console.log(
+        `   - Hari kerja: ${hariKerjaResult?.affectedRows || 0} rows`
+      );
+
+      res.json({
+        message: `✅ Hari libur dan hari kerja berhasil diproses dengan batch method (${duration}ms).`,
+        performance: {
+          duration_ms: duration,
+          libur_records: liburData.length,
+          libur_affected: liburResult?.affectedRows || 0,
+          hari_kerja_affected: hariKerjaResult?.affectedRows || 0,
+          total_affected: totalAffected,
+          method: "batch",
+        },
+      });
     })
     .catch((err) => {
-      console.error("❌ Error hari libur:", err);
+      console.error("❌ Error hari libur batch:", err);
       res.status(500).json({ message: "❌ Gagal memproses hari libur." });
     });
 });
@@ -262,53 +323,136 @@ app.post("/update-ci-co", (req, res) => {
     return res.status(400).json({ message: "❌ Data tidak valid." });
   }
 
-  const tasks = [];
+  console.log(
+    `🔄 Processing ${data.length} CI/CO records with BATCH method...`
+  );
+  const startTime = Date.now();
+
+  // Group by operation type for batch processing
+  const inUpdates = [];
+  const outUpdates = [];
 
   data.forEach(({ perner, tanggal, waktu, tipe, correction }) => {
-    let timeColumn = "";
-    let correctionColumn = "";
+    const updateData = { perner, tanggal, waktu, correction };
 
-    // ✨ MODIFIED: Map both time and correction columns
     if (tipe.toUpperCase() === "CLOCK_IN") {
-      timeColumn = "daily_in";
-      correctionColumn = "correction_in";
+      inUpdates.push(updateData);
     } else if (tipe.toUpperCase() === "CLOCK_OUT") {
-      timeColumn = "daily_out";
-      correctionColumn = "correction_out";
-    } else {
-      return; // Skip invalid tipe
+      outUpdates.push(updateData);
     }
+  });
 
-    // ✨ MODIFIED: Update both time and correction fields
-    const sql = `
-      UPDATE olah_absensi
-      SET ${timeColumn} = ?, ${correctionColumn} = ?
-      WHERE perner = ? AND tanggal = ?
+  const tasks = [];
+
+  // Batch update for CLOCK_IN
+  if (inUpdates.length > 0) {
+    const batchInSQL = `
+      UPDATE olah_absensi 
+      SET daily_in = CASE 
+        ${inUpdates
+          .map(() => `WHEN perner = ? AND tanggal = ? THEN ?`)
+          .join(" ")}
+      END,
+      correction_in = CASE 
+        ${inUpdates
+          .map(() => `WHEN perner = ? AND tanggal = ? THEN ?`)
+          .join(" ")}
+      END
+      WHERE (perner, tanggal) IN (${inUpdates.map(() => "(?, ?)").join(", ")})
     `;
+
+    const inParams = [];
+    // Build parameters for daily_in CASE
+    inUpdates.forEach((item) => {
+      inParams.push(item.perner, item.tanggal, item.waktu);
+    });
+    // Build parameters for correction_in CASE
+    inUpdates.forEach((item) => {
+      inParams.push(item.perner, item.tanggal, item.correction);
+    });
+    // Build parameters for WHERE clause
+    inUpdates.forEach((item) => {
+      inParams.push(item.perner, item.tanggal);
+    });
 
     tasks.push(
       new Promise((resolve, reject) => {
-        // ✨ MODIFIED: Include correction in parameters
-        conn.query(sql, [waktu, correction, perner, tanggal], (err, result) => {
+        conn.query(batchInSQL, inParams, (err, result) => {
           if (err) return reject(err);
-          resolve();
+          console.log(`✅ Batch IN: ${result.affectedRows} rows updated`);
+          resolve(result);
         });
       })
     );
-  });
+  }
+
+  // Batch update for CLOCK_OUT
+  if (outUpdates.length > 0) {
+    const batchOutSQL = `
+      UPDATE olah_absensi 
+      SET daily_out = CASE 
+        ${outUpdates
+          .map(() => `WHEN perner = ? AND tanggal = ? THEN ?`)
+          .join(" ")}
+      END,
+      correction_out = CASE 
+        ${outUpdates
+          .map(() => `WHEN perner = ? AND tanggal = ? THEN ?`)
+          .join(" ")}
+      END
+      WHERE (perner, tanggal) IN (${outUpdates.map(() => "(?, ?)").join(", ")})
+    `;
+
+    const outParams = [];
+    // Build parameters for daily_out CASE
+    outUpdates.forEach((item) => {
+      outParams.push(item.perner, item.tanggal, item.waktu);
+    });
+    // Build parameters for correction_out CASE
+    outUpdates.forEach((item) => {
+      outParams.push(item.perner, item.tanggal, item.correction);
+    });
+    // Build parameters for WHERE clause
+    outUpdates.forEach((item) => {
+      outParams.push(item.perner, item.tanggal);
+    });
+
+    tasks.push(
+      new Promise((resolve, reject) => {
+        conn.query(batchOutSQL, outParams, (err, result) => {
+          if (err) return reject(err);
+          console.log(`✅ Batch OUT: ${result.affectedRows} rows updated`);
+          resolve(result);
+        });
+      })
+    );
+  }
 
   Promise.all(tasks)
-    .then(() => {
+    .then((results) => {
+      const endTime = Date.now();
+      const duration = endTime - startTime;
+      const totalAffected = results.reduce((sum, r) => sum + r.affectedRows, 0);
+
+      console.log(
+        `⚡ CI/CO Batch completed in ${duration}ms, ${totalAffected} rows affected`
+      );
+
       res.json({
-        message: `✅ Berhasil memproses ${data.length} data CI/CO dengan status koreksi.`,
+        message: `✅ Berhasil memproses ${data.length} data CI/CO dengan batch method (${duration}ms).`,
+        performance: {
+          duration_ms: duration,
+          total_records: data.length,
+          affected_rows: totalAffected,
+          method: "batch",
+        },
       });
     })
     .catch((err) => {
-      console.error("❌ Gagal update CI/CO:", err);
+      console.error("❌ Gagal batch update CI/CO:", err);
       res.status(500).json({ message: "❌ Gagal update data CI/CO." });
     });
 });
-
 app.get("/getAllData", (req, res) => {
   conn.query(
     "SELECT * FROM olah_absensi ORDER BY tanggal DESC",
@@ -385,41 +529,201 @@ app.post("/update-att-abs-daily", (req, res) => {
     return res.status(400).json({ message: "❌ Data tidak valid." });
   }
 
-  const tasks = [];
+  console.log(
+    `🔄 Processing ${data.length} ATT/ABS records with ENHANCED BATCH method...`
+  );
+  const startTime = Date.now();
+
+  // Separate data by category for optimized batch operations
+  const attUpdates = [];
+  const absUpdates = [];
 
   data.forEach(({ perner, tanggal, tipe_text, kategori }) => {
-    const kolom =
-      kategori === "att"
-        ? "att_daily"
-        : kategori === "abs"
-        ? "abs_daily"
-        : null;
-    if (!kolom) return;
+    const updateData = { perner, tanggal, tipe_text };
 
-    const sql = `UPDATE olah_absensi SET ${kolom} = ? WHERE perner = ? AND tanggal = ?`;
-
-    tasks.push(
-      new Promise((resolve, reject) => {
-        conn.query(sql, [tipe_text, perner, tanggal], (err) => {
-          if (err) return reject(err);
-          resolve();
-        });
-      })
-    );
+    if (kategori === "att") {
+      attUpdates.push(updateData);
+    } else if (kategori === "abs") {
+      absUpdates.push(updateData);
+    }
   });
 
+  console.log(
+    `📊 Data distribution: ATT=${attUpdates.length}, ABS=${absUpdates.length}`
+  );
+
+  const tasks = [];
+
+  // BATCH 1: Update ATT (attendance) records
+  if (attUpdates.length > 0) {
+    // Chunk large datasets to avoid MySQL query limits
+    const attChunks = [];
+    const chunkSize = 500; // Process 500 records per batch
+
+    for (let i = 0; i < attUpdates.length; i += chunkSize) {
+      attChunks.push(attUpdates.slice(i, i + chunkSize));
+    }
+
+    attChunks.forEach((chunk, chunkIndex) => {
+      const batchAttSQL = `
+        UPDATE olah_absensi 
+        SET att_daily = CASE 
+          ${chunk.map(() => `WHEN perner = ? AND tanggal = ? THEN ?`).join(" ")}
+          ELSE att_daily
+        END
+        WHERE (perner, tanggal) IN (${chunk.map(() => "(?, ?)").join(", ")})
+      `;
+
+      const attParams = [];
+      // Build parameters for CASE statement
+      chunk.forEach((item) => {
+        attParams.push(item.perner, item.tanggal, item.tipe_text);
+      });
+      // Build parameters for WHERE clause
+      chunk.forEach((item) => {
+        attParams.push(item.perner, item.tanggal);
+      });
+
+      tasks.push(
+        new Promise((resolve, reject) => {
+          conn.query(batchAttSQL, attParams, (err, result) => {
+            if (err) {
+              console.error(`❌ ATT Batch ${chunkIndex + 1} failed:`, err);
+              return reject(err);
+            }
+            console.log(
+              `✅ ATT Batch ${chunkIndex + 1}/${attChunks.length}: ${
+                result.affectedRows
+              } rows updated`
+            );
+            resolve({
+              type: "att",
+              chunk: chunkIndex + 1,
+              affectedRows: result.affectedRows,
+            });
+          });
+        })
+      );
+    });
+  }
+
+  // BATCH 2: Update ABS (absence) records
+  if (absUpdates.length > 0) {
+    // Chunk large datasets
+    const absChunks = [];
+    const chunkSize = 500;
+
+    for (let i = 0; i < absUpdates.length; i += chunkSize) {
+      absChunks.push(absUpdates.slice(i, i + chunkSize));
+    }
+
+    absChunks.forEach((chunk, chunkIndex) => {
+      const batchAbsSQL = `
+        UPDATE olah_absensi 
+        SET abs_daily = CASE 
+          ${chunk.map(() => `WHEN perner = ? AND tanggal = ? THEN ?`).join(" ")}
+          ELSE abs_daily
+        END
+        WHERE (perner, tanggal) IN (${chunk.map(() => "(?, ?)").join(", ")})
+      `;
+
+      const absParams = [];
+      // Build parameters for CASE statement
+      chunk.forEach((item) => {
+        absParams.push(item.perner, item.tanggal, item.tipe_text);
+      });
+      // Build parameters for WHERE clause
+      chunk.forEach((item) => {
+        absParams.push(item.perner, item.tanggal);
+      });
+
+      tasks.push(
+        new Promise((resolve, reject) => {
+          conn.query(batchAbsSQL, absParams, (err, result) => {
+            if (err) {
+              console.error(`❌ ABS Batch ${chunkIndex + 1} failed:`, err);
+              return reject(err);
+            }
+            console.log(
+              `✅ ABS Batch ${chunkIndex + 1}/${absChunks.length}: ${
+                result.affectedRows
+              } rows updated`
+            );
+            resolve({
+              type: "abs",
+              chunk: chunkIndex + 1,
+              affectedRows: result.affectedRows,
+            });
+          });
+        })
+      );
+    });
+  }
+
+  // Execute all batch operations
   Promise.all(tasks)
-    .then(() => {
+    .then((results) => {
+      const endTime = Date.now();
+      const duration = endTime - startTime;
+
+      // Calculate statistics
+      const attResults = results.filter((r) => r.type === "att");
+      const absResults = results.filter((r) => r.type === "abs");
+
+      const totalAttAffected = attResults.reduce(
+        (sum, r) => sum + r.affectedRows,
+        0
+      );
+      const totalAbsAffected = absResults.reduce(
+        (sum, r) => sum + r.affectedRows,
+        0
+      );
+      const totalAffected = totalAttAffected + totalAbsAffected;
+
+      console.log(`⚡ ATT/ABS Enhanced Batch completed in ${duration}ms`);
+      console.log(
+        `   - ATT batches: ${attResults.length}, affected: ${totalAttAffected} rows`
+      );
+      console.log(
+        `   - ABS batches: ${absResults.length}, affected: ${totalAbsAffected} rows`
+      );
+      console.log(`   - Total affected: ${totalAffected} rows`);
+
       res.json({
-        message: `✅ Berhasil memproses ${data.length} data ATT ABS Daily.`,
+        message: `✅ Berhasil memproses ${data.length} data ATT ABS Daily dengan enhanced batch method (${duration}ms).`,
+        performance: {
+          duration_ms: duration,
+          total_records: data.length,
+          att_records: attUpdates.length,
+          abs_records: absUpdates.length,
+          att_batches: attResults.length,
+          abs_batches: absResults.length,
+          att_affected: totalAttAffected,
+          abs_affected: totalAbsAffected,
+          total_affected: totalAffected,
+          method: "enhanced_batch_with_chunking",
+          avg_records_per_batch: Math.round(
+            (attUpdates.length + absUpdates.length) /
+              (attResults.length + absResults.length)
+          ),
+        },
       });
     })
     .catch((err) => {
-      console.error("❌ Gagal update ATT ABS:", err);
-      res.status(500).json({ message: "❌ Gagal update ATT ABS Daily." });
+      console.error("❌ Gagal enhanced batch update ATT/ABS:", err);
+      res.status(500).json({
+        message: "❌ Gagal update ATT ABS Daily.",
+        error: err.message,
+        debug: {
+          att_records: attUpdates.length,
+          abs_records: absUpdates.length,
+          total_tasks: tasks.length,
+        },
+      });
     });
 });
 
+// OPTIMASI ATT SAP
 app.post("/update-att-sap", (req, res) => {
   const { data } = req.body;
 
@@ -427,37 +731,73 @@ app.post("/update-att-sap", (req, res) => {
     return res.status(400).json({ message: "❌ Data tidak valid." });
   }
 
-  const tasks = [];
+  console.log(
+    `🔄 Processing ${data.length} ATT SAP records with BATCH method...`
+  );
+  const startTime = Date.now();
 
-  data.forEach(({ perner, tanggal, tipe_text }) => {
-    const sql = `
-      UPDATE olah_absensi
-      SET att_sap = ?
-      WHERE perner = ? AND tanggal = ?
+  // Chunk untuk dataset besar
+  const chunkSize = 500;
+  const chunks = [];
+  for (let i = 0; i < data.length; i += chunkSize) {
+    chunks.push(data.slice(i, i + chunkSize));
+  }
+
+  const tasks = chunks.map((chunk, chunkIndex) => {
+    const batchSQL = `
+      UPDATE olah_absensi 
+      SET att_sap = CASE 
+        ${chunk.map(() => `WHEN perner = ? AND tanggal = ? THEN ?`).join(" ")}
+        ELSE att_sap
+      END
+      WHERE (perner, tanggal) IN (${chunk.map(() => "(?, ?)").join(", ")})
     `;
 
-    tasks.push(
-      new Promise((resolve, reject) => {
-        conn.query(sql, [tipe_text, perner, tanggal], (err) => {
-          if (err) return reject(err);
-          resolve();
-        });
-      })
-    );
+    const params = [];
+    chunk.forEach((item) => {
+      params.push(item.perner, item.tanggal, item.tipe_text);
+    });
+    chunk.forEach((item) => {
+      params.push(item.perner, item.tanggal);
+    });
+
+    return new Promise((resolve, reject) => {
+      conn.query(batchSQL, params, (err, result) => {
+        if (err) return reject(err);
+        console.log(
+          `✅ ATT SAP Batch ${chunkIndex + 1}/${chunks.length}: ${
+            result.affectedRows
+          } rows`
+        );
+        resolve(result.affectedRows);
+      });
+    });
   });
 
   Promise.all(tasks)
-    .then(() => {
+    .then((results) => {
+      const endTime = Date.now();
+      const duration = endTime - startTime;
+      const totalAffected = results.reduce((sum, rows) => sum + rows, 0);
+
       res.json({
-        message: `✅ Berhasil memproses ${data.length} data ATT ABS.`,
+        message: `✅ Berhasil memproses ${data.length} data ATT SAP dengan batch method (${duration}ms).`,
+        performance: {
+          duration_ms: duration,
+          total_records: data.length,
+          affected_rows: totalAffected,
+          batches: chunks.length,
+          method: "batch_chunked",
+        },
       });
     })
     .catch((err) => {
-      console.error("❌ Gagal update ATT ABS:", err);
-      res.status(500).json({ message: "❌ Gagal update ATT ABS." });
+      console.error("❌ Gagal batch update ATT SAP:", err);
+      res.status(500).json({ message: "❌ Gagal update ATT SAP." });
     });
 });
 
+// OPTIMASI ABS SAP
 app.post("/update-abs-sap", (req, res) => {
   const { data } = req.body;
 
@@ -465,33 +805,68 @@ app.post("/update-abs-sap", (req, res) => {
     return res.status(400).json({ message: "❌ Data tidak valid." });
   }
 
-  const tasks = [];
+  console.log(
+    `🔄 Processing ${data.length} ABS SAP records with BATCH method...`
+  );
+  const startTime = Date.now();
 
-  data.forEach(({ perner, tanggal, tipe_text }) => {
-    const sql = `
-      UPDATE olah_absensi
-      SET abs_sap = ?
-      WHERE perner = ? AND tanggal = ?
+  // Chunk untuk dataset besar
+  const chunkSize = 500;
+  const chunks = [];
+  for (let i = 0; i < data.length; i += chunkSize) {
+    chunks.push(data.slice(i, i + chunkSize));
+  }
+
+  const tasks = chunks.map((chunk, chunkIndex) => {
+    const batchSQL = `
+      UPDATE olah_absensi 
+      SET abs_sap = CASE 
+        ${chunk.map(() => `WHEN perner = ? AND tanggal = ? THEN ?`).join(" ")}
+        ELSE abs_sap
+      END
+      WHERE (perner, tanggal) IN (${chunk.map(() => "(?, ?)").join(", ")})
     `;
 
-    tasks.push(
-      new Promise((resolve, reject) => {
-        conn.query(sql, [tipe_text, perner, tanggal], (err) => {
-          if (err) return reject(err);
-          resolve();
-        });
-      })
-    );
+    const params = [];
+    chunk.forEach((item) => {
+      params.push(item.perner, item.tanggal, item.tipe_text);
+    });
+    chunk.forEach((item) => {
+      params.push(item.perner, item.tanggal);
+    });
+
+    return new Promise((resolve, reject) => {
+      conn.query(batchSQL, params, (err, result) => {
+        if (err) return reject(err);
+        console.log(
+          `✅ ABS SAP Batch ${chunkIndex + 1}/${chunks.length}: ${
+            result.affectedRows
+          } rows`
+        );
+        resolve(result.affectedRows);
+      });
+    });
   });
 
   Promise.all(tasks)
-    .then(() => {
+    .then((results) => {
+      const endTime = Date.now();
+      const duration = endTime - startTime;
+      const totalAffected = results.reduce((sum, rows) => sum + rows, 0);
+
       res.json({
-        message: `✅ Berhasil memproses ${data.length} data ABS SAP.`,
+        message: `✅ Berhasil memproses ${data.length} data ABS SAP dengan batch method (${duration}ms).`,
+        performance: {
+          duration_ms: duration,
+          total_records: data.length,
+          affected_rows: totalAffected,
+          batches: chunks.length,
+          method: "batch_chunked",
+        },
       });
     })
     .catch((err) => {
-      console.error("❌ Gagal update ABS SAP:", err);
+      console.error("❌ Gagal batch update ABS SAP:", err);
       res.status(500).json({ message: "❌ Gagal update ABS SAP." });
     });
 });
@@ -520,34 +895,261 @@ app.post("/update-sppd-umum", (req, res) => {
     return res.status(400).json({ message: "❌ Data tidak valid." });
   }
 
-  const tasks = [];
+  console.log(
+    `🔄 Processing ${data.length} SPPD Umum records with ENHANCED BATCH method...`
+  );
+  const startTime = Date.now();
 
-  data.forEach(({ perner, tanggal, keterangan }) => {
-    const sql = `
-      UPDATE olah_absensi
-      SET sppd_umum = ?
-      WHERE perner = ? AND tanggal = ?
-    `;
+  // STEP 1: Process SPPD data in memory (optimized)
+  const processDataStart = Date.now();
+  const finalDataMap = new Map(); // Use Map for better performance
+  let processedInputs = 0;
+  let errorCount = 0;
+  let totalDatesGenerated = 0;
 
-    tasks.push(
-      new Promise((resolve, reject) => {
-        conn.query(sql, [keterangan, perner, tanggal], (err) => {
-          if (err) return reject(err);
-          resolve();
+  // Process each SPPD record
+  data.forEach((item, index) => {
+    try {
+      const { perner, tanggal, keterangan } = item;
+
+      // Validate required fields
+      if (!perner || !tanggal) {
+        console.warn(`⚠️ Record ${index + 1}: Missing perner or tanggal`);
+        errorCount++;
+        return;
+      }
+
+      // For SPPD Umum, the 'tanggal' field actually contains date range info
+      // But from your original logic, it seems like direct mapping
+      const key = `${perner}||${tanggal}`;
+
+      // Handle duplicate entries for same perner+tanggal
+      if (finalDataMap.has(key)) {
+        const existing = finalDataMap.get(key);
+        // Merge keterangan if different
+        const existingKet = existing.keterangan;
+        const newKet = keterangan || "Perjalanan dinas";
+
+        if (existingKet !== newKet) {
+          finalDataMap.set(key, {
+            perner,
+            tanggal,
+            keterangan: `${existingKet} || ${newKet}`,
+          });
+        }
+      } else {
+        finalDataMap.set(key, {
+          perner,
+          tanggal,
+          keterangan: keterangan || "Perjalanan dinas",
         });
-      })
-    );
+        totalDatesGenerated++;
+      }
+
+      processedInputs++;
+    } catch (error) {
+      console.error(`❌ Error processing SPPD record ${index + 1}:`, error);
+      errorCount++;
+    }
   });
 
+  // Alternative: If your input data is actually in raw format (perner, start, end)
+  // Uncomment this section if that's the case:
+  /*
+  data.forEach((row, index) => {
+    try {
+      const parts = row.split("\t");
+      if (parts.length < 3) {
+        console.warn(`⚠️ Row ${index + 1}: Insufficient data (${parts.length} parts)`);
+        errorCount++;
+        return;
+      }
+
+      const [perner, start, end] = parts;
+      
+      // Parse dates
+      const [sd, sm, sy] = start.split("/");
+      const [ed, em, ey] = end.split("/");
+      const startDate = new Date(`${sy}-${sm}-${sd}`);
+      const endDate = new Date(`${ey}-${em}-${ed}`);
+
+      // Validate date range
+      if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+        console.warn(`⚠️ Row ${index + 1}: Invalid date format`);
+        errorCount++;
+        return;
+      }
+
+      if (endDate < startDate) {
+        console.warn(`⚠️ Row ${index + 1}: End date before start date`);
+        errorCount++;
+        return;
+      }
+
+      // Generate date range
+      for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+        const tanggal = d.toISOString().slice(0, 10);
+        const key = `${perner}||${tanggal}`;
+
+        if (!finalDataMap.has(key)) {
+          finalDataMap.set(key, []);
+        }
+        finalDataMap.get(key).push("Perjalanan dinas");
+        totalDatesGenerated++;
+      }
+
+      processedInputs++;
+    } catch (error) {
+      console.error(`❌ Error processing raw SPPD row ${index + 1}:`, error);
+      errorCount++;
+    }
+  });
+
+  // Convert Map to final data structure for raw format
+  const finalData = [];
+  for (const [key, keteranganArray] of finalDataMap.entries()) {
+    const [perner, tanggal] = key.split("||");
+    finalData.push({
+      perner,
+      tanggal,
+      keterangan: keteranganArray.join(" || ")
+    });
+  }
+  */
+
+  // Convert Map to Array (for processed format)
+  const finalData = Array.from(finalDataMap.values());
+  const processDataDuration = Date.now() - processDataStart;
+
+  console.log(`🔧 SPPD Data processing completed:`);
+  console.log(`   - Input records: ${data.length}`);
+  console.log(`   - Processed records: ${processedInputs}`);
+  console.log(`   - Error records: ${errorCount}`);
+  console.log(`   - Generated records: ${finalData.length}`);
+  console.log(`   - Processing time: ${processDataDuration}ms`);
+
+  if (finalData.length === 0) {
+    return res.status(400).json({
+      message: "⚠️ Tidak ada data valid untuk SPPD Umum.",
+      debug: {
+        input_records: data.length,
+        processed_records: processedInputs,
+        error_count: errorCount,
+      },
+    });
+  }
+
+  // STEP 2: Batch database update (chunked)
+  const batchUpdateStart = Date.now();
+  const chunkSize = 1000; // Large chunks for SPPD
+  const chunks = [];
+
+  for (let i = 0; i < finalData.length; i += chunkSize) {
+    chunks.push(finalData.slice(i, i + chunkSize));
+  }
+
+  console.log(
+    `📦 SPPD data chunked into ${chunks.length} batches (max ${chunkSize} records each)`
+  );
+
+  const tasks = chunks.map((chunk, chunkIndex) => {
+    const batchSQL = `
+      UPDATE olah_absensi 
+      SET sppd_umum = CASE 
+        ${chunk.map(() => `WHEN perner = ? AND tanggal = ? THEN ?`).join(" ")}
+        ELSE sppd_umum
+      END
+      WHERE (perner, tanggal) IN (${chunk.map(() => "(?, ?)").join(", ")})
+    `;
+
+    const params = [];
+    // Build parameters for CASE statement
+    chunk.forEach((item) => {
+      params.push(item.perner, item.tanggal, item.keterangan);
+    });
+    // Build parameters for WHERE clause
+    chunk.forEach((item) => {
+      params.push(item.perner, item.tanggal);
+    });
+
+    return new Promise((resolve, reject) => {
+      conn.query(batchSQL, params, (err, result) => {
+        if (err) {
+          console.error(`❌ SPPD Umum Batch ${chunkIndex + 1} failed:`, err);
+          return reject(err);
+        }
+
+        console.log(
+          `✅ SPPD Batch ${chunkIndex + 1}/${chunks.length}: ${
+            result.affectedRows
+          } rows updated`
+        );
+        resolve({
+          chunk: chunkIndex + 1,
+          affectedRows: result.affectedRows,
+          chunkSize: chunk.length,
+        });
+      });
+    });
+  });
+
+  // Execute all batch operations
   Promise.all(tasks)
-    .then(() => {
+    .then((results) => {
+      const batchUpdateDuration = Date.now() - batchUpdateStart;
+      const overallDuration = Date.now() - startTime;
+
+      const totalAffected = results.reduce((sum, r) => sum + r.affectedRows, 0);
+      const avgRowsPerBatch = Math.round(totalAffected / results.length);
+
+      console.log(
+        `⚡ SPPD Umum Enhanced Batch completed in ${overallDuration}ms`
+      );
+      console.log(`   - Data processing: ${processDataDuration}ms`);
+      console.log(`   - Batch updates: ${batchUpdateDuration}ms`);
+      console.log(
+        `   - Total affected: ${totalAffected} rows across ${results.length} batches`
+      );
+
       res.json({
-        message: `✅ Berhasil mengisi ${data.length} baris SPPD Umum.`,
+        message: `✅ Berhasil mengisi ${totalAffected} baris SPPD Umum dengan enhanced batch method (${overallDuration}ms).`,
+        performance: {
+          duration_ms: overallDuration,
+          data_processing_ms: processDataDuration,
+          batch_update_ms: batchUpdateDuration,
+          input_records: data.length,
+          processed_records: processedInputs,
+          error_records: errorCount,
+          generated_records: finalData.length,
+          affected_rows: totalAffected,
+          batches: results.length,
+          avg_rows_per_batch: avgRowsPerBatch,
+          chunk_size: chunkSize,
+          method: "enhanced_batch_with_deduplication",
+        },
+        statistics: {
+          successful_batches: results.length,
+          failed_batches: 0,
+          success_rate: Math.round((processedInputs / data.length) * 100) + "%",
+          efficiency_ratio:
+            Math.round((totalAffected / finalData.length) * 100) + "%",
+          duplicate_handling: "merged_with_separator",
+        },
       });
     })
     .catch((err) => {
-      console.error("❌ Gagal update SPPD Umum:", err);
-      res.status(500).json({ message: "❌ Gagal update SPPD Umum." });
+      console.error("❌ Gagal enhanced batch update SPPD Umum:", err);
+      res.status(500).json({
+        message: "❌ Gagal update SPPD Umum.",
+        error: err.message,
+        debug: {
+          input_records: data.length,
+          processed_records: processedInputs,
+          error_records: errorCount,
+          generated_records: finalData.length,
+          total_batches: chunks.length,
+        },
+      });
     });
 });
 
@@ -558,34 +1160,110 @@ app.post("/update-work-schedule", (req, res) => {
     return res.status(400).json({ message: "❌ Data tidak valid." });
   }
 
-  const tasks = [];
+  console.log(
+    `🔄 Processing ${data.length} work schedule records with OPTIMIZED BATCH method...`
+  );
+  const startTime = Date.now();
 
-  data.forEach(({ perner, tanggal, ws_rule }) => {
-    const sql = `
-      UPDATE olah_absensi
-      SET ws_rule = ?
-      WHERE perner = ? AND tanggal = ?
+  // For large datasets, use chunking to avoid MySQL query limits
+  const chunkSize = 1500; // Optimal size for work schedule batch updates
+  const chunks = [];
+
+  for (let i = 0; i < data.length; i += chunkSize) {
+    chunks.push(data.slice(i, i + chunkSize));
+  }
+
+  console.log(
+    `📦 Data chunked into ${chunks.length} batch(es) (max ${chunkSize} records each)`
+  );
+
+  const tasks = chunks.map((chunk, chunkIndex) => {
+    const batchSQL = `
+      UPDATE olah_absensi 
+      SET ws_rule = CASE 
+        ${chunk.map(() => `WHEN perner = ? AND tanggal = ? THEN ?`).join(" ")}
+        ELSE ws_rule
+      END
+      WHERE (perner, tanggal) IN (${chunk.map(() => "(?, ?)").join(", ")})
     `;
 
-    tasks.push(
-      new Promise((resolve, reject) => {
-        conn.query(sql, [ws_rule, perner, tanggal], (err) => {
-          if (err) return reject(err);
-          resolve();
+    const params = [];
+    // Build parameters for CASE statement
+    chunk.forEach((item) => {
+      params.push(item.perner, item.tanggal, item.ws_rule);
+    });
+    // Build parameters for WHERE clause
+    chunk.forEach((item) => {
+      params.push(item.perner, item.tanggal);
+    });
+
+    return new Promise((resolve, reject) => {
+      conn.query(batchSQL, params, (err, result) => {
+        if (err) {
+          console.error(
+            `❌ Work Schedule Batch ${chunkIndex + 1} failed:`,
+            err
+          );
+          return reject(err);
+        }
+
+        console.log(
+          `✅ WS Batch ${chunkIndex + 1}/${chunks.length}: ${
+            result.affectedRows
+          } rows updated`
+        );
+        resolve({
+          chunk: chunkIndex + 1,
+          affectedRows: result.affectedRows,
+          chunkSize: chunk.length,
         });
-      })
-    );
+      });
+    });
   });
 
   Promise.all(tasks)
-    .then(() => {
+    .then((results) => {
+      const endTime = Date.now();
+      const duration = endTime - startTime;
+      const totalAffected = results.reduce((sum, r) => sum + r.affectedRows, 0);
+
+      console.log(
+        `⚡ Work Schedule Optimized Batch completed in ${duration}ms`
+      );
+      console.log(`   - Total records processed: ${data.length}`);
+      console.log(`   - Total rows affected: ${totalAffected}`);
+      console.log(`   - Batches executed: ${results.length}`);
+      console.log(
+        `   - Database efficiency: ${Math.round(
+          (totalAffected / data.length) * 100
+        )}%`
+      );
+
       res.json({
-        message: `✅ Berhasil memproses ${data.length} data Work Schedule.`,
+        message: `✅ Berhasil memproses ${data.length} data Work Schedule dengan optimized batch method (${duration}ms).`,
+        performance: {
+          duration_ms: duration,
+          total_records: data.length,
+          affected_rows: totalAffected,
+          batches: results.length,
+          avg_records_per_batch: Math.round(data.length / results.length),
+          database_efficiency:
+            Math.round((totalAffected / data.length) * 100) + "%",
+          method: "optimized_batch_with_chunking",
+        },
       });
     })
     .catch((err) => {
-      console.error("❌ Gagal update Work Schedule:", err);
-      res.status(500).json({ message: "❌ Gagal update Work Schedule." });
+      console.error("❌ Gagal optimized batch update Work Schedule:", err);
+      res.status(500).json({
+        message: "❌ Gagal update Work Schedule.",
+        error: err.message,
+        debug: {
+          total_records: data.length,
+          total_batches: chunks.length,
+          chunk_size: chunkSize,
+        },
+      });
     });
 });
 
@@ -596,35 +1274,56 @@ app.post("/update-substitution-daily", (req, res) => {
     return res.status(400).json({ message: "❌ Data tidak valid." });
   }
 
-  const tasks = [];
+  console.log(
+    `🔄 Processing ${data.length} substitution daily records with BATCH method...`
+  );
+  const startTime = Date.now();
 
-  data.forEach(({ perner, tanggal, jenis_shift }) => {
-    const sql = `
-      UPDATE olah_absensi
-      SET jenis_jam_kerja_shift_daily = ?
-      WHERE perner = ? AND tanggal = ?
-    `;
+  // Single batch update
+  const batchSQL = `
+    UPDATE olah_absensi 
+    SET jenis_jam_kerja_shift_daily = CASE 
+      ${data.map(() => `WHEN perner = ? AND tanggal = ? THEN ?`).join(" ")}
+      ELSE jenis_jam_kerja_shift_daily
+    END
+    WHERE (perner, tanggal) IN (${data.map(() => "(?, ?)").join(", ")})
+  `;
 
-    tasks.push(
-      new Promise((resolve, reject) => {
-        conn.query(sql, [jenis_shift, perner, tanggal], (err) => {
-          if (err) return reject(err);
-          resolve();
-        });
-      })
-    );
+  const params = [];
+  // Build parameters for CASE statement
+  data.forEach((item) => {
+    params.push(item.perner, item.tanggal, item.jenis_shift);
+  });
+  // Build parameters for WHERE clause
+  data.forEach((item) => {
+    params.push(item.perner, item.tanggal);
   });
 
-  Promise.all(tasks)
-    .then(() => {
-      res.json({
-        message: `✅ Berhasil memproses ${data.length} data Substitution Daily.`,
-      });
-    })
-    .catch((err) => {
-      console.error("❌ Gagal update Substitution Daily:", err);
-      res.status(500).json({ message: "❌ Gagal update Substitution Daily." });
+  conn.query(batchSQL, params, (err, result) => {
+    if (err) {
+      console.error("❌ Gagal batch update Substitution Daily:", err);
+      return res
+        .status(500)
+        .json({ message: "❌ Gagal update Substitution Daily." });
+    }
+
+    const endTime = Date.now();
+    const duration = endTime - startTime;
+
+    console.log(
+      `⚡ Substitution Daily Batch completed in ${duration}ms, ${result.affectedRows} rows affected`
+    );
+
+    res.json({
+      message: `✅ Berhasil memproses ${data.length} data Substitution Daily dengan batch method (${duration}ms).`,
+      performance: {
+        duration_ms: duration,
+        total_records: data.length,
+        affected_rows: result.affectedRows,
+        method: "batch",
+      },
     });
+  });
 });
 
 app.post("/update-substitution-sap", (req, res) => {
@@ -634,34 +1333,268 @@ app.post("/update-substitution-sap", (req, res) => {
     return res.status(400).json({ message: "❌ Data tidak valid." });
   }
 
-  const tasks = [];
+  console.log(`🔍 DEBUGGING substitution SAP data format...`);
+  console.log(`📊 Data length: ${data.length}`);
+  console.log(`🔍 First item type: ${typeof data[0]}`);
+  console.log(
+    `🔍 First item sample:`,
+    JSON.stringify(data[0]).substring(0, 200)
+  );
 
-  data.forEach(({ perner, tanggal, jenis_shift }) => {
-    const sql = `
-      UPDATE olah_absensi
-      SET jenis_jam_kerja_shift_sap = ?
-      WHERE perner = ? AND tanggal = ?
+  // Check if it's array of strings (raw) or array of objects (processed)
+  const isStringFormat = typeof data[0] === "string";
+  console.log(
+    `📋 Format detected: ${
+      isStringFormat ? "STRING (needs parsing)" : "OBJECT (pre-processed)"
+    }`
+  );
+
+  const startTime = Date.now();
+  let finalData = [];
+
+  if (isStringFormat) {
+    // === PROCESS RAW STRING DATA ===
+    console.log(`🔧 Processing raw string format...`);
+
+    const dataMap = new Map();
+    let processedRows = 0;
+    let errorCount = 0;
+    let barisError = null;
+
+    // Use ORIGINAL LOGIC exactly as in your server.js
+    for (let i = 0; i < data.length; i++) {
+      try {
+        const row = data[i];
+        const parts = row.split("\t");
+
+        if (parts.length === 7) {
+          parts.push(""); // tambahkan kolom kosong di akhir agar jadi kolom ke-8
+        }
+
+        if (parts.length < 8) {
+          errorCount++;
+          continue;
+        }
+
+        const perner = parts[0];
+        const tglMulai = parts[2];
+        const tglAkhir = parts[3];
+        const jamStart = parts[4].trim();
+        const jamEnd = parts[5].trim();
+        const jadwal = parts[7]?.trim()?.toLowerCase() || "";
+
+        const [sd, sm, sy] = tglMulai.split("/");
+        const [ed, em, ey] = tglAkhir.split("/");
+
+        const startDate = new Date(`${sy}-${sm}-${sd}`);
+        const endDate = new Date(`${ey}-${em}-${ed}`);
+
+        let tipe = "";
+        let jamMasuk = "";
+        let jamPulang = "";
+
+        if (jadwal === "free") {
+          tipe = "OFF";
+          jamMasuk = "00.00";
+          jamPulang = "00.00";
+        } else {
+          // Referensi shift - EXACT SAME AS ORIGINAL
+          if (jamStart === "00:00:00" && jamEnd === "08:00:00") {
+            tipe = "Shift2-Malam";
+            jamMasuk = "00.00";
+            jamPulang = "08.00";
+          } else if (jamStart === "08:00:00" && jamEnd === "16:00:00") {
+            tipe = "Shift2-Pagi";
+            jamMasuk = "08.00";
+            jamPulang = "16.00";
+          } else if (jamStart === "16:00:00" && jamEnd === "00:00:00") {
+            tipe = "Shift2-Siang";
+            jamMasuk = "16.00";
+            jamPulang = "24.00";
+          } else {
+            barisError = i + 1;
+            break;
+          }
+        }
+
+        const nilai = `${tipe}~${jamMasuk}~${jamPulang}`;
+
+        for (
+          let d = new Date(startDate);
+          d <= endDate;
+          d.setDate(d.getDate() + 1)
+        ) {
+          const tanggal = d.toISOString().slice(0, 10);
+          const key = `${perner}||${tanggal}`;
+
+          if (!dataMap.has(key)) {
+            dataMap.set(key, []);
+          }
+          dataMap.get(key).push(nilai);
+        }
+
+        processedRows++;
+      } catch (error) {
+        console.error(`❌ Error processing row ${i + 1}:`, error);
+        errorCount++;
+      }
+    }
+
+    if (barisError !== null) {
+      return res.status(400).json({
+        message: `❌ Baris ${barisError} memiliki jam shift yang tidak dikenali.\nProses dibatalkan. Periksa kembali data yang Anda tempel.`,
+      });
+    }
+
+    // Convert to final format
+    for (const [key, nilaiArray] of dataMap.entries()) {
+      const [perner, tanggal] = key.split("||");
+      const unik = Array.from(new Set(nilaiArray));
+      const jenis_shift = unik.length === 1 ? unik[0] : unik.join(" || ");
+
+      finalData.push({ perner, tanggal, jenis_shift });
+    }
+
+    console.log(
+      `✅ String processing: ${processedRows}/${data.length} rows → ${finalData.length} records`
+    );
+  } else {
+    // === USE PRE-PROCESSED OBJECT DATA ===
+    console.log(`🔧 Using pre-processed object format...`);
+
+    // Validate object structure
+    const sample = data[0];
+    if (
+      !sample.hasOwnProperty("perner") ||
+      !sample.hasOwnProperty("tanggal") ||
+      !sample.hasOwnProperty("jenis_shift")
+    ) {
+      console.log(
+        `❌ Invalid object structure. Expected: {perner, tanggal, jenis_shift}`
+      );
+      console.log(`❌ Received:`, Object.keys(sample));
+
+      return res.status(400).json({
+        message:
+          "❌ Invalid object format. Expected: {perner, tanggal, jenis_shift}",
+        received_keys: Object.keys(sample),
+        sample_data: sample,
+      });
+    }
+
+    // Data is already processed, use directly
+    finalData = data;
+    console.log(
+      `✅ Object format: Using ${finalData.length} pre-processed records`
+    );
+  }
+
+  // Check if we have valid data
+  if (finalData.length === 0) {
+    return res.status(400).json({
+      message: "⚠️ Tidak ada data valid untuk Substitution SAP.",
+      debug: {
+        input_format: isStringFormat ? "string" : "object",
+        input_count: data.length,
+        output_count: finalData.length,
+      },
+    });
+  }
+
+  // === BATCH PROCESSING (COMMON FOR BOTH FORMATS) ===
+  console.log(
+    `📦 Starting batch processing for ${finalData.length} records...`
+  );
+
+  const chunkSize = 500;
+  const chunks = [];
+  for (let i = 0; i < finalData.length; i += chunkSize) {
+    chunks.push(finalData.slice(i, i + chunkSize));
+  }
+
+  console.log(`📦 Data chunked into ${chunks.length} batches`);
+
+  const tasks = chunks.map((chunk, chunkIndex) => {
+    const batchSQL = `
+      UPDATE olah_absensi 
+      SET jenis_jam_kerja_shift_sap = CASE 
+        ${chunk.map(() => `WHEN perner = ? AND tanggal = ? THEN ?`).join(" ")}
+        ELSE jenis_jam_kerja_shift_sap
+      END
+      WHERE (perner, tanggal) IN (${chunk.map(() => "(?, ?)").join(", ")})
     `;
 
-    tasks.push(
-      new Promise((resolve, reject) => {
-        conn.query(sql, [jenis_shift, perner, tanggal], (err) => {
-          if (err) return reject(err);
-          resolve();
+    const params = [];
+    chunk.forEach((item) => {
+      params.push(item.perner, item.tanggal, item.jenis_shift);
+    });
+    chunk.forEach((item) => {
+      params.push(item.perner, item.tanggal);
+    });
+
+    return new Promise((resolve, reject) => {
+      conn.query(batchSQL, params, (err, result) => {
+        if (err) {
+          console.error(
+            `❌ Substitution SAP Batch ${chunkIndex + 1} failed:`,
+            err
+          );
+          return reject(err);
+        }
+
+        console.log(
+          `✅ Substitution SAP Batch ${chunkIndex + 1}/${chunks.length}: ${
+            result.affectedRows
+          } rows updated`
+        );
+        resolve({
+          chunk: chunkIndex + 1,
+          affectedRows: result.affectedRows,
         });
-      })
-    );
+      });
+    });
   });
 
   Promise.all(tasks)
-    .then(() => {
+    .then((results) => {
+      const endTime = Date.now();
+      const duration = endTime - startTime;
+      const totalAffected = results.reduce((sum, r) => sum + r.affectedRows, 0);
+
+      console.log(
+        `⚡ Substitution SAP adaptive processing completed in ${duration}ms`
+      );
+      console.log(
+        `   - Format: ${isStringFormat ? "RAW STRING" : "PROCESSED OBJECT"}`
+      );
+      console.log(`   - Input: ${data.length} records`);
+      console.log(`   - Output: ${finalData.length} records`);
+      console.log(`   - Database: ${totalAffected} rows affected`);
+
       res.json({
-        message: `✅ Berhasil memproses ${data.length} data Substitution SAP.`,
+        message: `✅ Berhasil memproses ${data.length} data Substitution SAP dengan adaptive method (${duration}ms).`,
+        performance: {
+          duration_ms: duration,
+          input_records: data.length,
+          processed_records: finalData.length,
+          affected_rows: totalAffected,
+          batches: results.length,
+          format_detected: isStringFormat ? "raw_string" : "processed_object",
+          method: "adaptive_batch_processing",
+        },
       });
     })
     .catch((err) => {
-      console.error("❌ Gagal update Substitution SAP:", err);
-      res.status(500).json({ message: "❌ Gagal update Substitution SAP." });
+      console.error("❌ Gagal adaptive batch update Substitution SAP:", err);
+      res.status(500).json({
+        message: "❌ Gagal update Substitution SAP.",
+        error: err.message,
+        debug: {
+          input_format: isStringFormat ? "string" : "object",
+          input_count: data.length,
+          final_data_count: finalData.length,
+        },
+      });
     });
 });
 
@@ -686,58 +1619,55 @@ app.get("/get-ganda", (req, res) => {
 });
 
 app.post("/update-status-ganda", (req, res) => {
-  const ambilSQL = `
-    SELECT perner, tanggal,
-           att_daily, abs_daily, att_sap, abs_sap, sppd_umum,
-           jenis_jam_kerja_shift_daily, jenis_jam_kerja_shift_sap,
-           ws_rule, jenis_hari
-    FROM olah_absensi
+  console.log("🔄 Starting SIMPLIFIED status ganda processing...");
+  const overallStartTime = Date.now();
+
+  // STEP 1: Reset (same as before)
+  const resetSQL = `
+    UPDATE olah_absensi SET
+      status_ganda_att_abs = NULL, status_ganda_ws_rule = NULL,
+      att_daily_new = NULL, abs_daily_new = NULL, att_sap_new = NULL, abs_sap_new = NULL, sppd_umum_new = NULL,
+      value_att_abs = NULL, is_att_abs = NULL, value_shift_daily_sap = NULL, is_shift_daily_sap = NULL,
+      jenis_jam_kerja_shift_daily_new = NULL, jenis_jam_kerja_shift_sap_new = NULL,
+      status_jam_kerja = NULL, kategori_jam_kerja = NULL, komponen_perhitungan_jkp = NULL,
+      status_absen = NULL, status_in_out = NULL, ket_in_out = NULL, kategori_hit_jkp = NULL,
+      jam_kerja_pegawai = NULL, jam_kerja_pegawai_cleansing = NULL, jam_kerja_seharusnya = NULL
     WHERE tanggal IS NOT NULL
   `;
 
-  const resetSQL = `
-    UPDATE olah_absensi
-        SET
-          status_ganda_att_abs = NULL,
-          status_ganda_ws_rule = NULL,
-          att_daily_new = NULL,
-          abs_daily_new = NULL,
-          att_sap_new = NULL,
-          abs_sap_new = NULL,
-          sppd_umum_new = NULL,
-          value_att_abs = NULL,
-          is_att_abs = NULL,
-          jenis_jam_kerja_shift_daily_new = NULL,
-          jenis_jam_kerja_shift_sap_new = NULL,
-          value_shift_daily_sap = NULL,
-          status_jam_kerja = NULL,
-          is_shift_daily_sap = NULL,
-          kategori_jam_kerja = NULL,
-          komponen_perhitungan_jkp = NULL,
-          status_absen = NULL,
-          status_in_out = NULL,
-          ket_in_out = NULL,
-          kategori_hit_jkp = NULL,
-          jam_kerja_pegawai = NULL,
-          jam_kerja_pegawai_cleansing = NULL,
-          jam_kerja_seharusnya = NULL
-        `;
-
-  conn.query(resetSQL, (err) => {
+  conn.query(resetSQL, (err, resetResult) => {
     if (err) {
-      console.error("❌ Gagal mereset data:", err);
+      console.error("❌ Reset failed:", err);
       return res.status(500).json({ message: "❌ Gagal mereset data." });
     }
 
+    console.log(`✅ Reset: ${resetResult.affectedRows} rows`);
+
+    // STEP 2: Get data
+    const ambilSQL = `
+      SELECT perner, tanggal, att_daily, abs_daily, att_sap, abs_sap, sppd_umum,
+             jenis_jam_kerja_shift_daily, jenis_jam_kerja_shift_sap, ws_rule, jenis_hari
+      FROM olah_absensi WHERE tanggal IS NOT NULL ORDER BY perner, tanggal
+    `;
+
     conn.query(ambilSQL, (err, rows) => {
       if (err) {
-        console.error("❌ Gagal mengambil data:", err);
+        console.error("❌ Fetch failed:", err);
         return res.status(500).json({ message: "❌ Gagal mengambil data." });
       }
 
-      const updateTasks = [];
+      console.log(`📊 Fetched: ${rows.length} rows`);
 
-      rows.forEach((row) => {
+      if (rows.length === 0) {
+        return res.json({ message: "⚠️ Tidak ada data untuk diproses." });
+      }
+
+      // STEP 3: Process in memory (same business logic)
+      console.log("🔧 Processing business logic...");
+      const processStart = Date.now();
+
+      const processedData = rows.map((row) => {
+        // [Same business logic as before - shortened for brevity]
         const {
           perner,
           tanggal,
@@ -752,36 +1682,33 @@ app.post("/update-status-ganda", (req, res) => {
           jenis_hari,
         } = row;
 
-        // 1. Evaluasi status_ganda_att_abs
+        // 1. Status ganda att/abs
         const nilaiIsi = [att_daily, abs_daily, att_sap, abs_sap, sppd_umum]
           .filter((v) => v && v.trim() !== "")
           .map((v) => v.trim());
-
         let status = "Normal";
         if (nilaiIsi.length > 1) {
           const unik = new Set(nilaiIsi);
           if (unik.size > 1) status = "Ganda";
         }
 
-        // 2. Evaluasi status_ganda_ws_rule
+        // 2. Status ganda ws_rule
         const isiDaily = (jenis_jam_kerja_shift_daily || "").trim();
         const isiSAP = (jenis_jam_kerja_shift_sap || "").trim();
-
         let status_ws = "Normal";
         const keduanyaTerisi = isiDaily && isiSAP;
         const isSama = isiDaily === isiSAP;
         const adaDoubleBar = isiDaily.includes("||") || isiSAP.includes("||");
-
         if ((keduanyaTerisi && !isSama) || adaDoubleBar) {
           status_ws = "Ganda";
         }
 
-        // 3. Penyalinan *_new absensi
-        let att_daily_new = null;
-        let abs_daily_new = null;
-        let att_sap_new = null;
-        let abs_sap_new = null;
-        let sppd_umum_new = null;
+        // 3. Copy *_new values (simplified)
+        let att_daily_new = null,
+          abs_daily_new = null,
+          att_sap_new = null,
+          abs_sap_new = null,
+          sppd_umum_new = null;
         let value_att_abs = null;
 
         if (status === "Normal") {
@@ -803,18 +1730,15 @@ app.post("/update-status-ganda", (req, res) => {
           }
         }
 
-        // 4. Penyalinan shift *_new
-        let jenis_jam_kerja_shift_daily_new = null;
-        let jenis_jam_kerja_shift_sap_new = null;
-        let value_shift_daily_sap = null;
-        let is_shift_daily_sap = "false";
+        // 4. Copy shift *_new
+        let jenis_jam_kerja_shift_daily_new = null,
+          jenis_jam_kerja_shift_sap_new = null;
+        let value_shift_daily_sap = null,
+          is_shift_daily_sap = "false";
 
         if (status_ws === "Normal") {
-          if (isiSAP) {
-            jenis_jam_kerja_shift_sap_new = isiSAP;
-          } else if (isiDaily) {
-            jenis_jam_kerja_shift_daily_new = isiDaily;
-          }
+          if (isiSAP) jenis_jam_kerja_shift_sap_new = isiSAP;
+          else if (isiDaily) jenis_jam_kerja_shift_daily_new = isiDaily;
         }
 
         if (jenis_jam_kerja_shift_sap_new) {
@@ -828,13 +1752,9 @@ app.post("/update-status-ganda", (req, res) => {
         }
 
         const is_att_abs =
-          value_att_abs !== null &&
-          value_att_abs !== undefined &&
-          value_att_abs.trim() !== ""
-            ? "true"
-            : "false";
+          value_att_abs && value_att_abs.trim() !== "" ? "true" : "false";
 
-        // 5. Parse wsin-wsout dari ws_rule
+        // 5. Parse ws_rule
         let wsin = "-",
           wsout = "-";
         if (ws_rule && ws_rule.includes("~")) {
@@ -843,84 +1763,45 @@ app.post("/update-status-ganda", (req, res) => {
           wsout = outRaw.replace(/\./g, ":");
         }
 
-        // 6. Tentukan status_jam_kerja
+        // 6. Status jam kerja
         const shiftValue = value_shift_daily_sap?.toLowerCase() || "";
         let status_jam_kerja = "-";
 
-        if (shiftValue.includes("pdkb")) {
+        if (shiftValue.includes("pdkb"))
           status_jam_kerja = `Normal => PDKB (${wsin}-${wsout})`;
-        } else if (shiftValue.includes("piket")) {
+        else if (shiftValue.includes("piket"))
           status_jam_kerja = `Normal => PIKET (${wsin}-${wsout})`;
-        } else if (shiftValue.includes("shift2-malam")) {
+        else if (shiftValue.includes("shift2-malam"))
           status_jam_kerja = "Shift => Malam (00:00-08:00)";
-        } else if (shiftValue.includes("shift2-siang")) {
+        else if (shiftValue.includes("shift2-siang"))
           status_jam_kerja = "Shift => Siang (16:00-24:00)";
-        } else if (shiftValue.includes("shift2-pagi")) {
+        else if (shiftValue.includes("shift2-pagi"))
           status_jam_kerja = "Shift => Pagi (08:00-16:00)";
-        } else if (shiftValue.includes("off")) {
-          status_jam_kerja = "Shift => OFF";
-        } else {
-          status_jam_kerja = `Normal => (${wsin}-${wsout})`;
-        }
+        else if (shiftValue.includes("off")) status_jam_kerja = "Shift => OFF";
+        else status_jam_kerja = `Normal => (${wsin}-${wsout})`;
 
-        // 7. Tentukan kategori_jam_kerja dan komponen perhitungan jkp
-        let kategori_jam_kerja = "Normal"; // default
-        if (shiftValue.includes("pdkb")) {
-          kategori_jam_kerja = "PDKB";
-        } else if (shiftValue.includes("piket")) {
-          kategori_jam_kerja = "PIKET";
-        } else if (
-          shiftValue.includes("shift2-malam") ||
-          shiftValue.includes("shift2-siang") ||
-          shiftValue.includes("shift2-pagi") ||
-          shiftValue.includes("off")
-        ) {
+        // 7. Kategori jam kerja
+        let kategori_jam_kerja = "Normal";
+        if (shiftValue.includes("pdkb")) kategori_jam_kerja = "PDKB";
+        else if (shiftValue.includes("piket")) kategori_jam_kerja = "PIKET";
+        else if (shiftValue.includes("shift2-") || shiftValue.includes("off"))
           kategori_jam_kerja = "Shift";
-        }
 
-        // Penentuan komponen_perhitungan_jkp sesuai instruksi (DIPERBAIKI)
-        let komponen_perhitungan_jkp = false;
-
-        // Cek apakah jenis_hari mengandung "kerja" (hari kerja)
+        // 8. Komponen perhitungan jkp
         const isHariKerja =
           jenis_hari && jenis_hari.toLowerCase().includes("kerja");
-
-        if (kategori_jam_kerja === "Shift") {
-          komponen_perhitungan_jkp = true;
-        } else if (
+        let komponen_perhitungan_jkp = false;
+        if (kategori_jam_kerja === "Shift") komponen_perhitungan_jkp = true;
+        else if (
           kategori_jam_kerja &&
           kategori_jam_kerja !== "Shift" &&
           isHariKerja
-        ) {
+        )
           komponen_perhitungan_jkp = true;
-        } else {
-          komponen_perhitungan_jkp = false;
-        }
 
-        // 8. Update ke database
-        const sqlUpdate = `
-            UPDATE olah_absensi
-            SET
-              status_ganda_att_abs = ?,
-              status_ganda_ws_rule = ?,
-              att_daily_new = ?,
-              abs_daily_new = ?,
-              att_sap_new = ?,
-              abs_sap_new = ?,
-              sppd_umum_new = ?,
-              jenis_jam_kerja_shift_daily_new = ?,
-              jenis_jam_kerja_shift_sap_new = ?,
-              value_att_abs = ?,
-              is_att_abs = ?,
-              value_shift_daily_sap = ?,
-              is_shift_daily_sap = ?,
-              status_jam_kerja = ?,
-              kategori_jam_kerja = ?,
-              komponen_perhitungan_jkp = ?
-            WHERE perner = ? AND tanggal = ?
-          `;
-
-        const params = [
+        return {
+          perner,
+          tanggal,
           status,
           status_ws,
           att_daily_new,
@@ -937,29 +1818,215 @@ app.post("/update-status-ganda", (req, res) => {
           status_jam_kerja,
           kategori_jam_kerja,
           komponen_perhitungan_jkp,
-          perner,
-          tanggal,
-        ];
-
-        updateTasks.push(
-          new Promise((resolve, reject) => {
-            conn.query(sqlUpdate, params, (err, result) => {
-              if (err) return reject(err);
-              resolve(result);
-            });
-          })
-        );
+        };
       });
 
-      Promise.all(updateTasks)
-        .then(() => {
+      const processedDuration = Date.now() - processStart;
+      console.log(
+        `✅ Processed: ${processedData.length} records (${processedDuration}ms)`
+      );
+
+      // STEP 4: Multiple batch updates (simplified approach)
+      console.log("💾 Starting multiple batch updates...");
+      const batchStartTime = Date.now();
+
+      const chunkSize = 300;
+      const chunks = [];
+      for (let i = 0; i < processedData.length; i += chunkSize) {
+        chunks.push(processedData.slice(i, i + chunkSize));
+      }
+
+      console.log(`📦 ${chunks.length} batches to process`);
+
+      // Update in separate batches by field groups to avoid complex SQL
+      const updateFieldGroups = [
+        // Group 1: Status fields
+        {
+          name: "Status Fields",
+          fields: [
+            "status_ganda_att_abs",
+            "status_ganda_ws_rule",
+            "is_att_abs",
+            "is_shift_daily_sap",
+          ],
+          dataFields: [
+            "status",
+            "status_ws",
+            "is_att_abs",
+            "is_shift_daily_sap",
+          ],
+        },
+        // Group 2: *_new fields
+        {
+          name: "New Value Fields",
+          fields: [
+            "att_daily_new",
+            "abs_daily_new",
+            "att_sap_new",
+            "abs_sap_new",
+            "sppd_umum_new",
+            "jenis_jam_kerja_shift_daily_new",
+            "jenis_jam_kerja_shift_sap_new",
+          ],
+          dataFields: [
+            "att_daily_new",
+            "abs_daily_new",
+            "att_sap_new",
+            "abs_sap_new",
+            "sppd_umum_new",
+            "jenis_jam_kerja_shift_daily_new",
+            "jenis_jam_kerja_shift_sap_new",
+          ],
+        },
+        // Group 3: Value/text fields
+        {
+          name: "Value Fields",
+          fields: [
+            "value_att_abs",
+            "value_shift_daily_sap",
+            "status_jam_kerja",
+            "kategori_jam_kerja",
+          ],
+          dataFields: [
+            "value_att_abs",
+            "value_shift_daily_sap",
+            "status_jam_kerja",
+            "kategori_jam_kerja",
+          ],
+        },
+        // Group 4: Boolean fields
+        {
+          name: "Boolean Fields",
+          fields: ["komponen_perhitungan_jkp"],
+          dataFields: ["komponen_perhitungan_jkp"],
+        },
+      ];
+
+      const allBatchTasks = [];
+
+      updateFieldGroups.forEach((group, groupIndex) => {
+        chunks.forEach((chunk, chunkIndex) => {
+          const batchTask = new Promise((resolve, reject) => {
+            const setClauses = group.fields.map(() => {
+              return `CASE ${chunk
+                .map(() => "WHEN perner = ? AND tanggal = ? THEN ?")
+                .join(" ")} END`;
+            });
+
+            const batchSQL = `
+              UPDATE olah_absensi SET
+              ${group.fields
+                .map((field, i) => `${field} = ${setClauses[i]}`)
+                .join(", ")}
+              WHERE (perner, tanggal) IN (${chunk
+                .map(() => "(?, ?)")
+                .join(", ")})
+            `;
+
+            const params = [];
+            // Add CASE parameters for each field
+            group.dataFields.forEach((dataField) => {
+              chunk.forEach((item) => {
+                params.push(item.perner, item.tanggal, item[dataField]);
+              });
+            });
+            // Add WHERE parameters
+            chunk.forEach((item) => {
+              params.push(item.perner, item.tanggal);
+            });
+
+            const taskStart = Date.now();
+            conn.query(batchSQL, params, (err, result) => {
+              if (err) {
+                console.error(
+                  `❌ ${group.name} Batch ${chunkIndex + 1} failed:`,
+                  err
+                );
+                return reject(err);
+              }
+
+              const taskDuration = Date.now() - taskStart;
+              console.log(
+                `✅ ${group.name} Batch ${chunkIndex + 1}/${chunks.length}: ${
+                  result.affectedRows
+                } rows (${taskDuration}ms)`
+              );
+
+              resolve({
+                group: group.name,
+                chunk: chunkIndex + 1,
+                affectedRows: result.affectedRows,
+                duration: taskDuration,
+              });
+            });
+          });
+
+          allBatchTasks.push(batchTask);
+        });
+      });
+
+      // Execute all batch tasks
+      Promise.all(allBatchTasks)
+        .then((results) => {
+          const batchDuration = Date.now() - batchStartTime;
+          const overallDuration = Date.now() - overallStartTime;
+
+          // Group results by field group
+          const groupStats = updateFieldGroups.map((group) => {
+            const groupResults = results.filter((r) => r.group === group.name);
+            return {
+              name: group.name,
+              batches: groupResults.length,
+              totalAffected: groupResults.reduce(
+                (sum, r) => sum + r.affectedRows,
+                0
+              ),
+              avgDuration: Math.round(
+                groupResults.reduce((sum, r) => sum + r.duration, 0) /
+                  groupResults.length
+              ),
+            };
+          });
+
+          const totalAffected = results.reduce(
+            (sum, r) => sum + r.affectedRows,
+            0
+          );
+
+          console.log(`⚡ SIMPLIFIED STATUS GANDA COMPLETED!`);
+          console.log(`   ⏱️ Overall: ${overallDuration}ms`);
+          console.log(`   📊 Processed: ${processedData.length} records`);
+          console.log(`   📦 Total batches: ${results.length}`);
+          console.log(`   ✅ Total updates: ${totalAffected}`);
+
+          groupStats.forEach((stat) => {
+            console.log(
+              `   📈 ${stat.name}: ${stat.batches} batches, ${stat.totalAffected} updates, ${stat.avgDuration}ms avg`
+            );
+          });
+
           res.json({
-            message: `✅ Status Ganda/Normal & status_jam_kerja diperbarui untuk ${rows.length} baris.`,
+            message: `✅ Status Ganda diperbarui dengan simplified batch method (${overallDuration}ms).`,
+            performance: {
+              overall_duration_ms: overallDuration,
+              processing_duration_ms: processedDuration,
+              batch_duration_ms: batchDuration,
+              total_records: processedData.length,
+              total_updates: totalAffected,
+              total_batches: results.length,
+              field_groups: updateFieldGroups.length,
+              chunk_size: chunkSize,
+              method: "simplified_multi_group_batch_processing",
+            },
+            field_group_stats: groupStats,
           });
         })
         .catch((err) => {
-          console.error("❌ Gagal update status:", err);
-          res.status(500).json({ message: "❌ Gagal mengupdate status." });
+          console.error("❌ Simplified batch processing failed:", err);
+          res.status(500).json({
+            message: "❌ Gagal simplified batch processing.",
+            error: err.message,
+          });
         });
     });
   });
@@ -1548,149 +2615,111 @@ Values: ${JSON.stringify(values)}
 
 app.post("/proses-kalkulasi-jkp-backend-selective", async (req, res) => {
   try {
-    const { filterValue, targetRows } = req.body;
+    console.log("🔄 Starting SIMPLIFIED JKP backend selective processing...");
+    const overallStartTime = Date.now();
 
-    const hardcodedTargetRows = [
-      // { perner: "92143410", tanggal: "2025-02-28" }
-    ];
+    const { filterValue, targetRows } = req.body;
+    const hardcodedTargetRows = [];
 
     const selectedTargetRows =
       targetRows ||
       (hardcodedTargetRows.length > 0 ? hardcodedTargetRows : null);
-
     const isProcessAllData =
       !selectedTargetRows || selectedTargetRows.length === 0;
 
-    console.log(
-      `🔍 Processing mode: ${isProcessAllData ? "ALL_DATA" : "SELECTIVE"}`
-    );
-    if (!isProcessAllData) {
-      console.log(`🎯 Target rows: ${selectedTargetRows.length}`);
-    }
+    console.log(`🔍 Mode: ${isProcessAllData ? "ALL_DATA" : "SELECTIVE"}`);
 
-    const ambil = await fetch(`${BASE_URL}/ambil-data-absensi-untuk-jkp`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        filterValue: filterValue || "shift_daily => Shift2-Malam~00.00~08.00",
+    // STEP 1: Fetch data (with timeout)
+    console.log("📊 Fetching source data...");
+    const fetchStart = Date.now();
+
+    const ambil = await Promise.race([
+      fetch(`${BASE_URL}/ambil-data-absensi-untuk-jkp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          filterValue: filterValue || "shift_daily => Shift2-Malam~00.00~08.00",
+        }),
       }),
-    });
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Fetch timeout")), 30000)
+      ),
+    ]);
 
-    if (!ambil.ok) {
-      throw new Error(`HTTP error! status: ${ambil.status}`);
-    }
+    if (!ambil.ok) throw new Error(`HTTP error! status: ${ambil.status}`);
 
     const allData = await ambil.json();
+    const fetchDuration = Date.now() - fetchStart;
+
+    console.log(
+      `✅ Fetched: ${allData?.length || 0} records (${fetchDuration}ms)`
+    );
 
     if (!Array.isArray(allData) || allData.length === 0) {
-      return res.status(400).json({
-        message: "❌ Data tidak valid atau kosong",
-      });
+      return res.status(400).json({ message: "❌ No data from source" });
     }
 
+    // STEP 2: Filter data efficiently
     let filteredData = [];
-    let foundTargets = [];
-    let missingTargets = [];
-
     if (isProcessAllData) {
       filteredData = allData;
-      foundTargets = allData.map((row) => ({
-        perner: row.perner,
-        tanggal: formatTanggalSafe(row.tanggal),
-        originalTarget: "ALL_DATA",
-        foundRowDate: row.tanggal,
-        status: "found",
-      }));
     } else {
-      if (selectedTargetRows && Array.isArray(selectedTargetRows)) {
-        selectedTargetRows.forEach((target) => {
-          if (!target || !target.perner || !target.tanggal) return;
+      const targetMap = new Map();
+      selectedTargetRows.forEach((target) => {
+        if (target?.perner && target?.tanggal) {
+          targetMap.set(
+            `${target.perner}||${formatTanggalSafe(target.tanggal)}`,
+            true
+          );
+        }
+      });
 
-          const targetDate = formatTanggalSafe(target.tanggal);
-          const foundRow = allData.find((row) => {
-            if (!row || !row.perner || !row.tanggal) return false;
-
-            const rowDate = formatTanggalSafe(row.tanggal);
-            const penerMatch = row.perner === target.perner;
-
-            let dateMatch = isSameDate(targetDate, rowDate);
-
-            if (
-              !dateMatch &&
-              row.tanggal &&
-              typeof row.tanggal === "string" &&
-              row.tanggal.includes("T")
-            ) {
-              const utcDate = new Date(row.tanggal);
-              const localDate = new Date(
-                utcDate.getTime() + 7 * 60 * 60 * 1000
-              );
-              const localDateStr = formatTanggalSafe(localDate);
-              if (targetDate === localDateStr) {
-                dateMatch = true;
-              }
-            }
-
-            return penerMatch && dateMatch;
-          });
-
-          if (foundRow) {
-            filteredData.push(foundRow);
-            foundTargets.push({
-              perner: target.perner,
-              tanggal: targetDate,
-              originalTarget: target.tanggal,
-              foundRowDate: foundRow.tanggal,
-              status: "found",
-            });
-          } else {
-            missingTargets.push({
-              perner: target.perner,
-              tanggal: targetDate,
-              originalTarget: target.tanggal,
-              status: "not_found",
-            });
-          }
-        });
-      }
-    }
-
-    if (filteredData.length === 0) {
-      return res.status(400).json({
-        message: isProcessAllData
-          ? "❌ Tidak ada data dalam database untuk diproses"
-          : "❌ Tidak ada target rows yang ditemukan dalam dataset",
-        targeting: isProcessAllData
-          ? { mode: "ALL_DATA", total_data: allData.length, filtered_data: 0 }
-          : {
-              total_targets: selectedTargetRows ? selectedTargetRows.length : 0,
-              found: foundTargets,
-              missing: missingTargets,
-            },
+      filteredData = allData.filter((row) => {
+        if (!row?.perner || !row?.tanggal) return false;
+        return targetMap.has(
+          `${row.perner}||${formatTanggalSafe(row.tanggal)}`
+        );
       });
     }
 
-    const hasilUpdate = [];
-    const logJKP = [];
+    console.log(`🔍 Filtered: ${filteredData.length} records`);
 
-    filteredData.forEach((row) => {
+    if (filteredData.length === 0) {
+      return res
+        .status(400)
+        .json({ message: "❌ No filtered data to process" });
+    }
+
+    // STEP 3: Process JKP calculations
+    console.log("🔧 Processing JKP calculations...");
+    const processStart = Date.now();
+
+    const processedResults = [];
+    let errorCount = 0;
+
+    for (let i = 0; i < filteredData.length; i++) {
       try {
-        if (!row.perner || !row.tanggal) return;
+        const row = filteredData[i];
+        if (!row.perner || !row.tanggal) {
+          errorCount++;
+          continue;
+        }
 
         const hasilJKP = hitungJKPFinal(row);
-        if (!hasilJKP) return;
+        if (!hasilJKP) {
+          errorCount++;
+          continue;
+        }
 
         const hasilJKPShift = hitungJKPShift(row);
 
+        // Simplified logic (keeping only essential calculations)
         const rawDurasi = Number(hasilJKP.durasi ?? 0);
-
-        // Pilih sumber ket_in_out sesuai kategori
         const ket_in_out_final =
           hasilJKP.ket === "JKP Shift"
             ? hasilJKPShift?.ket_in_out ?? hasilJKP?.ket_in_out ?? null
             : hasilJKP?.ket_in_out ?? hasilJKPShift?.ket_in_out ?? null;
 
-        // ✨ FITUR BARU: Ekstrak durasi_seharusnya
         const durasi_seharusnya_final =
           hasilJKP.ket === "JKP Shift"
             ? hasilJKPShift?.durasi_seharusnya ??
@@ -1700,15 +2729,12 @@ app.post("/proses-kalkulasi-jkp-backend-selective", async (req, res) => {
               hasilJKPShift?.durasi_seharusnya ??
               null;
 
-        let rawDurasiCleansing;
-        let daily_in_raw;
-        let daily_out_raw;
+        let rawDurasiCleansing, daily_in_raw, daily_out_raw;
 
         if (hasilJKP.ket === "JKP Shift") {
           rawDurasiCleansing = Number(
             hasilJKPShift.durasi_cleansing_c ??
               hasilJKPShift.durasi_cleansing ??
-              hasilJKP.durasi_cleansing_c ??
               hasilJKP.durasi ??
               0
           );
@@ -1719,7 +2745,6 @@ app.post("/proses-kalkulasi-jkp-backend-selective", async (req, res) => {
           daily_out_raw =
             hasilJKPShift.daily_out_cleansing_c ??
             hasilJKP.daily_out_cleansing_c ??
-            hasilJKP.jpr ??
             row.daily_out ??
             null;
         } else {
@@ -1732,41 +2757,37 @@ app.post("/proses-kalkulasi-jkp-backend-selective", async (req, res) => {
           daily_in_raw =
             hasilJKP.daily_in_cleansing_c ??
             hasilJKP.daily_in_cleansing ??
-            hasilJKP.jmr ??
             row.daily_in ??
             null;
           daily_out_raw =
             hasilJKP.daily_out_cleansing_c ??
             hasilJKP.daily_out_cleansing ??
-            hasilJKP.jpr ??
             row.daily_out ??
             null;
         }
 
-        const finalTanggal = formatTanggalSafe(row.tanggal);
-
-        // ✨ FITUR BARU: Perhitungan field-field untuk database
         const jam_kerja_pegawai_cleansing = !isNaN(rawDurasiCleansing)
           ? parseFloat(rawDurasiCleansing.toFixed(3))
           : 0;
-
         const jam_kerja_seharusnya =
           durasi_seharusnya_final !== null &&
           !isNaN(Number(durasi_seharusnya_final))
             ? parseFloat(Number(durasi_seharusnya_final).toFixed(3))
             : null;
 
-        // ✨ FITUR BARU: Hitung persentase pemenuhan jam kerja
         let persentase = null;
         if (jam_kerja_seharusnya !== null && jam_kerja_seharusnya > 0) {
-          const persentase_raw =
-            (jam_kerja_pegawai_cleansing / jam_kerja_seharusnya) * 100;
-          persentase = parseFloat(persentase_raw.toFixed(2));
+          persentase = parseFloat(
+            (
+              (jam_kerja_pegawai_cleansing / jam_kerja_seharusnya) *
+              100
+            ).toFixed(2)
+          );
         }
 
-        const hasil = {
+        processedResults.push({
           perner: row.perner,
-          tanggal: finalTanggal,
+          tanggal: formatTanggalSafe(row.tanggal),
           jkp: !isNaN(rawDurasi) ? parseFloat(rawDurasi.toFixed(3)) : 0,
           daily_in_cleansing:
             daily_in_raw && daily_in_raw !== "-"
@@ -1781,176 +2802,201 @@ app.post("/proses-kalkulasi-jkp-backend-selective", async (req, res) => {
           ket_in_out: ket_in_out_final || null,
           jam_kerja_seharusnya: jam_kerja_seharusnya,
           persentase: persentase,
-        };
+        });
 
-        hasilUpdate.push(hasil);
-
-        logJKP.push(
-          row.__logJKP !== undefined
-            ? row.__logJKP
-            : `❌ Log tidak tersedia untuk ${row.perner} - ${formatTanggalSafe(
-                row.tanggal
-              )}`
-        );
+        // Progress for large datasets
+        if ((i + 1) % 1000 === 0) {
+          console.log(`⏳ Processed: ${i + 1}/${filteredData.length}`);
+        }
       } catch (error) {
-        logJKP.push(
-          `❌ Error processing target ${row.perner}: ${error.message}`
-        );
+        console.error(`Error processing row ${i + 1}:`, error.message);
+        errorCount++;
       }
-    });
-
-    if (hasilUpdate.length === 0) {
-      return res.status(400).json({
-        message: isProcessAllData
-          ? "❌ Tidak ada data yang berhasil diproses dari database"
-          : "❌ Tidak ada target rows yang berhasil diproses",
-      });
     }
 
-    // ✨ FITUR BARU: Update SQL query dengan jam_kerja_seharusnya dan persentase
-    const sql = `
-      UPDATE olah_absensi
-      SET jam_kerja_pegawai = ?, 
-          daily_in_cleansing = ?, 
-          daily_out_cleansing = ?, 
-          jam_kerja_pegawai_cleansing = ?,
-          kategori_hit_jkp = ?,
-          ket_in_out = ?,
-          jam_kerja_seharusnya = ?,
-          persentase = ?
-      WHERE perner = ? AND (
-        DATE(tanggal) = ? OR 
-        DATE(CONVERT_TZ(tanggal, '+00:00', '+07:00')) = ? OR
-        tanggal = ?
-      )
-    `;
+    const processDuration = Date.now() - processStart;
+    console.log(
+      `✅ JKP calculations: ${processedResults.length} successful, ${errorCount} errors (${processDuration}ms)`
+    );
 
-    const tasks = hasilUpdate.map((item) => {
-      const {
-        perner,
-        tanggal,
-        jkp,
-        daily_in_cleansing,
-        daily_out_cleansing,
-        durasi_cleansing,
-        kategori_hit_jkp,
-        ket_in_out,
-        jam_kerja_seharusnya,
-        persentase,
-      } = item;
+    if (processedResults.length === 0) {
+      return res
+        .status(400)
+        .json({ message: "❌ No successful JKP calculations" });
+    }
 
-      const values = [
-        jkp,
-        daily_in_cleansing,
-        daily_out_cleansing,
-        durasi_cleansing,
-        kategori_hit_jkp,
-        ket_in_out,
-        jam_kerja_seharusnya,
-        persentase,
-        perner,
-        tanggal,
-        tanggal,
-        tanggal,
-      ];
+    // STEP 4: Simplified batch updates - separate by field groups
+    console.log("💾 Starting simplified batch database updates...");
+    const batchStart = Date.now();
 
-      return new Promise((resolve, reject) => {
-        const cekQuery = `
-          SELECT perner, tanggal, jam_kerja_pegawai, daily_in_cleansing,
-                 daily_out_cleansing, jam_kerja_pegawai_cleansing,
-                 kategori_hit_jkp, ket_in_out, jam_kerja_seharusnya, persentase
-          FROM olah_absensi
-          WHERE perner = ? AND (
-            DATE(tanggal) = ? OR 
-            DATE(CONVERT_TZ(tanggal, '+00:00', '+07:00')) = ? OR
-            tanggal = ?
-          )
-        `;
+    const chunkSize = 200;
+    const chunks = [];
+    for (let i = 0; i < processedResults.length; i += chunkSize) {
+      chunks.push(processedResults.slice(i, i + chunkSize));
+    }
 
-        conn.query(
-          cekQuery,
-          [perner, tanggal, tanggal, tanggal],
-          (cekErr, cekRows) => {
-            if (cekErr) {
-              return reject(new Error(`Cek data gagal: ${cekErr.message}`));
-            }
-            if (cekRows.length === 0) {
-              return resolve({
-                perner,
-                tanggal,
-                affectedRows: 0,
-                status: "skip - not found",
-              });
-            }
-            conn.query(sql, values, (err, result) => {
-              if (err) {
-                return reject(
-                  new Error(`SQL Error for target ${perner}: ${err.message}`)
-                );
-              }
-              resolve({
-                perner,
-                tanggal,
-                affectedRows: result.affectedRows,
-                status: result.affectedRows > 0 ? "updated" : "not-updated",
-                beforeUpdate: cekRows[0],
-                updateValues: values,
-              });
+    console.log(`📦 ${chunks.length} chunks to process`);
+
+    // Group fields for simpler SQL
+    const fieldGroups = [
+      // Group 1: Primary JKP fields
+      {
+        name: "Primary JKP",
+        updates: [
+          { field: "jam_kerja_pegawai", dataField: "jkp" },
+          {
+            field: "jam_kerja_pegawai_cleansing",
+            dataField: "durasi_cleansing",
+          },
+          { field: "jam_kerja_seharusnya", dataField: "jam_kerja_seharusnya" },
+          { field: "persentase", dataField: "persentase" },
+        ],
+      },
+      // Group 2: Cleansing fields
+      {
+        name: "Cleansing Data",
+        updates: [
+          { field: "daily_in_cleansing", dataField: "daily_in_cleansing" },
+          { field: "daily_out_cleansing", dataField: "daily_out_cleansing" },
+          { field: "kategori_hit_jkp", dataField: "kategori_hit_jkp" },
+          { field: "ket_in_out", dataField: "ket_in_out" },
+        ],
+      },
+    ];
+
+    const allBatchTasks = [];
+
+    fieldGroups.forEach((group) => {
+      chunks.forEach((chunk, chunkIndex) => {
+        const task = new Promise((resolve, reject) => {
+          // Simple field-by-field update
+          const setClauses = group.updates.map((update) => {
+            return `${update.field} = CASE ${chunk
+              .map(() => "WHEN perner = ? AND DATE(tanggal) = ? THEN ?")
+              .join(" ")} ELSE ${update.field} END`;
+          });
+
+          const sql = `
+            UPDATE olah_absensi SET
+            ${setClauses.join(",\n            ")}
+            WHERE (perner, DATE(tanggal)) IN (${chunk
+              .map(() => "(?, ?)")
+              .join(", ")})
+          `;
+
+          const params = [];
+
+          // Parameters for each field's CASE statement
+          group.updates.forEach((update) => {
+            chunk.forEach((item) => {
+              params.push(item.perner, item.tanggal, item[update.dataField]);
             });
-          }
-        );
+          });
+
+          // Parameters for WHERE clause
+          chunk.forEach((item) => {
+            params.push(item.perner, item.tanggal);
+          });
+
+          const taskStart = Date.now();
+          conn.query(sql, params, (err, result) => {
+            if (err) {
+              console.error(
+                `❌ ${group.name} batch ${chunkIndex + 1} failed:`,
+                err
+              );
+              return reject(err);
+            }
+
+            const taskDuration = Date.now() - taskStart;
+            console.log(
+              `✅ ${group.name} batch ${chunkIndex + 1}/${chunks.length}: ${
+                result.affectedRows
+              } rows (${taskDuration}ms)`
+            );
+
+            resolve({
+              group: group.name,
+              chunk: chunkIndex + 1,
+              affectedRows: result.affectedRows,
+              duration: taskDuration,
+            });
+          });
+        });
+
+        allBatchTasks.push(task);
       });
     });
 
-    await Promise.allSettled(tasks);
+    // Execute all batch tasks
+    const batchResults = await Promise.allSettled(allBatchTasks);
+    const batchDuration = Date.now() - batchStart;
+    const overallDuration = Date.now() - overallStartTime;
 
-    // ✨ FITUR BARU: Enhanced response message dengan statistik persentase
-    const updatedRowsCount = hasilUpdate.length;
-    const jamKerjaSeharusnyaCount = hasilUpdate.filter(
-      (item) => item.jam_kerja_seharusnya !== null
-    ).length;
-    const persentaseCount = hasilUpdate.filter(
-      (item) => item.persentase !== null
-    ).length;
+    const successfulTasks = batchResults
+      .filter((r) => r.status === "fulfilled")
+      .map((r) => r.value);
+    const failedTasks = batchResults.filter((r) => r.status === "rejected");
+    const totalAffected = successfulTasks.reduce(
+      (sum, r) => sum + r.affectedRows,
+      0
+    );
 
-    // Hitung statistik persentase
-    const persentaseData = hasilUpdate.filter(
+    // Calculate statistics
+    const persentaseData = processedResults.filter(
       (item) => item.persentase !== null
     );
     let avgPersentase = null;
-    let minPersentase = null;
-    let maxPersentase = null;
-
     if (persentaseData.length > 0) {
-      const persentaseValues = persentaseData.map((item) => item.persentase);
+      const values = persentaseData.map((item) => item.persentase);
       avgPersentase = parseFloat(
-        (
-          persentaseValues.reduce((a, b) => a + b, 0) / persentaseValues.length
-        ).toFixed(2)
+        (values.reduce((a, b) => a + b, 0) / values.length).toFixed(2)
       );
-      minPersentase = Math.min(...persentaseValues);
-      maxPersentase = Math.max(...persentaseValues);
     }
 
+    console.log(`⚡ SIMPLIFIED JKP PROCESSING COMPLETED!`);
+    console.log(`   ⏱️ Overall: ${overallDuration}ms`);
+    console.log(`   📊 Fetch: ${fetchDuration}ms`);
+    console.log(`   🔧 Process: ${processDuration}ms`);
+    console.log(`   💾 Batch: ${batchDuration}ms`);
+    console.log(`   ✅ Updates: ${totalAffected}`);
+    console.log(
+      `   📦 Successful tasks: ${successfulTasks.length}/${allBatchTasks.length}`
+    );
+
     res.json({
-      message: `✅ Processing completed. ${updatedRowsCount} records processed. ${persentaseCount} records with persentase data (avg: ${avgPersentase}%).`,
-      details: {
-        total_processed: updatedRowsCount,
-        with_jam_kerja_seharusnya: jamKerjaSeharusnyaCount,
-        with_persentase: persentaseCount,
-        without_persentase: updatedRowsCount - persentaseCount,
-        persentase_stats: {
-          average: avgPersentase,
-          minimum: minPersentase,
-          maximum: maxPersentase,
-          count: persentaseCount,
-        },
+      message: `✅ Simplified JKP processing completed. ${processedResults.length} records processed, ${totalAffected} database updates (${overallDuration}ms).`,
+      performance: {
+        overall_duration_ms: overallDuration,
+        fetch_duration_ms: fetchDuration,
+        processing_duration_ms: processDuration,
+        batch_duration_ms: batchDuration,
+        total_processed: processedResults.length,
+        total_affected: totalAffected,
+        successful_tasks: successfulTasks.length,
+        failed_tasks: failedTasks.length,
+        total_batches: chunks.length * fieldGroups.length,
+        method: "simplified_field_group_batch_processing",
+      },
+      statistics: {
+        error_count: errorCount,
+        success_rate: `${Math.round(
+          (processedResults.length / filteredData.length) * 100
+        )}%`,
+        with_persentase: persentaseData.length,
+        avg_persentase: avgPersentase,
+        processing_rate: `${Math.round(
+          processedResults.length / (processDuration / 1000)
+        )} calculations/sec`,
+        database_rate: `${Math.round(
+          totalAffected / (batchDuration / 1000)
+        )} updates/sec`,
       },
     });
   } catch (err) {
-    console.error("❌ Fatal error in selective JKP calculation:", err);
+    console.error("❌ Fatal error in simplified JKP processing:", err);
     res.status(500).json({
-      message: "❌ Fatal error during selective JKP calculation process.",
+      message: "❌ Fatal error during simplified JKP processing.",
       error: err.message,
     });
   }
@@ -2909,154 +3955,168 @@ app.post("/proses-status-in-out", async (req, res) => {
 // ENDPOINT: Generate Rekap Absensi
 // ============================================
 app.post("/generate-rekap-absensi", (req, res) => {
-  console.log("📈 Starting generate rekap absensi...");
-  const startTime = Date.now();
+  console.log("🔄 Starting PARALLEL CHUNKED generate rekap absensi...");
+  const overallStartTime = Date.now();
 
-  // Step 1: Clear existing data (optional)
+  // STEP 1: Clear existing data
+  console.log("🗑️ Clearing existing rekap data...");
   const clearSQL = "DELETE FROM rekap_absensi";
-  conn.query(clearSQL, (clearErr) => {
+
+  conn.query(clearSQL, (clearErr, clearResult) => {
     if (clearErr) {
       console.warn("⚠️ Warning clearing rekap_absensi:", clearErr.message);
     }
 
-    // Step 2: Get unique PERNERs
-    const getPernersSQL =
-      "SELECT DISTINCT perner FROM olah_absensi ORDER BY perner";
+    console.log(
+      `✅ Cleared: ${clearResult?.affectedRows || 0} existing records`
+    );
+
+    // STEP 2: Get unique PERNERs efficiently
+    console.log("📋 Getting list of employees...");
+    const getPernersStartTime = Date.now();
+
+    const getPernersSQL = `
+      SELECT DISTINCT perner, COUNT(*) as record_count
+      FROM olah_absensi 
+      WHERE perner IS NOT NULL 
+      GROUP BY perner 
+      ORDER BY perner
+    `;
 
     conn.query(getPernersSQL, (err, perners) => {
       if (err) {
-        console.error("❌ Gagal mengambil daftar perner:", err);
+        console.error("❌ Failed to get employee list:", err);
         return res.status(500).json({
+          success: false,
           message: "❌ Gagal mengambil daftar pegawai.",
           error: err.message,
         });
       }
 
-      console.log(`📋 Ditemukan ${perners.length} pegawai untuk diproses`);
+      const getPernersDate = Date.now() - getPernersStartTime;
+      console.log(
+        `✅ Found ${perners.length} employees in ${getPernersDate}ms`
+      );
 
-      // Step 3: Process each PERNER
-      const tasks = [];
-      let processedCount = 0;
-      let successCount = 0;
-      let errorCount = 0;
+      if (perners.length === 0) {
+        return res.json({
+          success: true,
+          message: "⚠️ No employees found to process.",
+          details: { total_pegawai: 0 },
+        });
+      }
 
-      perners.forEach((pernerRow) => {
-        const perner = pernerRow.perner;
+      // STEP 3: Parallel chunked processing (OPTIMIZED)
+      console.log("⚡ Starting parallel chunked processing...");
+      const processStartTime = Date.now();
 
-        tasks.push(
-          new Promise((resolve, reject) => {
-            // Complex SQL untuk calculate semua field sekaligus
-            const rekapSQL = `
-              SELECT 
-                '${perner}' as PERNER,
-                
-                -- Statistik Hari
-                COUNT(*) as TOTAL_HARI,
-                COUNT(CASE WHEN jenis_hari LIKE '%HARI KERJA%' THEN 1 END) as HARI_KERJA,
-                COUNT(CASE WHEN jenis_hari LIKE '%LIBUR%' THEN 1 END) as HARI_LIBUR,
-                
-                -- Statistik Koreksi
-                COUNT(CASE WHEN (correction_in = 'koreksi' OR correction_out = 'koreksi') THEN 1 END) as TOTAL_HARI_KOREKSI,
-                COUNT(CASE WHEN correction_in = 'koreksi' AND (correction_out != 'koreksi' OR correction_out IS NULL) THEN 1 END) as KOREKSI_IN,
-                COUNT(CASE WHEN correction_out = 'koreksi' AND (correction_in != 'koreksi' OR correction_in IS NULL) THEN 1 END) as KOREKSI_OUT,
-                COUNT(CASE WHEN correction_in = 'koreksi' AND correction_out = 'koreksi' THEN 1 END) as KOREKSI_IN_OUT,
-                
-                -- Jam Kerja Normal
-                COUNT(CASE WHEN status_jam_kerja LIKE '%Normal%' THEN 1 END) as TOTAL_JAM_KERJA_NORMAL,
-                COUNT(CASE WHEN status_jam_kerja LIKE '%PIKET%' THEN 1 END) as PIKET,
-                COUNT(CASE WHEN status_jam_kerja LIKE '%PDKB%' THEN 1 END) as PDKB,
-                COUNT(CASE WHEN status_jam_kerja LIKE '%Normal%' AND status_jam_kerja NOT LIKE '%PIKET%' AND status_jam_kerja NOT LIKE '%PDKB%' THEN 1 END) as REGULER,
-                
-                -- Jam Kerja Shift
-                COUNT(CASE WHEN status_jam_kerja LIKE '%Shift%' THEN 1 END) as TOTAL_JAM_KERJA_SHIFT,
-                COUNT(CASE WHEN status_jam_kerja LIKE '%Pagi%' THEN 1 END) as SHIFT_PAGI,
-                COUNT(CASE WHEN status_jam_kerja LIKE '%Siang%' THEN 1 END) as SHIFT_SIANG,
-                COUNT(CASE WHEN status_jam_kerja LIKE '%Malam%' THEN 1 END) as SHIFT_MALAM,
-                COUNT(CASE WHEN status_jam_kerja LIKE '%OFF%' THEN 1 END) as SHIFT_OFF,
-                
-                -- Status Absensi
-                COUNT(CASE WHEN status_absen = 'Lengkap' THEN 1 END) as ABSEN_LENGKAP,
-                COUNT(CASE WHEN status_absen LIKE '%tidak absen%' THEN 1 END) as TIDAK_ABSEN,
-                COUNT(CASE WHEN status_absen LIKE '%in kosong%' THEN 1 END) as IN_KOSONG,
-                COUNT(CASE WHEN status_absen LIKE '%out kosong%' THEN 1 END) as OUT_KOSONG,
-                
-                -- Pengajuan Ketidakhadiran (Parse value_att_abs)
-                COUNT(CASE WHEN SUBSTRING_INDEX(value_att_abs, '_', 1) IN ('att', 'sppd') THEN 1 END) as SPPD_TUGAS_LUAR_DLL,
-                COUNT(CASE WHEN SUBSTRING_INDEX(value_att_abs, '_', 1) = 'abs' THEN 1 END) as CUTI_IJIN,
-                
-                -- Jam Kerja Calculations
-                ROUND(COALESCE(SUM(CAST(jam_kerja_pegawai_cleansing AS DECIMAL(10,2))), 0), 2) as JAM_REALISASI,
-                ROUND(COALESCE(SUM(CAST(jam_kerja_seharusnya AS DECIMAL(10,2))), 0), 2) as JAM_SEHARUSNYA,
-                
-                -- Persentase JKP
-                CASE 
-                  WHEN COALESCE(SUM(CAST(jam_kerja_seharusnya AS DECIMAL(10,2))), 0) = 0 THEN 0.00
-                  ELSE ROUND(
-                    (COALESCE(SUM(CAST(jam_kerja_pegawai_cleansing AS DECIMAL(10,2))), 0) / 
-                     SUM(CAST(jam_kerja_seharusnya AS DECIMAL(10,2)))) * 100, 
-                    2
-                  )
-                END as PERSENTASE_JKP
-                
-              FROM olah_absensi 
-              WHERE perner = ?
+      const chunkSize = 20; // Process employees in parallel chunks
+      const chunks = [];
+      for (let i = 0; i < perners.length; i += chunkSize) {
+        chunks.push(perners.slice(i, i + chunkSize));
+      }
+
+      console.log(
+        `📦 Processing ${perners.length} employees in ${chunks.length} parallel chunks (${chunkSize} employees per chunk)`
+      );
+
+      // Process chunks in parallel with controlled concurrency
+      const maxConcurrentChunks = 5; // Limit concurrent chunks to avoid overwhelming DB
+      let processedChunks = 0;
+      let totalProcessed = 0;
+      let totalErrors = 0;
+      const allResults = [];
+
+      const processChunk = (chunk, chunkIndex) => {
+        return new Promise((resolve, reject) => {
+          console.log(
+            `🔧 Processing chunk ${chunkIndex + 1}/${chunks.length} (${
+              chunk.length
+            } employees)`
+          );
+
+          // Build multi-employee query for this chunk
+          const multiEmployeeSQL = `
+            SELECT 
+              perner as PERNER,
+              COUNT(*) as TOTAL_HARI,
+              COUNT(CASE WHEN jenis_hari LIKE '%HARI KERJA%' THEN 1 END) as HARI_KERJA,
+              COUNT(CASE WHEN jenis_hari LIKE '%LIBUR%' THEN 1 END) as HARI_LIBUR,
+              COUNT(CASE WHEN (correction_in = 'koreksi' OR correction_out = 'koreksi') THEN 1 END) as TOTAL_HARI_KOREKSI,
+              COUNT(CASE WHEN correction_in = 'koreksi' AND (correction_out != 'koreksi' OR correction_out IS NULL) THEN 1 END) as KOREKSI_IN,
+              COUNT(CASE WHEN correction_out = 'koreksi' AND (correction_in != 'koreksi' OR correction_in IS NULL) THEN 1 END) as KOREKSI_OUT,
+              COUNT(CASE WHEN correction_in = 'koreksi' AND correction_out = 'koreksi' THEN 1 END) as KOREKSI_IN_OUT,
+              COUNT(CASE WHEN status_jam_kerja LIKE '%Normal%' THEN 1 END) as TOTAL_JAM_KERJA_NORMAL,
+              COUNT(CASE WHEN status_jam_kerja LIKE '%PIKET%' THEN 1 END) as PIKET,
+              COUNT(CASE WHEN status_jam_kerja LIKE '%PDKB%' THEN 1 END) as PDKB,
+              COUNT(CASE WHEN status_jam_kerja LIKE '%Normal%' AND status_jam_kerja NOT LIKE '%PIKET%' AND status_jam_kerja NOT LIKE '%PDKB%' THEN 1 END) as REGULER,
+              COUNT(CASE WHEN status_jam_kerja LIKE '%Shift%' THEN 1 END) as TOTAL_JAM_KERJA_SHIFT,
+              COUNT(CASE WHEN status_jam_kerja LIKE '%Pagi%' THEN 1 END) as SHIFT_PAGI,
+              COUNT(CASE WHEN status_jam_kerja LIKE '%Siang%' THEN 1 END) as SHIFT_SIANG,
+              COUNT(CASE WHEN status_jam_kerja LIKE '%Malam%' THEN 1 END) as SHIFT_MALAM,
+              COUNT(CASE WHEN status_jam_kerja LIKE '%OFF%' THEN 1 END) as SHIFT_OFF,
+              COUNT(CASE WHEN status_absen = 'Lengkap' THEN 1 END) as ABSEN_LENGKAP,
+              COUNT(CASE WHEN status_absen LIKE '%tidak absen%' THEN 1 END) as TIDAK_ABSEN,
+              COUNT(CASE WHEN status_absen LIKE '%in kosong%' THEN 1 END) as IN_KOSONG,
+              COUNT(CASE WHEN status_absen LIKE '%out kosong%' THEN 1 END) as OUT_KOSONG,
+              COUNT(CASE WHEN SUBSTRING_INDEX(value_att_abs, '_', 1) IN ('att', 'sppd') THEN 1 END) as SPPD_TUGAS_LUAR_DLL,
+              COUNT(CASE WHEN SUBSTRING_INDEX(value_att_abs, '_', 1) = 'abs' THEN 1 END) as CUTI_IJIN,
+              ROUND(COALESCE(SUM(CAST(jam_kerja_pegawai_cleansing AS DECIMAL(10,2))), 0), 2) as JAM_REALISASI,
+              ROUND(COALESCE(SUM(CAST(jam_kerja_seharusnya AS DECIMAL(10,2))), 0), 2) as JAM_SEHARUSNYA,
+              CASE 
+                WHEN COALESCE(SUM(CAST(jam_kerja_seharusnya AS DECIMAL(10,2))), 0) = 0 THEN 0.00
+                ELSE ROUND(
+                  (COALESCE(SUM(CAST(jam_kerja_pegawai_cleansing AS DECIMAL(10,2))), 0) / 
+                   SUM(CAST(jam_kerja_seharusnya AS DECIMAL(10,2)))) * 100, 
+                  2
+                )
+              END as PERSENTASE_JKP
+            FROM olah_absensi 
+            WHERE perner IN (${chunk.map(() => "?").join(", ")})
+            GROUP BY perner
+            ORDER BY perner
+          `;
+
+          const chunkStartTime = Date.now();
+          const pernerList = chunk.map((p) => p.perner);
+
+          conn.query(multiEmployeeSQL, pernerList, (calcErr, chunkResults) => {
+            if (calcErr) {
+              console.error(
+                `❌ Chunk ${chunkIndex + 1} calculation failed:`,
+                calcErr
+              );
+              totalErrors += chunk.length;
+              return reject(calcErr);
+            }
+
+            if (chunkResults.length === 0) {
+              console.warn(`⚠️ Chunk ${chunkIndex + 1}: No data found`);
+              totalErrors += chunk.length;
+              return resolve([]);
+            }
+
+            // Batch insert chunk results
+            const insertSQL = `
+              INSERT INTO rekap_absensi (
+                PERNER, TOTAL_HARI, HARI_KERJA, HARI_LIBUR, 
+                TOTAL_HARI_KOREKSI, KOREKSI_IN, KOREKSI_OUT, KOREKSI_IN_OUT,
+                TOTAL_JAM_KERJA_NORMAL, PIKET, PDKB, REGULER,
+                TOTAL_JAM_KERJA_SHIFT, SHIFT_PAGI, SHIFT_SIANG, SHIFT_MALAM, SHIFT_OFF,
+                ABSEN_LENGKAP, TIDAK_ABSEN, IN_KOSONG, OUT_KOSONG,
+                SPPD_TUGAS_LUAR_DLL, CUTI_IJIN,
+                JAM_REALISASI, JAM_SEHARUSNYA, PERSENTASE_JKP
+              ) VALUES ${chunkResults
+                .map(
+                  () =>
+                    "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                )
+                .join(", ")}
             `;
 
-            conn.query(rekapSQL, [perner], (calcErr, calcResult) => {
-              if (calcErr) {
-                console.error(`❌ Error calculating for ${perner}:`, calcErr);
-                errorCount++;
-                return reject(calcErr);
-              }
-
-              if (calcResult.length === 0) {
-                console.warn(`⚠️ No data found for ${perner}`);
-                errorCount++;
-                return resolve();
-              }
-
-              const rekapData = calcResult[0];
-
-              // Insert into rekap_absensi
-              const insertSQL = `
-                INSERT INTO rekap_absensi (
-                  PERNER, TOTAL_HARI, HARI_KERJA, HARI_LIBUR, 
-                  TOTAL_HARI_KOREKSI, KOREKSI_IN, KOREKSI_OUT, KOREKSI_IN_OUT,
-                  TOTAL_JAM_KERJA_NORMAL, PIKET, PDKB, REGULER,
-                  TOTAL_JAM_KERJA_SHIFT, SHIFT_PAGI, SHIFT_SIANG, SHIFT_MALAM, SHIFT_OFF,
-                  ABSEN_LENGKAP, TIDAK_ABSEN, IN_KOSONG, OUT_KOSONG,
-                  SPPD_TUGAS_LUAR_DLL, CUTI_IJIN,
-                  JAM_REALISASI, JAM_SEHARUSNYA, PERSENTASE_JKP
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON DUPLICATE KEY UPDATE
-                  TOTAL_HARI = VALUES(TOTAL_HARI),
-                  HARI_KERJA = VALUES(HARI_KERJA),
-                  HARI_LIBUR = VALUES(HARI_LIBUR),
-                  TOTAL_HARI_KOREKSI = VALUES(TOTAL_HARI_KOREKSI),
-                  KOREKSI_IN = VALUES(KOREKSI_IN),
-                  KOREKSI_OUT = VALUES(KOREKSI_OUT),
-                  KOREKSI_IN_OUT = VALUES(KOREKSI_IN_OUT),
-                  TOTAL_JAM_KERJA_NORMAL = VALUES(TOTAL_JAM_KERJA_NORMAL),
-                  PIKET = VALUES(PIKET),
-                  PDKB = VALUES(PDKB),
-                  REGULER = VALUES(REGULER),
-                  TOTAL_JAM_KERJA_SHIFT = VALUES(TOTAL_JAM_KERJA_SHIFT),
-                  SHIFT_PAGI = VALUES(SHIFT_PAGI),
-                  SHIFT_SIANG = VALUES(SHIFT_SIANG),
-                  SHIFT_MALAM = VALUES(SHIFT_MALAM),
-                  SHIFT_OFF = VALUES(SHIFT_OFF),
-                  ABSEN_LENGKAP = VALUES(ABSEN_LENGKAP),
-                  TIDAK_ABSEN = VALUES(TIDAK_ABSEN),
-                  IN_KOSONG = VALUES(IN_KOSONG),
-                  OUT_KOSONG = VALUES(OUT_KOSONG),
-                  SPPD_TUGAS_LUAR_DLL = VALUES(SPPD_TUGAS_LUAR_DLL),
-                  CUTI_IJIN = VALUES(CUTI_IJIN),
-                  JAM_REALISASI = VALUES(JAM_REALISASI),
-                  JAM_SEHARUSNYA = VALUES(JAM_SEHARUSNYA),
-                  PERSENTASE_JKP = VALUES(PERSENTASE_JKP)
-              `;
-
-              const insertValues = [
+            const insertValues = [];
+            chunkResults.forEach((rekapData) => {
+              insertValues.push(
                 rekapData.PERNER,
                 rekapData.TOTAL_HARI || 0,
                 rekapData.HARI_KERJA || 0,
@@ -3082,72 +4142,157 @@ app.post("/generate-rekap-absensi", (req, res) => {
                 rekapData.CUTI_IJIN || 0,
                 rekapData.JAM_REALISASI || 0.0,
                 rekapData.JAM_SEHARUSNYA || 0.0,
-                rekapData.PERSENTASE_JKP || 0.0,
-              ];
-
-              conn.query(insertSQL, insertValues, (insertErr, insertResult) => {
-                if (insertErr) {
-                  console.error(`❌ Error inserting ${perner}:`, insertErr);
-                  errorCount++;
-                  return reject(insertErr);
-                }
-
-                processedCount++;
-                successCount++;
-
-                // Log progress setiap 10 pegawai
-                if (
-                  processedCount % 10 === 0 ||
-                  processedCount === perners.length
-                ) {
-                  console.log(
-                    `📊 Progress: ${processedCount}/${perners.length} pegawai diproses`
-                  );
-                }
-
-                resolve(insertResult);
-              });
+                rekapData.PERSENTASE_JKP || 0.0
+              );
             });
-          })
-        );
-      });
 
-      // Execute all tasks
-      Promise.allSettled(tasks)
-        .then((results) => {
-          const endTime = Date.now();
-          const duration = ((endTime - startTime) / 1000).toFixed(2);
+            conn.query(insertSQL, insertValues, (insertErr, insertResult) => {
+              if (insertErr) {
+                console.error(
+                  `❌ Chunk ${chunkIndex + 1} insert failed:`,
+                  insertErr
+                );
+                totalErrors += chunk.length;
+                return reject(insertErr);
+              }
 
-          console.log(`✅ Generate rekap selesai dalam ${duration}s`);
-          console.log(
-            `📊 Summary: ${successCount} sukses, ${errorCount} error dari ${perners.length} pegawai`
+              const chunkDuration = Date.now() - chunkStartTime;
+              processedChunks++;
+              totalProcessed += chunkResults.length;
+
+              console.log(
+                `✅ Chunk ${chunkIndex + 1}/${chunks.length}: ${
+                  chunkResults.length
+                } employees, ${
+                  insertResult.affectedRows
+                } records inserted (${chunkDuration}ms)`
+              );
+
+              // Progress reporting
+              const progressPercent = Math.round(
+                (processedChunks / chunks.length) * 100
+              );
+              console.log(
+                `📊 Progress: ${processedChunks}/${chunks.length} chunks (${progressPercent}%), ${totalProcessed}/${perners.length} employees`
+              );
+
+              resolve(chunkResults);
+            });
+          });
+        });
+      };
+
+      // Process chunks with controlled concurrency
+      const processChunksSequentially = async () => {
+        const results = [];
+
+        // Process chunks in batches of maxConcurrentChunks
+        for (let i = 0; i < chunks.length; i += maxConcurrentChunks) {
+          const batchChunks = chunks.slice(i, i + maxConcurrentChunks);
+          const batchPromises = batchChunks.map((chunk, index) =>
+            processChunk(chunk, i + index)
           );
 
-          // Get final statistics
+          console.log(
+            `🔄 Processing batch ${
+              Math.floor(i / maxConcurrentChunks) + 1
+            }/${Math.ceil(chunks.length / maxConcurrentChunks)} (${
+              batchPromises.length
+            } concurrent chunks)`
+          );
+
+          try {
+            const batchResults = await Promise.allSettled(batchPromises);
+
+            batchResults.forEach((result) => {
+              if (result.status === "fulfilled") {
+                results.push(...result.value);
+              } else {
+                console.error("Batch chunk failed:", result.reason);
+              }
+            });
+
+            // Small delay between batches to avoid overwhelming the database
+            if (i + maxConcurrentChunks < chunks.length) {
+              await new Promise((resolve) => setTimeout(resolve, 100));
+            }
+          } catch (error) {
+            console.error("Batch processing error:", error);
+          }
+        }
+
+        return results;
+      };
+
+      // Execute chunked processing
+      processChunksSequentially()
+        .then(() => {
+          const processDuration = Date.now() - processStartTime;
+          console.log(
+            `✅ Parallel processing completed: ${totalProcessed} successful, ${totalErrors} errors in ${processDuration}ms`
+          );
+
+          // STEP 4: Final statistics
+          console.log("📈 Getting final statistics...");
           const finalStatsSQL = `
             SELECT 
               COUNT(*) as total_pegawai,
               ROUND(AVG(PERSENTASE_JKP), 2) as avg_persentase,
               ROUND(SUM(JAM_REALISASI), 2) as total_jam_realisasi,
               ROUND(SUM(JAM_SEHARUSNYA), 2) as total_jam_seharusnya,
-              ROUND(AVG(TOTAL_HARI), 2) as avg_hari_total,
-              MIN(TOTAL_HARI) as min_hari_total,
-              MAX(TOTAL_HARI) as max_hari_total,
-              COUNT(CASE WHEN TOTAL_HARI < 20 THEN 1 END) as pegawai_data_kurang
+              MIN(PERSENTASE_JKP) as min_persentase,
+              MAX(PERSENTASE_JKP) as max_persentase
             FROM rekap_absensi
           `;
 
           conn.query(finalStatsSQL, (statsErr, statsResult) => {
+            const overallDuration = Date.now() - overallStartTime;
             const stats = statsErr ? null : statsResult[0];
+
+            console.log(`🎉 PARALLEL CHUNKED GENERATE REKAP COMPLETED!`);
+            console.log(
+              `   ⏱️ Overall: ${overallDuration}ms (${(
+                overallDuration / 1000
+              ).toFixed(2)}s)`
+            );
+            console.log(`   👥 Total employees: ${perners.length}`);
+            console.log(`   ✅ Processed: ${totalProcessed}`);
+            console.log(`   ❌ Errors: ${totalErrors}`);
+            console.log(
+              `   📦 Chunks: ${chunks.length} (${chunkSize} employees each)`
+            );
+            console.log(
+              `   ⚡ Processing rate: ${Math.round(
+                totalProcessed / (processDuration / 1000)
+              )} employees/sec`
+            );
 
             res.json({
               success: true,
-              message: `✅ Generate rekap absensi selesai dalam ${duration}s. ${successCount}/${perners.length} pegawai berhasil diproses.`,
+              message: `⚡ Parallel chunked generate rekap completed in ${(
+                overallDuration / 1000
+              ).toFixed(2)}s. ${totalProcessed}/${
+                perners.length
+              } employees processed.`,
+              performance: {
+                overall_duration_ms: overallDuration,
+                processing_duration_ms: processDuration,
+                employees_per_second: Math.round(
+                  totalProcessed / (processDuration / 1000)
+                ),
+                chunks_processed: processedChunks,
+                chunk_size: chunkSize,
+                max_concurrent_chunks: maxConcurrentChunks,
+                method: "parallel_chunked_processing",
+              },
               details: {
                 total_pegawai: perners.length,
-                successful: successCount,
-                failed: errorCount,
-                processing_time: `${duration}s`,
+                successful: totalProcessed,
+                failed: totalErrors,
+                success_rate: `${Math.round(
+                  (totalProcessed / perners.length) * 100
+                )}%`,
+                chunks: chunks.length,
                 generated_at: new Date().toISOString(),
               },
               stats: stats || null,
@@ -3155,10 +4300,10 @@ app.post("/generate-rekap-absensi", (req, res) => {
           });
         })
         .catch((err) => {
-          console.error("❌ Fatal error during generate rekap:", err);
+          console.error("❌ Fatal error during parallel processing:", err);
           res.status(500).json({
             success: false,
-            message: "❌ Fatal error saat generate rekap absensi.",
+            message: "❌ Fatal error during parallel chunked processing.",
             error: err.message,
           });
         });

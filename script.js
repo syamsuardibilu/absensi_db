@@ -1,9 +1,25 @@
 // === KONFIG API ===
 const PROD_API = "https://absensi-db.onrender.com"; // production API
 const isLocal = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
-const BASE_URL = (window.BASE_URL && window.BASE_URL.trim()) || (isLocal ? "http://localhost:3000" : PROD_API);
+const BASE_URL =
+  (window.BASE_URL && window.BASE_URL.trim()) ||
+  (isLocal ? "http://localhost:3000" : PROD_API);
 const api = (path, opts) => fetch(`${BASE_URL}${path}`, opts);
 // === END KONFIG ===
+
+// TAMBAH DI ATAS (setelah variabel jenisData)
+// === DEBOUNCE UTILITY ===
+function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
 
 const jenisData = [
   "DATA PEGAWAI",
@@ -54,13 +70,16 @@ jenisData.forEach((jenis) => {
     <div id="${idBase}_output" class="output-box"></div>
   `;
 
-  (container ? container : {appendChild:()=>{}}).appendChild(block);
+  (container ? container : { appendChild: () => {} }).appendChild(block);
 
   const textarea = document.getElementById(`${idBase}_textarea`);
-  textarea.addEventListener("input", () => tampilkanJumlahBaris(idBase));
+  // SESUDAH - pakai debouncing
+  const debouncedTampilkan = debounce(() => tampilkanJumlahBaris(idBase), 300);
+  textarea.addEventListener("input", debouncedTampilkan);
 });
 
 function prosesData(id) {
+  const startTime = Date.now();
   const textarea = document.getElementById(`${id}_textarea`);
   const output = document.getElementById(`${id}_output`);
   const input = textarea.value.trim();
@@ -111,8 +130,10 @@ function prosesData(id) {
     })
       .then((res) => res.json())
       .then((data) => {
+        const endTime = Date.now();
+        const duration = endTime - startTime;
         output.className = "output-box";
-        output.innerText = data.message || "✅ Data berhasil diproses.";
+        output.innerText = data.message + `\n⚡ Completed in: ${duration}ms`;
       })
       .catch((err) => {
         output.className = "output-box error";
@@ -156,8 +177,10 @@ function prosesData(id) {
     })
       .then((res) => res.json())
       .then((data) => {
+        const endTime = Date.now();
+        const duration = endTime - startTime;
         output.className = "output-box";
-        output.innerText = data.message || "✅ Hari libur berhasil diproses.";
+        output.innerText = data.message + `\n⚡ Completed in: ${duration}ms`;
       })
       .catch((err) => {
         output.className = "output-box error";
@@ -241,8 +264,10 @@ function prosesData(id) {
     })
       .then((res) => res.json())
       .then((data) => {
+        const endTime = Date.now();
+        const duration = endTime - startTime;
         output.className = "output-box";
-        output.innerText = data.message || "✅ Data CI/CO berhasil diproses.";
+        output.innerText = data.message + `\n⚡ Completed in: ${duration}ms`;
       })
       .catch((err) => {
         output.className = "output-box error";
@@ -386,9 +411,10 @@ function prosesData(id) {
     })
       .then((res) => res.json())
       .then((data) => {
+        const endTime = Date.now();
+        const duration = endTime - startTime;
         output.className = "output-box";
-        output.innerText =
-          data.message || "✅ Data ATT ABS Daily berhasil dikirim.";
+        output.innerText = data.message + `\n⚡ Completed in: ${duration}ms`;
       })
       .catch((err) => {
         output.className = "output-box error";
@@ -519,8 +545,12 @@ function prosesData(id) {
     })
       .then((res) => res.json())
       .then((data) => {
+        const endTime = Date.now();
+        const duration = endTime - startTime;
         output.className = "output-box";
-        output.innerText = data.message || "✅ Data ATT SAP berhasil diproses.";
+        output.innerText =
+          data.message ||
+          `✅ Data ATT SAP berhasil diproses dalam ${duration} ms.`;
       })
       .catch((err) => {
         output.className = "output-box error";
@@ -650,8 +680,12 @@ function prosesData(id) {
     })
       .then((res) => res.json())
       .then((data) => {
+        const endTime = Date.now();
+        const duration = endTime - startTime;
         output.className = "output-box";
-        output.innerText = data.message || "✅ Data ABS SAP berhasil diproses.";
+        output.innerText =
+          data.message ||
+          `✅ Data ABS SAP berhasil diproses dalam ${duration} ms.`;
       })
       .catch((err) => {
         output.className = "output-box error";
@@ -727,9 +761,12 @@ function prosesData(id) {
     })
       .then((res) => res.json())
       .then((data) => {
+        const endTime = Date.now();
+        const duration = endTime - startTime;
         output.className = "output-box";
         output.innerText =
-          data.message || "✅ Data SPPD Umum berhasil diproses.";
+          data.message ||
+          `✅ Data SPPD Umum berhasil diproses dalam ${duration} ms.`;
       })
       .catch((err) => {
         output.className = "output-box error";
@@ -740,11 +777,17 @@ function prosesData(id) {
   }
 
   if (id === "work_schedule") {
+    const overallStartTime = Date.now(); // ← TAMBAH: Overall timing
     output.innerText = "⏳ Mengambil batas tanggal maksimum dari database...";
+
+    const getLastDateStart = Date.now(); // ← TAMBAH: LastDate timing
 
     api("/get-lastdate")
       .then((res) => res.json())
       .then(({ lastdate }) => {
+        const getLastDateDuration = Date.now() - getLastDateStart; // ← TAMBAH
+        console.log(`📅 LastDate retrieved in ${getLastDateDuration}ms`); // ← TAMBAH
+
         if (!lastdate) {
           output.className = "output-box warning";
           output.innerText =
@@ -752,62 +795,83 @@ function prosesData(id) {
           return;
         }
 
+        // ← TAMBAH: Data processing timing
+        const dataProcessingStart = Date.now();
+        output.innerText = "⏳ Memproses data work schedule...";
+
         const rows = input
           .split(/\r?\n/)
           .map((line) => line.trim())
           .filter((line) => line !== "");
 
         const dataMap = new Map();
+        let processedRows = 0; // ← TAMBAH: Counter
+        let errorRows = 0; // ← TAMBAH: Error counter
 
         for (const row of rows) {
           const parts = row.split("\t");
-          if (parts.length < 6) continue;
-
-          const [perner, , start, end, , jadwal] = parts;
-
-          const [sd, sm, sy] = start.split("/");
-          let [ed, em, ey] = end.split("/");
-
-          let endDate = new Date(`${ey}-${em}-${ed}`);
-          if (ed === "31" && em === "12" && ey === "9999") {
-            let correctedDate = new Date(lastdate);
-            correctedDate.setDate(correctedDate.getDate() + 1);
-            endDate = correctedDate;
+          if (parts.length < 6) {
+            errorRows++; // ← TAMBAH
+            continue;
           }
 
-          const startDate = new Date(`${sy}-${sm}-${sd}`);
+          try {
+            // ← TAMBAH: Error handling
+            const [perner, , start, end, , jadwal] = parts;
 
-          const [seninText, jumatText] = jadwal.split(",J:");
-          if (!seninText || !jumatText) continue;
+            const [sd, sm, sy] = start.split("/");
+            let [ed, em, ey] = end.split("/");
 
-          const [jamInNormalRaw, jamOutNormalRaw] = seninText
-            .trim()
-            .split("-")
-            .map((s) => s.replace(":", "."));
-          const [jamInJumatRaw, jamOutJumatRaw] = jumatText
-            .trim()
-            .split("-")
-            .map((s) => s.replace(":", "."));
+            let endDate = new Date(`${ey}-${em}-${ed}`);
+            if (ed === "31" && em === "12" && ey === "9999") {
+              let correctedDate = new Date(lastdate);
+              correctedDate.setDate(correctedDate.getDate() + 1);
+              endDate = correctedDate;
+            }
 
-          const jamInNormal = formatJam(jamInNormalRaw);
-          const jamOutNormal = formatJam(jamOutNormalRaw);
-          const jamInJumat = formatJam(jamInJumatRaw);
-          const jamOutJumat = formatJam(jamOutJumatRaw);
+            const startDate = new Date(`${sy}-${sm}-${sd}`);
 
-          for (
-            let d = new Date(startDate);
-            d <= endDate;
-            d.setDate(d.getDate() + 1)
-          ) {
-            const tanggal = d.toISOString().slice(0, 10);
-            const isJumat = d.getDay() === 5;
+            const [seninText, jumatText] = jadwal.split(",J:");
+            if (!seninText || !jumatText) {
+              errorRows++; // ← TAMBAH
+              continue;
+            }
 
-            const jamMasuk = isJumat ? jamInJumat : jamInNormal;
-            const jamPulang = isJumat ? jamOutJumat : jamOutNormal;
-            const nilai = `${jamMasuk}~${jamPulang}`;
+            const [jamInNormalRaw, jamOutNormalRaw] = seninText
+              .trim()
+              .split("-")
+              .map((s) => s.replace(":", "."));
+            const [jamInJumatRaw, jamOutJumatRaw] = jumatText
+              .trim()
+              .split("-")
+              .map((s) => s.replace(":", "."));
 
-            const key = `${perner}||${tanggal}`;
-            dataMap.set(key, nilai);
+            const jamInNormal = formatJam(jamInNormalRaw);
+            const jamOutNormal = formatJam(jamOutNormalRaw);
+            const jamInJumat = formatJam(jamInJumatRaw);
+            const jamOutJumat = formatJam(jamOutJumatRaw);
+
+            for (
+              let d = new Date(startDate);
+              d <= endDate;
+              d.setDate(d.getDate() + 1)
+            ) {
+              const tanggal = d.toISOString().slice(0, 10);
+              const isJumat = d.getDay() === 5;
+
+              const jamMasuk = isJumat ? jamInJumat : jamInNormal;
+              const jamPulang = isJumat ? jamOutJumat : jamOutNormal;
+              const nilai = `${jamMasuk}~${jamPulang}`;
+
+              const key = `${perner}||${tanggal}`;
+              dataMap.set(key, nilai);
+            }
+
+            processedRows++; // ← TAMBAH
+          } catch (error) {
+            // ← TAMBAH: Error handling
+            console.warn(`❌ Error processing work schedule row:`, error);
+            errorRows++;
           }
         }
 
@@ -818,13 +882,26 @@ function prosesData(id) {
           finalData.push({ perner, tanggal, ws_rule });
         }
 
+        const dataProcessingDuration = Date.now() - dataProcessingStart; // ← TAMBAH
+
+        // ← TAMBAH: Enhanced logging
+        console.log(`🔧 Work Schedule data processing completed:`);
+        console.log(`   - Input rows: ${rows.length}`);
+        console.log(`   - Processed rows: ${processedRows}`);
+        console.log(`   - Error rows: ${errorRows}`);
+        console.log(`   - Generated records: ${finalData.length}`);
+        console.log(`   - Processing time: ${dataProcessingDuration}ms`);
+
         if (finalData.length === 0) {
           output.className = "output-box warning";
           output.innerText = "⚠️ Tidak ada data valid untuk Work Schedule.";
           return;
         }
 
-        output.innerText = "⏳ Mengirim data ke server...";
+        // ← TAMBAH: Show processing summary
+        output.innerText = `⏳ Mengirim ${finalData.length} records ke server... (diproses dari ${rows.length} input rows)`;
+
+        const apiCallStart = Date.now(); // ← TAMBAH: API timing
 
         api("/update-work-schedule", {
           method: "POST",
@@ -833,9 +910,32 @@ function prosesData(id) {
         })
           .then((res) => res.json())
           .then((data) => {
+            const overallDuration = Date.now() - overallStartTime; // ← TAMBAH
+            const apiCallDuration = Date.now() - apiCallStart; // ← TAMBAH
+
             output.className = "output-box";
-            output.innerText =
+
+            // ← TAMBAH: Enhanced success message
+            const message =
               data.message || "✅ Work Schedule berhasil diproses.";
+            const performanceInfo = `
+📊 Performance Summary:
+   • Overall: ${overallDuration}ms
+   • Get LastDate: ${getLastDateDuration}ms  
+   • Data Processing: ${dataProcessingDuration}ms
+   • API Call: ${apiCallDuration}ms
+   • Input → Generated: ${rows.length} → ${finalData.length} records
+   • Success Rate: ${Math.round((processedRows / rows.length) * 100)}%`;
+
+            output.innerText = message + performanceInfo;
+
+            // ← TAMBAH: Console summary
+            console.log(
+              `⚡ Work Schedule frontend completed in ${overallDuration}ms`
+            );
+            if (data.performance) {
+              console.log(`   Backend performance:`, data.performance);
+            }
           })
           .catch((err) => {
             output.className = "output-box error";
@@ -951,9 +1051,13 @@ function prosesData(id) {
     })
       .then((res) => res.json())
       .then((data) => {
+        const endTime = Date.now();
+        const duration = endTime - startTime;
+
         output.className = "output-box";
         output.innerText =
-          data.message || "✅ Data Substitution Daily berhasil diproses.";
+          data.message ||
+          `✅ Data Substitution Daily berhasil diproses dalam ${duration} ms.`;
       })
       .catch((err) => {
         output.className = "output-box error";
@@ -1093,9 +1197,13 @@ function prosesData(id) {
     })
       .then((res) => res.json())
       .then((data) => {
+        const endTime = Date.now();
+        const duration = endTime - startTime;
+
         output.className = "output-box";
         output.innerText =
-          data.message || "✅ Data Substitution SAP berhasil diproses.";
+          data.message ||
+          `✅ Data Substitution SAP berhasil diproses dalam ${duration} ms.`;
       })
       .catch((err) => {
         output.className = "output-box error";
