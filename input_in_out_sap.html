@@ -1,0 +1,1510 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dashboard Input In Out SAP</title>
+
+    <!-- SheetJS Library untuk Export Excel XLSX -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        padding: 20px;
+      }
+
+      .dashboard-container {
+        max-width: 1400px;
+        margin: 0 auto;
+      }
+
+      .header {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        padding: 30px;
+        border-radius: 16px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+        margin-bottom: 30px;
+      }
+
+      .header h1 {
+        color: #2c3e50;
+        font-size: 2.5rem;
+        font-weight: 700;
+        text-align: center;
+        margin-bottom: 10px;
+      }
+
+      .header p {
+        color: #7f8c8d;
+        text-align: center;
+        font-size: 1.1rem;
+      }
+
+      .controls {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        padding: 25px;
+        border-radius: 16px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        margin-bottom: 25px;
+        display: flex;
+        gap: 15px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+
+      .btn {
+        padding: 12px 24px;
+        border: none;
+        border-radius: 10px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .btn-primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+      }
+
+      .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+      }
+
+      .btn-secondary {
+        background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        color: white;
+        box-shadow: 0 4px 15px rgba(17, 153, 142, 0.4);
+      }
+
+      .btn-secondary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(17, 153, 142, 0.6);
+      }
+
+      .btn-download {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        color: white;
+        box-shadow: 0 4px 15px rgba(240, 147, 251, 0.4);
+      }
+
+      .btn-download:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(240, 147, 251, 0.6);
+      }
+
+      .btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none !important;
+      }
+
+      .search-box {
+        flex: 1;
+        min-width: 250px;
+      }
+
+      .search-box input {
+        width: 100%;
+        padding: 12px 16px;
+        border: 2px solid #e1e8ed;
+        border-radius: 10px;
+        font-size: 14px;
+        background: rgba(255, 255, 255, 0.9);
+        transition: all 0.3s ease;
+      }
+
+      .search-box input:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+      }
+
+      .stats {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        padding: 20px;
+        border-radius: 16px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        margin-bottom: 25px;
+        display: none;
+      }
+
+      .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+      }
+
+      .stat-card {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        color: white;
+        padding: 20px;
+        border-radius: 12px;
+        text-align: center;
+      }
+
+      .stat-card h3 {
+        font-size: 0.9rem;
+        margin-bottom: 8px;
+        opacity: 0.9;
+      }
+
+      .stat-card p {
+        font-size: 1.5rem;
+        font-weight: 700;
+      }
+
+      .table-container {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border-radius: 16px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+        overflow: hidden;
+        position: relative;
+      }
+
+      .table-scroll-wrapper {
+        overflow-x: auto;
+        overflow-y: auto;
+        max-height: 600px;
+        position: relative;
+        scrollbar-width: thin;
+        scrollbar-color: #667eea #f1f1f1;
+      }
+
+      .table-scroll-wrapper::-webkit-scrollbar {
+        height: 12px;
+        width: 12px;
+      }
+
+      .table-scroll-wrapper::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 6px;
+      }
+
+      .table-scroll-wrapper::-webkit-scrollbar-thumb {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 6px;
+      }
+
+      .table-scroll-wrapper::-webkit-scrollbar-thumb:hover {
+        background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%);
+      }
+
+      .scroll-indicator {
+        position: absolute;
+        top: 10px;
+        right: 20px;
+        background: rgba(102, 126, 234, 0.9);
+        color: white;
+        padding: 8px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+        z-index: 150;
+        animation: fadeInOut 3s ease-in-out;
+      }
+
+      @keyframes fadeInOut {
+        0%,
+        100% {
+          opacity: 0;
+        }
+        50% {
+          opacity: 1;
+        }
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+        min-width: 1200px;
+      }
+
+      th,
+      td {
+        border: 1px solid #e1e8ed;
+        padding: 12px 8px;
+        text-align: center;
+        white-space: nowrap;
+      }
+
+      thead th {
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: #fff;
+        font-weight: 600;
+        font-size: 11px;
+      }
+
+      tbody tr:nth-child(even) {
+        background: rgba(102, 126, 234, 0.05);
+      }
+
+      tbody tr:hover {
+        background: rgba(102, 126, 234, 0.15);
+        transform: scale(1.001);
+        transition: all 0.2s ease;
+      }
+
+      .perner {
+        font-weight: 700;
+        background: rgba(102, 126, 234, 0.2);
+        position: sticky;
+        left: 0;
+        z-index: 90;
+      }
+
+      .is-change-true {
+        background: rgba(231, 76, 60, 0.1);
+        color: #e74c3c;
+        font-weight: 600;
+      }
+
+      .is-change-false {
+        background: rgba(39, 174, 96, 0.1);
+        color: #27ae60;
+        font-weight: 600;
+      }
+
+      .time-input {
+        width: 80px;
+        padding: 4px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        text-align: center;
+        font-size: 11px;
+      }
+
+      .loading {
+        display: none;
+        text-align: center;
+        padding: 40px;
+        color: #667eea;
+        font-size: 1.2rem;
+        font-weight: 600;
+      }
+
+      .loading-spinner {
+        width: 40px;
+        height: 40px;
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #667eea;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 15px;
+      }
+
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+
+      .alert {
+        padding: 15px;
+        border-radius: 10px;
+        margin-bottom: 20px;
+        font-weight: 600;
+      }
+
+      .alert-success {
+        background: rgba(39, 174, 96, 0.1);
+        color: #27ae60;
+        border: 2px solid rgba(39, 174, 96, 0.2);
+      }
+
+      .alert-error {
+        background: rgba(231, 76, 60, 0.1);
+        color: #e74c3c;
+        border: 2px solid rgba(231, 76, 60, 0.2);
+      }
+
+      .alert-info {
+        background: rgba(52, 152, 219, 0.1);
+        color: #3498db;
+        border: 2px solid rgba(52, 152, 219, 0.2);
+      }
+
+      .pagination {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 10px;
+        padding: 20px;
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        margin-top: 15px;
+        border-radius: 12px;
+      }
+
+      .pagination button {
+        padding: 8px 16px;
+        border: 2px solid #e1e8ed;
+        background: white;
+        color: #2c3e50;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+      }
+
+      .pagination button:hover:not(:disabled) {
+        background: #667eea;
+        color: white;
+        border-color: #667eea;
+      }
+
+      .pagination button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .pagination .active {
+        background: #667eea;
+        color: white;
+        border-color: #667eea;
+      }
+
+      /* Enhanced Footer and Pagination Styles */
+      .footer-info {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border-radius: 16px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        margin-top: 20px;
+        overflow: hidden;
+      }
+
+      .footer-content {
+        padding: 20px 30px;
+      }
+
+      .data-info {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+        align-items: center;
+      }
+
+      .info-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 16px;
+        background: linear-gradient(135deg, #f8f9ff 0%, #e8f0fe 100%);
+        border-radius: 12px;
+        border: 1px solid rgba(102, 126, 234, 0.1);
+        transition: all 0.3s ease;
+      }
+
+      .info-item:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.2);
+      }
+
+      .info-label {
+        font-size: 0.9rem;
+        color: #7f8c8d;
+        font-weight: 600;
+      }
+
+      .info-value {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: #2c3e50;
+        padding: 4px 12px;
+        background: rgba(102, 126, 234, 0.1);
+        border-radius: 8px;
+        min-width: 60px;
+        text-align: center;
+      }
+
+      /* Enhanced Pagination Styles */
+      .enhanced-pagination {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border-radius: 16px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        margin-top: 15px;
+        padding: 0;
+        overflow: hidden;
+      }
+
+      .pagination-info {
+        padding: 20px 30px;
+      }
+
+      .pagination-summary {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .pagination-text,
+      .pagination-page-info {
+        font-size: 0.95rem;
+        color: #5a6c7d;
+        font-weight: 500;
+      }
+
+      .pagination-text strong,
+      .pagination-page-info strong {
+        color: #2c3e50;
+        font-weight: 700;
+      }
+
+      .pagination-controls {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+      }
+
+      .pagination-btn {
+        padding: 10px 14px;
+        border: 2px solid transparent;
+        background: rgba(102, 126, 234, 0.1);
+        color: #667eea;
+        border-radius: 10px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-weight: 600;
+        font-size: 0.9rem;
+        min-width: 44px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .pagination-btn:hover:not(:disabled) {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+      }
+
+      .pagination-btn:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      .pagination-btn.active {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-color: #5a67d8;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+      }
+
+      .pagination-edge {
+        background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        color: white;
+      }
+
+      .pagination-edge:hover:not(:disabled) {
+        background: linear-gradient(135deg, #0f8278 0%, #2dd868 100%);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(17, 153, 142, 0.4);
+      }
+
+      .pagination-nav {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        color: white;
+      }
+
+      .pagination-nav:hover:not(:disabled) {
+        background: linear-gradient(135deg, #e077e6 0%, #e04960 100%);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(240, 147, 251, 0.4);
+      }
+
+      .pagination-numbers {
+        display: flex;
+        gap: 4px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+
+      .pagination-ellipsis {
+        padding: 10px 8px;
+        color: #7f8c8d;
+        font-weight: bold;
+        cursor: default;
+      }
+
+      .pagination-tools {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding-top: 20px;
+        border-top: 1px solid rgba(102, 126, 234, 0.1);
+        gap: 20px;
+        flex-wrap: wrap;
+      }
+
+      .items-per-page,
+      .page-jump {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .items-per-page label,
+      .page-jump label {
+        font-size: 0.9rem;
+        color: #5a6c7d;
+        font-weight: 600;
+        white-space: nowrap;
+      }
+
+      .items-select,
+      .page-input {
+        padding: 8px 12px;
+        border: 2px solid #e1e8ed;
+        border-radius: 8px;
+        background: white;
+        color: #2c3e50;
+        font-size: 0.9rem;
+        font-weight: 500;
+        transition: all 0.3s ease;
+      }
+
+      .items-select:focus,
+      .page-input:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+      }
+
+      .items-select {
+        cursor: pointer;
+        min-width: 80px;
+      }
+
+      .page-input {
+        width: 80px;
+        text-align: center;
+      }
+
+      .pagination-jump {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 8px 16px;
+        font-size: 0.85rem;
+      }
+
+      .no-data {
+        text-align: center;
+        padding: 60px 20px;
+        color: #7f8c8d;
+        font-size: 1.2rem;
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 12px;
+      }
+
+      @media (max-width: 768px) {
+        .controls {
+          flex-direction: column;
+          align-items: stretch;
+        }
+
+        .search-box {
+          min-width: auto;
+        }
+
+        .header h1 {
+          font-size: 1.8rem;
+        }
+
+        .stats-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="dashboard-container">
+      <!-- Header -->
+      <div class="header">
+        <h1>⏰ Dashboard Input In Out SAP</h1>
+        <p>Sistem Manajemen Data Clock In dan Clock Out untuk SAP</p>
+      </div>
+
+      <!-- Controls -->
+      <div class="controls">
+        <button id="loadBtn" class="btn btn-primary">
+          <span>📊</span> Load Data
+        </button>
+        <button id="refreshBtn" class="btn btn-secondary">
+          <span>🔄</span> Refresh Data
+        </button>
+        <button id="downloadBtn" class="btn btn-download" disabled>
+          <span>📊</span> Download Excel (.xlsx)
+        </button>
+        <div class="search-box">
+          <input
+            type="text"
+            id="searchInput"
+            placeholder="🔍 Cari berdasarkan PERNER atau Nama..."
+          />
+        </div>
+      </div>
+
+      <!-- Alert Messages -->
+      <div id="alertContainer"></div>
+
+      <!-- Statistics -->
+      <div id="statsContainer" class="stats">
+        <div class="stats-grid" id="statsGrid">
+          <!-- Stats akan di-generate oleh JavaScript -->
+        </div>
+      </div>
+
+      <!-- Loading -->
+      <div id="loadingContainer" class="loading">
+        <div class="loading-spinner"></div>
+        <div>Memproses data...</div>
+      </div>
+
+      <!-- Table -->
+      <div class="table-container" id="tableContainer">
+        <div
+          class="scroll-indicator"
+          id="scrollIndicator"
+          style="display: none"
+        >
+          ← Scroll untuk melihat kolom lainnya →
+        </div>
+        <div class="table-scroll-wrapper" id="tableScrollWrapper">
+          <div class="no-data" id="noDataMessage">
+            📋 Belum ada data. Klik tombol "Load Data" untuk memulai.
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer Information -->
+      <div id="footerInfo" class="footer-info" style="display: none">
+        <div class="footer-content">
+          <div class="data-info">
+            <div class="info-item">
+              <span class="info-label">📊 Total Data:</span>
+              <span class="info-value" id="totalDataCount">0</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">👥 Unique PERNER:</span>
+              <span class="info-value" id="uniquePernerCount">0</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">🔄 Records with Changes:</span>
+              <span class="info-value" id="changedRecordsCount">0</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">📅 Date Range:</span>
+              <span class="info-value" id="dateRangeInfo">-</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Enhanced Pagination -->
+      <div
+        id="paginationContainer"
+        class="enhanced-pagination"
+        style="display: none"
+      >
+        <div class="pagination-info">
+          <div class="pagination-summary">
+            <span class="pagination-text">
+              Menampilkan <strong id="recordsStart">0</strong> -
+              <strong id="recordsEnd">0</strong> dari
+              <strong id="recordsTotal">0</strong> data
+            </span>
+            <span class="pagination-page-info">
+              Halaman <strong id="currentPageInfo">1</strong> dari
+              <strong id="totalPagesInfo">1</strong>
+            </span>
+          </div>
+
+          <div class="pagination-controls">
+            <!-- Jump to first -->
+            <button
+              id="firstPageBtn"
+              class="pagination-btn pagination-edge"
+              title="Halaman Pertama"
+            >
+              <span>⏮️</span>
+            </button>
+
+            <!-- Previous page -->
+            <button
+              id="prevPageBtn"
+              class="pagination-btn pagination-nav"
+              title="Halaman Sebelumnya"
+            >
+              <span>◀️</span>
+            </button>
+
+            <!-- Page numbers container -->
+            <div class="pagination-numbers" id="paginationNumbers">
+              <!-- Page numbers akan di-generate oleh JavaScript -->
+            </div>
+
+            <!-- Next page -->
+            <button
+              id="nextPageBtn"
+              class="pagination-btn pagination-nav"
+              title="Halaman Selanjutnya"
+            >
+              <span>▶️</span>
+            </button>
+
+            <!-- Jump to last -->
+            <button
+              id="lastPageBtn"
+              class="pagination-btn pagination-edge"
+              title="Halaman Terakhir"
+            >
+              <span>⏭️</span>
+            </button>
+          </div>
+
+          <div class="pagination-tools">
+            <!-- Items per page selector -->
+            <div class="items-per-page">
+              <label for="itemsPerPageSelect">Data per halaman:</label>
+              <select id="itemsPerPageSelect" class="items-select">
+                <option value="25">25</option>
+                <option value="50" selected>50</option>
+                <option value="100">100</option>
+                <option value="200">200</option>
+              </select>
+            </div>
+
+            <!-- Quick page jump -->
+            <div class="page-jump">
+              <label for="pageJumpInput">Ke halaman:</label>
+              <input
+                type="number"
+                id="pageJumpInput"
+                class="page-input"
+                min="1"
+                placeholder="1"
+              />
+              <button id="pageJumpBtn" class="pagination-btn pagination-jump">
+                Go
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const BASE_URL =
+        (window.BASE_URL && window.BASE_URL.trim()) || window.location.origin;
+      const api = (path, opts) => {
+        const p = path.startsWith("/") ? path : `/${path}`;
+        return fetch(`${BASE_URL}${p}`, opts);
+      };
+
+      // Global variables
+      let currentPage = 1;
+      let itemsPerPage = 50;
+      let totalPages = 1;
+      let searchQuery = "";
+      let currentData = [];
+
+      // DOM Elements
+      const loadBtn = document.getElementById("loadBtn");
+      const refreshBtn = document.getElementById("refreshBtn");
+      const downloadBtn = document.getElementById("downloadBtn");
+      const searchInput = document.getElementById("searchInput");
+      const alertContainer = document.getElementById("alertContainer");
+      const statsContainer = document.getElementById("statsContainer");
+      const loadingContainer = document.getElementById("loadingContainer");
+      const tableContainer = document.getElementById("tableContainer");
+      const tableScrollWrapper = document.getElementById("tableScrollWrapper");
+      const scrollIndicator = document.getElementById("scrollIndicator");
+      const paginationContainer = document.getElementById(
+        "paginationContainer"
+      );
+      const noDataMessage = document.getElementById("noDataMessage");
+
+      // Event Listeners
+      loadBtn.addEventListener("click", loadInputInOutData);
+      refreshBtn.addEventListener("click", loadInputInOutData);
+      downloadBtn.addEventListener("click", downloadExcel);
+      searchInput.addEventListener("input", debounce(handleSearch, 500));
+
+      // Enhanced pagination event listeners
+      document
+        .getElementById("itemsPerPageSelect")
+        .addEventListener("change", handleItemsPerPageChange);
+      document
+        .getElementById("pageJumpInput")
+        .addEventListener("keypress", handlePageJumpKeypress);
+      document
+        .getElementById("pageJumpBtn")
+        .addEventListener("click", handlePageJump);
+      document
+        .getElementById("firstPageBtn")
+        .addEventListener("click", () => goToPage(1));
+      document
+        .getElementById("lastPageBtn")
+        .addEventListener("click", () => goToPage(totalPages));
+      document
+        .getElementById("prevPageBtn")
+        .addEventListener("click", () => goToPage(currentPage - 1));
+      document
+        .getElementById("nextPageBtn")
+        .addEventListener("click", () => goToPage(currentPage + 1));
+
+      // Helper functions
+      function isValidTime(timeStr) {
+        return timeStr && timeStr !== null && timeStr !== "00:00:00";
+      }
+
+      function calculateDefaults(clockIn, clockOut) {
+        const hasClockIn = isValidTime(clockIn);
+        const hasClockOut = isValidTime(clockOut);
+
+        let clockInDefault, clockOutDefault, isChange;
+
+        if (hasClockIn && hasClockOut) {
+          // Kedua ada nilai
+          clockInDefault = clockIn;
+          clockOutDefault = clockOut;
+          isChange = false;
+        } else if (hasClockIn && !hasClockOut) {
+          // Clock in ada, clock out kosong
+          clockInDefault = clockIn;
+          clockOutDefault = clockIn;
+          isChange = true;
+        } else if (!hasClockIn && hasClockOut) {
+          // Clock in kosong, clock out ada
+          clockInDefault = clockOut;
+          clockOutDefault = clockOut;
+          isChange = true;
+        } else {
+          // Kedua kosong
+          clockInDefault = "00:00:00";
+          clockOutDefault = "00:00:00";
+          isChange = true;
+        }
+
+        return { clockInDefault, clockOutDefault, isChange };
+      }
+
+      // Load Input In Out Data Function
+      async function loadInputInOutData() {
+        try {
+          showLoading(true);
+          showAlert("📊 Mengambil data input in out...", "info");
+
+          const offset = (currentPage - 1) * itemsPerPage;
+          const url = `${BASE_URL}/getInputInOutSapData?limit=${itemsPerPage}&offset=${offset}&search=${encodeURIComponent(
+            searchQuery
+          )}`;
+
+          console.log("🔗 API Request URL:", url);
+
+          const response = await fetch(url);
+          const result = await response.json();
+
+          if (result.success) {
+            displayInputInOutData(result.data);
+            displayPagination(result.pagination);
+            displayStats(result.metadata);
+
+            if (result.data.length > 0) {
+              noDataMessage.style.display = "none";
+              statsContainer.style.display = "block";
+              downloadBtn.disabled = false;
+              updateFooterInfo(result.metadata, result.pagination);
+              document.getElementById("footerInfo").style.display = "block";
+            } else {
+              noDataMessage.style.display = "block";
+              downloadBtn.disabled = true;
+              document.getElementById("footerInfo").style.display = "none";
+              noDataMessage.innerHTML = searchQuery
+                ? "🔍 Tidak ada data yang sesuai dengan pencarian."
+                : '📋 Belum ada data. Klik tombol "Load Data" untuk memulai.';
+            }
+
+            showAlert("✅ Data berhasil dimuat!", "success");
+          } else {
+            showAlert(`❌ ${result.message}`, "error");
+          }
+        } catch (error) {
+          console.error("Error loading data:", error);
+          showAlert("❌ Terjadi kesalahan saat memuat data.", "error");
+        } finally {
+          showLoading(false);
+        }
+      }
+
+      // Display Input In Out Data in Table
+      function displayInputInOutData(data) {
+        if (!data || data.length === 0) {
+          tableScrollWrapper.innerHTML = `<div class="no-data">📋 Tidak ada data untuk ditampilkan.</div>`;
+          downloadBtn.disabled = true;
+          return;
+        }
+
+        currentData = data;
+        downloadBtn.disabled = false;
+
+        const table = `
+          <table>
+            <thead>
+              <tr>
+                <th>No.</th>
+                <th>PERNER</th>
+                <th>NIP</th>
+                <th>Nama</th>
+                <th>Tanggal</th>
+                <th>Clock In</th>
+                <th>Clock Out</th>
+                <th>Clock In Default</th>
+                <th>Clock Out Default</th>
+                <th>Is Change</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${data
+                .map((row, index) => {
+                  const { clockInDefault, clockOutDefault, isChange } =
+                    calculateDefaults(
+                      row.daily_in_cleansing,
+                      row.daily_out_cleansing
+                    );
+
+                  const rowNumber =
+                    (currentPage - 1) * itemsPerPage + index + 1;
+
+                  return `
+                  <tr>
+                    <td>${rowNumber}</td>
+                    <td class="perner">${row.perner}</td>
+                    <td>${row.nip || "-"}</td>
+                    <td style="text-align: left; max-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${
+                      row.nama || "-"
+                    }</td>
+                    <td>${new Date(row.tanggal).toLocaleDateString(
+                      "id-ID"
+                    )}</td>
+                    <td>${row.daily_in_cleansing || "-"}</td>
+                    <td>${row.daily_out_cleansing || "-"}</td>
+                    <td>${clockInDefault}</td>
+                    <td>${clockOutDefault}</td>
+                    <td class="${
+                      isChange ? "is-change-true" : "is-change-false"
+                    }">${isChange ? "true" : "false"}</td>
+                  </tr>
+                `;
+                })
+                .join("")}
+            </tbody>
+          </table>
+        `;
+
+        tableScrollWrapper.innerHTML = table;
+        showScrollIndicator();
+
+        tableScrollWrapper.addEventListener("scroll", () => {
+          scrollIndicator.style.display = "none";
+        });
+      }
+
+      // Display Statistics
+      function displayStats(metadata) {
+        if (!metadata) return;
+
+        const statsGrid = document.getElementById("statsGrid");
+        statsGrid.innerHTML = `
+          <div class="stat-card">
+            <h3>Total Records</h3>
+            <p>${metadata.total_records || 0}</p>
+          </div>
+          <div class="stat-card">
+            <h3>Unique PERNER</h3>
+            <p>${metadata.unique_perner || 0}</p>
+          </div>
+          <div class="stat-card">
+            <h3>Records with Changes</h3>
+            <p>${metadata.records_with_changes || 0}</p>
+          </div>
+          <div class="stat-card">
+            <h3>Processing Time</h3>
+            <p>${metadata.processing_time_ms || 0}ms</p>
+          </div>
+        `;
+        statsContainer.style.display = "block";
+      }
+
+      // Enhanced Display Pagination
+      function displayPagination(pagination) {
+        if (!pagination || pagination.totalPages <= 1) {
+          paginationContainer.style.display = "none";
+          return;
+        }
+
+        totalPages = pagination.totalPages;
+        currentPage = Math.floor(pagination.offset / pagination.limit) + 1;
+
+        // Update pagination summary
+        const recordsStart = pagination.offset + 1;
+        const recordsEnd = Math.min(
+          pagination.offset + pagination.limit,
+          pagination.total_records
+        );
+
+        document.getElementById("recordsStart").textContent =
+          recordsStart.toLocaleString();
+        document.getElementById("recordsEnd").textContent =
+          recordsEnd.toLocaleString();
+        document.getElementById("recordsTotal").textContent =
+          pagination.total_records.toLocaleString();
+        document.getElementById("currentPageInfo").textContent = currentPage;
+        document.getElementById("totalPagesInfo").textContent = totalPages;
+
+        // Update pagination controls
+        document.getElementById("firstPageBtn").disabled = currentPage === 1;
+        document.getElementById("prevPageBtn").disabled = currentPage === 1;
+        document.getElementById("nextPageBtn").disabled =
+          currentPage === totalPages;
+        document.getElementById("lastPageBtn").disabled =
+          currentPage === totalPages;
+
+        // Update items per page selector
+        document.getElementById("itemsPerPageSelect").value = itemsPerPage;
+
+        // Update page jump input
+        document.getElementById("pageJumpInput").max = totalPages;
+        document.getElementById(
+          "pageJumpInput"
+        ).placeholder = `1-${totalPages}`;
+
+        // Generate page numbers
+        generatePageNumbers();
+
+        paginationContainer.style.display = "block";
+      }
+
+      // Generate page numbers with smart ellipsis
+      function generatePageNumbers() {
+        const numbersContainer = document.getElementById("paginationNumbers");
+        numbersContainer.innerHTML = "";
+
+        const maxVisible = 7; // Maximum visible page buttons
+        let startPage, endPage;
+
+        if (totalPages <= maxVisible) {
+          startPage = 1;
+          endPage = totalPages;
+        } else {
+          const halfVisible = Math.floor(maxVisible / 2);
+
+          if (currentPage <= halfVisible + 1) {
+            startPage = 1;
+            endPage = maxVisible - 1;
+          } else if (currentPage >= totalPages - halfVisible) {
+            startPage = totalPages - maxVisible + 2;
+            endPage = totalPages;
+          } else {
+            startPage = currentPage - halfVisible;
+            endPage = currentPage + halfVisible;
+          }
+        }
+
+        // Add first page if not in range
+        if (startPage > 1) {
+          numbersContainer.appendChild(createPageButton(1));
+
+          if (startPage > 2) {
+            const ellipsis = document.createElement("span");
+            ellipsis.className = "pagination-ellipsis";
+            ellipsis.textContent = "...";
+            numbersContainer.appendChild(ellipsis);
+          }
+        }
+
+        // Add page numbers in range
+        for (let i = startPage; i <= endPage; i++) {
+          numbersContainer.appendChild(createPageButton(i));
+        }
+
+        // Add last page if not in range
+        if (endPage < totalPages) {
+          if (endPage < totalPages - 1) {
+            const ellipsis = document.createElement("span");
+            ellipsis.className = "pagination-ellipsis";
+            ellipsis.textContent = "...";
+            numbersContainer.appendChild(ellipsis);
+          }
+
+          numbersContainer.appendChild(createPageButton(totalPages));
+        }
+      }
+
+      // Create page button
+      function createPageButton(pageNumber) {
+        const button = document.createElement("button");
+        button.className = `pagination-btn ${
+          pageNumber === currentPage ? "active" : ""
+        }`;
+        button.textContent = pageNumber;
+        button.onclick = () => goToPage(pageNumber);
+        button.title = `Ke halaman ${pageNumber}`;
+        return button;
+      }
+
+      // Update footer information
+      function updateFooterInfo(metadata, pagination) {
+        if (!metadata) return;
+
+        document.getElementById("totalDataCount").textContent =
+          metadata.total_records.toLocaleString();
+        document.getElementById("uniquePernerCount").textContent =
+          metadata.unique_perner.toLocaleString();
+        document.getElementById("changedRecordsCount").textContent =
+          metadata.records_with_changes.toLocaleString();
+
+        // Date range info
+        if (pagination && pagination.total_records > 0) {
+          // You might want to add date range to metadata if available
+          document.getElementById("dateRangeInfo").textContent =
+            "Lihat data terbaru";
+        } else {
+          document.getElementById("dateRangeInfo").textContent = "-";
+        }
+      }
+
+      // Handle items per page change
+      function handleItemsPerPageChange() {
+        const newItemsPerPage = parseInt(
+          document.getElementById("itemsPerPageSelect").value
+        );
+        if (newItemsPerPage !== itemsPerPage) {
+          itemsPerPage = newItemsPerPage;
+          currentPage = 1; // Reset to first page
+          loadInputInOutData();
+        }
+      }
+
+      // Handle page jump
+      function handlePageJump() {
+        const pageInput = document.getElementById("pageJumpInput");
+        const targetPage = parseInt(pageInput.value);
+
+        if (
+          targetPage &&
+          targetPage >= 1 &&
+          targetPage <= totalPages &&
+          targetPage !== currentPage
+        ) {
+          goToPage(targetPage);
+        }
+
+        pageInput.value = "";
+      }
+
+      // Handle page jump keypress
+      function handlePageJumpKeypress(e) {
+        if (e.key === "Enter") {
+          handlePageJump();
+        }
+      }
+
+      // Go to specific page
+      function goToPage(page) {
+        if (page < 1 || page > totalPages || page === currentPage) return;
+        currentPage = page;
+        loadInputInOutData();
+      }
+
+      // Handle search
+      function handleSearch() {
+        searchQuery = searchInput.value.trim();
+        currentPage = 1;
+        loadInputInOutData();
+      }
+
+      // Download Excel Function
+      async function downloadExcel() {
+        try {
+          if (!currentData || currentData.length === 0) {
+            showAlert("❌ Tidak ada data untuk diunduh.", "error");
+            return;
+          }
+
+          showLoading(true);
+          showAlert("📊 Mengunduh data dalam format Excel (.xlsx)...", "info");
+
+          // Get all data for export
+          const allDataResponse = await fetch(
+            `${BASE_URL}/getInputInOutSapData?limit=10000&offset=0&search=${encodeURIComponent(
+              searchQuery
+            )}`
+          );
+          const allDataResult = await allDataResponse.json();
+
+          if (!allDataResult.success) {
+            throw new Error("Gagal mengambil data lengkap");
+          }
+
+          const data = allDataResult.data;
+          console.log(`📊 Exporting ${data.length} records to Excel (.xlsx)`);
+
+          // Create workbook
+          const wb = XLSX.utils.book_new();
+
+          // Prepare data for Excel with proper date formatting
+          const excelData = [];
+
+          data.forEach((row, index) => {
+            const { clockInDefault, clockOutDefault, isChange } =
+              calculateDefaults(
+                row.daily_in_cleansing,
+                row.daily_out_cleansing
+              );
+
+            // Parse tanggal to proper Date object
+            const tanggalDate = new Date(row.tanggal);
+
+            excelData.push({
+              "No.": index + 1,
+              PERNER: row.perner,
+              NIP: row.nip || "",
+              Nama: row.nama || "",
+              Tanggal: tanggalDate, // Keep as Date object for Excel
+              "Clock In": row.daily_in_cleansing || "",
+              "Clock Out": row.daily_out_cleansing || "",
+              "Clock In Default": clockInDefault,
+              "Clock Out Default": clockOutDefault,
+              "Is Change": isChange ? "true" : "false",
+            });
+          });
+
+          // Create worksheet
+          const ws = XLSX.utils.json_to_sheet(excelData);
+
+          // Apply custom formatting to worksheet cells
+          const range = XLSX.utils.decode_range(ws["!ref"]);
+
+          // Apply formatting to each cell
+          for (let rowNum = range.s.r; rowNum <= range.e.r; rowNum++) {
+            for (let colNum = range.s.c; colNum <= range.e.c; colNum++) {
+              const cellAddress = XLSX.utils.encode_cell({
+                r: rowNum,
+                c: colNum,
+              });
+              const cell = ws[cellAddress];
+
+              if (!cell) continue;
+
+              // Initialize cell style if not exists
+              if (!cell.s) cell.s = {};
+
+              // Header row formatting (row 0)
+              if (rowNum === 0) {
+                cell.s = {
+                  font: { bold: true, color: { rgb: "FFFFFF" }, size: 12 },
+                  fill: { fgColor: { rgb: "667EEA" } },
+                  alignment: { horizontal: "center", vertical: "center" },
+                  border: {
+                    top: { style: "thin", color: { rgb: "FFFFFF" } },
+                    bottom: { style: "thin", color: { rgb: "FFFFFF" } },
+                    left: { style: "thin", color: { rgb: "FFFFFF" } },
+                    right: { style: "thin", color: { rgb: "FFFFFF" } },
+                  },
+                };
+              } else {
+                // Data rows formatting
+                cell.s = {
+                  alignment: { horizontal: "center", vertical: "center" },
+                  border: {
+                    top: { style: "thin", color: { rgb: "CCCCCC" } },
+                    bottom: { style: "thin", color: { rgb: "CCCCCC" } },
+                    left: { style: "thin", color: { rgb: "CCCCCC" } },
+                    right: { style: "thin", color: { rgb: "CCCCCC" } },
+                  },
+                };
+
+                // Special formatting for specific columns
+                const colHeaders = [
+                  "No.",
+                  "PERNER",
+                  "NIP",
+                  "Nama",
+                  "Tanggal",
+                  "Clock In",
+                  "Clock Out",
+                  "Clock In Default",
+                  "Clock Out Default",
+                  "Is Change",
+                ];
+                const colHeader = colHeaders[colNum];
+
+                if (colHeader === "PERNER") {
+                  // PERNER column
+                  cell.s.font = { bold: true };
+                  cell.s.fill = { fgColor: { rgb: "E3F2FD" } };
+                  cell.s.alignment.horizontal = "center";
+                } else if (colHeader === "Nama") {
+                  // Nama column - left aligned
+                  cell.s.alignment.horizontal = "left";
+                } else if (colHeader === "Tanggal") {
+                  // Date column - specific format dd/mm/yyyy
+                  cell.s.numFmt = "dd/mm/yyyy";
+                  cell.s.alignment.horizontal = "center";
+                } else if (
+                  colHeader === "Clock In" ||
+                  colHeader === "Clock Out" ||
+                  colHeader === "Clock In Default" ||
+                  colHeader === "Clock Out Default"
+                ) {
+                  // Time columns
+                  cell.s.alignment.horizontal = "center";
+                  if (cell.v && cell.v !== "" && cell.v !== "-") {
+                    cell.s.fill = { fgColor: { rgb: "F0F8FF" } };
+                  }
+                } else if (colHeader === "Is Change") {
+                  // Is Change column with conditional formatting
+                  cell.s.font = { bold: true };
+                  if (cell.v === "true") {
+                    cell.s.fill = { fgColor: { rgb: "FFEBEE" } };
+                    cell.s.font.color = { rgb: "C62828" };
+                  } else {
+                    cell.s.fill = { fgColor: { rgb: "E8F5E8" } };
+                    cell.s.font.color = { rgb: "2E7D32" };
+                  }
+                }
+              }
+            }
+          }
+
+          // Set column widths for better readability
+          const colWidths = [
+            { wch: 6 }, // No. - slightly wider
+            { wch: 12 }, // PERNER
+            { wch: 15 }, // NIP
+            { wch: 30 }, // Nama - much wider for names
+            { wch: 14 }, // Tanggal - wider for dd/mm/yyyy format
+            { wch: 12 }, // Clock In
+            { wch: 12 }, // Clock Out
+            { wch: 16 }, // Clock In Default
+            { wch: 16 }, // Clock Out Default
+            { wch: 12 }, // Is Change
+          ];
+          ws["!cols"] = colWidths;
+
+          // Set row heights for better appearance
+          ws["!rows"] = [
+            { hpt: 25 }, // Header row height
+          ];
+
+          // Add worksheet to workbook
+          XLSX.utils.book_append_sheet(wb, ws, "Input In Out SAP");
+
+          // Generate filename
+          const timestamp = new Date().toISOString().split("T")[0];
+          const filename = `Input_In_Out_SAP_${timestamp}${
+            searchQuery ? "_Filtered" : ""
+          }.xlsx`;
+
+          // Write and download file
+          XLSX.writeFile(wb, filename);
+
+          showAlert(
+            `✅ File "${filename}" berhasil diunduh! (${data.length} records)`,
+            "success"
+          );
+        } catch (error) {
+          console.error("Download error:", error);
+          showAlert(`❌ Gagal mengunduh file: ${error.message}`, "error");
+        } finally {
+          showLoading(false);
+        }
+      }
+
+      // Show loading state
+      function showLoading(show) {
+        loadingContainer.style.display = show ? "block" : "none";
+      }
+
+      // Show alert messages
+      function showAlert(message, type) {
+        const alertClass =
+          type === "success"
+            ? "alert-success"
+            : type === "error"
+            ? "alert-error"
+            : "alert-info";
+        const alertHTML = `<div class="alert ${alertClass}">${message}</div>`;
+        alertContainer.innerHTML = alertHTML;
+
+        setTimeout(() => {
+          alertContainer.innerHTML = "";
+        }, 5000);
+      }
+
+      // Debounce function
+      function debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+          const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+          };
+          clearTimeout(timeout);
+          timeout = setTimeout(later, wait);
+        };
+      }
+
+      // Show scroll indicator
+      function showScrollIndicator() {
+        const table = tableScrollWrapper.querySelector("table");
+        if (table && table.scrollWidth > tableScrollWrapper.clientWidth) {
+          scrollIndicator.style.display = "block";
+          setTimeout(() => {
+            scrollIndicator.style.display = "none";
+          }, 3000);
+        }
+      }
+
+      // Initialize
+      document.addEventListener("DOMContentLoaded", () => {
+        loadInputInOutData();
+      });
+    </script>
+  </body>
+</html>

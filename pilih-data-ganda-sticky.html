@@ -726,12 +726,15 @@
     </div>
 
     <script>
-      // BASE URL untuk API calls - Dinamis berdasarkan environment
-      const PROD_API = "https://absensi-db.onrender.com";
-      const isLocal = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
       const BASE_URL =
-        (window.BASE_URL && window.BASE_URL.trim()) ||
-        (isLocal ? "http://localhost:3000" : PROD_API);
+        (window.BASE_URL && window.BASE_URL.trim()) || window.location.origin;
+
+      // Helper fetch: aman jika path tanpa "/" di depan.
+      const api = (path, opts) => {
+        const p = path.startsWith("/") ? path : `/${path}`;
+        return fetch(`${BASE_URL}${p}`, opts);
+      };
+      // === END KONFIG ===
 
       console.log("🔧 BASE_URL:", BASE_URL);
       console.log("🌐 Current hostname:", location.hostname);

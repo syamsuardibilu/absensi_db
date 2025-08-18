@@ -1,10 +1,14 @@
-// === KONFIG API ===
-const PROD_API = "https://absensi-db.onrender.com"; // production API
-const isLocal = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
+// === KONFIG API (final) ===
+// Opsional: bisa override dari HTML sebelum script ini dimuat.
+// <script>window.BASE_URL = "https://absensi-db.onrender.com";</script>
 const BASE_URL =
-  (window.BASE_URL && window.BASE_URL.trim()) ||
-  (isLocal ? "http://localhost:3000" : PROD_API);
-const api = (path, opts) => fetch(`${BASE_URL}${path}`, opts);
+  (window.BASE_URL && window.BASE_URL.trim()) || window.location.origin;
+
+// Helper fetch: aman jika path tanpa "/" di depan.
+const api = (path, opts) => {
+  const p = path.startsWith("/") ? path : `/${path}`;
+  return fetch(`${BASE_URL}${p}`, opts);
+};
 // === END KONFIG ===
 
 // TAMBAH DI ATAS (setelah variabel jenisData)

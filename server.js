@@ -6,13 +6,52 @@ const mysql = require("mysql2");
 const cors = require("cors");
 const fs = require("fs");
 const path = require("path");
+const DIR = __dirname;
 
 const app = express();
 
+app.use(express.static(DIR, { dotfiles: "ignore" }));
+
+// Halaman daftar file sederhana
+app.get("/files", (_req, res) => {
+  const items = fs.readdirSync(DIR).filter((name) => {
+    if (name === "node_modules") return false;
+    if (name.startsWith(".")) return false; // sembunyikan dotfiles
+    return true;
+  });
+  const html =
+    "<h1>Daftar File</h1><ul>" +
+    items
+      .map((n) => `<li><a href="/${encodeURIComponent(n)}">${n}</a></li>`)
+      .join("") +
+    "</ul>";
+  res.send(html);
+});
+
+// Opsional: jadikan / menampilkan daftar juga
+app.get("/", (_req, res) => res.redirect("/files"));
+
+function getLanIPv4() {
+  const os = require("os");
+  const nets = os.networkInterfaces();
+  for (const name of Object.keys(nets)) {
+    for (const net of nets[name] || []) {
+      if (net.family === "IPv4" && !net.internal) return net.address;
+    }
+  }
+  return null;
+}
+
 // ===== Env (works on Render + Local) =====
 const NODE_ENV = process.env.NODE_ENV || "development";
+const HOST = process.env.HOST || "0.0.0.0";
 const PORT = Number(process.env.PORT || 3000);
-const INTERNAL_BASE_URL = `http://127.0.0.1:${PORT}`;
+
+const INTERNAL_BASE_URL =
+  process.env.INTERNAL_BASE_URL ||
+  (NODE_ENV === "development" ? `http://127.0.0.1:${PORT}` : "");
+
+// const INTERNAL_BASE_URL = `http://127.0.0.1:${PORT}`;
 const BASE_URL =
   process.env.BASE_URL || process.env.RENDER_EXTERNAL_URL || INTERNAL_BASE_URL;
 
@@ -1946,11 +1985,11 @@ app.post("/update-status-ganda", (req, res) => {
               }
 
               const taskDuration = Date.now() - taskStart;
-              console.log(
-                `✅ ${group.name} Batch ${chunkIndex + 1}/${chunks.length}: ${
-                  result.affectedRows
-                } rows (${taskDuration}ms)`
-              );
+              // console.log(
+              //   `✅ ${group.name} Batch ${chunkIndex + 1}/${chunks.length}: ${
+              //     result.affectedRows
+              //   } rows (${taskDuration}ms)`
+              // );
 
               resolve({
                 group: group.name,
@@ -2775,7 +2814,7 @@ app.post("/proses-kalkulasi-jkp-backend-selective", async (req, res) => {
             ? parseFloat(Number(durasi_seharusnya_final).toFixed(3))
             : null;
 
-        let persentase = null;
+        let persentase = 0;
         if (jam_kerja_seharusnya !== null && jam_kerja_seharusnya > 0) {
           persentase = parseFloat(
             (
@@ -4373,9 +4412,2106 @@ app.get("/get-rekap-absensi", (req, res) => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`✅ Server listening on ${PORT}`);
-  console.log(`🔗 Health: http://127.0.0.1:${PORT}/api/health`);
+// ======================================================
+// FORMAT BLASTING ENDPOINTS
+// ======================================================
+
+// 📊 GET: Ambil semua data rekap_absensi untuk format blasting
+// STEP 1: Tambahkan ini ke server.js (setelah endpoint lain yang sudah ada)
+// 🔧 FIXED ENDPOINT - Pastikan return format array
+// 🗄️ DATABASE REAL ENDPOINT (gunakan setelah dummy berhasil)
+// ======================================================
+// CORRECT ENDPOINT: getRekapAbsensi dengan JOIN ke data_pegawai
+// ======================================================
+
+// 📊 GET: Ambil data rekap_absensi dengan JOIN ke data_pegawai
+// ======================================================
+// CORRECT ENDPOINT: getRekapAbsensi dengan JOIN + Periode Bulan
+// ======================================================
+
+// 📊 GET: Ambil data rekap_absensi dengan JOIN ke data_pegawai + periode bulan
+app.get("/getRekapAbsensi", (req, res) => {
+  const startTime = Date.now();
+  console.log("🚀 Fetching rekap_absensi with JOIN and periode bulan...");
+
+  // Step 1: Ambil sample tanggal dari olah_absensi untuk menentukan periode
+  const periodeSQL = `
+    SELECT tanggal 
+    FROM olah_absensi 
+    WHERE tanggal IS NOT NULL 
+    ORDER BY tanggal DESC 
+    LIMIT 1
+  `;
+
+  conn.query(periodeSQL, (periodeErr, periodeResults) => {
+    if (periodeErr) {
+      console.error("❌ Error getting periode:", periodeErr);
+      return res.status(500).json({
+        success: false,
+        message: "❌ Gagal mengambil periode bulan absensi",
+        error: periodeErr.message,
+      });
+    }
+
+    // Determine periode bulan dan tahun dari olah_absensi
+    let periodeBulan = "Tidak Diketahui";
+    let periodeTahun = new Date().getFullYear();
+
+    if (periodeResults.length > 0 && periodeResults[0].tanggal) {
+      const tanggalSample = new Date(periodeResults[0].tanggal);
+      const monthNames = [
+        "Januari",
+        "Februari",
+        "Maret",
+        "April",
+        "Mei",
+        "Juni",
+        "Juli",
+        "Agustus",
+        "September",
+        "Oktober",
+        "November",
+        "Desember",
+      ];
+      periodeBulan = monthNames[tanggalSample.getMonth()];
+      periodeTahun = tanggalSample.getFullYear();
+    }
+
+    console.log(`📅 Periode absensi: ${periodeBulan} ${periodeTahun}`);
+
+    // Step 2: Query dengan LEFT JOIN untuk ambil data pegawai
+    const sql = `
+      SELECT 
+        r.PERNER,
+        dp.nama,
+        dp.nip,
+        dp.bidang,
+        dp.no_telp,
+        r.TOTAL_HARI,
+        r.HARI_KERJA,
+        r.HARI_LIBUR,
+        r.TOTAL_HARI_KOREKSI,
+        r.KOREKSI_IN,
+        r.KOREKSI_OUT,
+        r.KOREKSI_IN_OUT,
+        r.TOTAL_JAM_KERJA_NORMAL,
+        r.PIKET,
+        r.PDKB,
+        r.REGULER,
+        r.TOTAL_JAM_KERJA_SHIFT,
+        r.SHIFT_PAGI,
+        r.SHIFT_SIANG,
+        r.SHIFT_MALAM,
+        r.SHIFT_OFF,
+        r.ABSEN_LENGKAP,
+        r.TIDAK_ABSEN,
+        r.IN_KOSONG,
+        r.OUT_KOSONG,
+        r.SPPD_TUGAS_LUAR_DLL,
+        r.CUTI_IJIN,
+        r.JAM_REALISASI,
+        r.JAM_SEHARUSNYA,
+        r.PERSENTASE_JKP,
+        r.RESULT_BLASTING
+      FROM rekap_absensi r
+      LEFT JOIN data_pegawai dp ON r.PERNER = dp.perner
+      ORDER BY r.PERNER ASC
+    `;
+
+    conn.query(sql, (err, results) => {
+      if (err) {
+        console.error("❌ Error fetching data with JOIN:", err);
+        return res.status(500).json({
+          success: false,
+          message: "❌ Gagal mengambil data rekap dengan pegawai",
+          error: err.message,
+        });
+      }
+
+      const endTime = Date.now();
+      const duration = endTime - startTime;
+
+      console.log(
+        `✅ Data with JOIN fetched: ${results.length} records in ${duration}ms`
+      );
+
+      // Debug log untuk check JOIN result
+      if (results.length > 0) {
+        const sampleData = results[0];
+        console.log(`📊 Sample data:`, {
+          PERNER: sampleData.PERNER,
+          nama: sampleData.nama,
+          nip: sampleData.nip,
+          bidang: sampleData.bidang,
+          no_telp: sampleData.no_telp,
+        });
+
+        // Count berapa yang punya data pegawai
+        const withPegawaiData = results.filter((r) => r.nama !== null).length;
+        const withoutPegawaiData = results.filter(
+          (r) => r.nama === null
+        ).length;
+
+        console.log(`📈 JOIN Statistics:`);
+        console.log(`   - Records with pegawai data: ${withPegawaiData}`);
+        console.log(`   - Records without pegawai data: ${withoutPegawaiData}`);
+        console.log(
+          `   - Match percentage: ${(
+            (withPegawaiData / results.length) *
+            100
+          ).toFixed(2)}%`
+        );
+      }
+
+      // Format hasil untuk konsistensi + tambahkan periode
+      const formattedResults = results.map((row) => ({
+        PERNER: row.PERNER || "",
+        nama: row.nama || null,
+        nip: row.nip || null,
+        bidang: row.bidang || null,
+        no_telp: row.no_telp || null,
+        // Tambahkan info periode untuk template pesan
+        periode_bulan: periodeBulan,
+        periode_tahun: periodeTahun,
+        TOTAL_HARI: parseInt(row.TOTAL_HARI) || 0,
+        HARI_KERJA: parseInt(row.HARI_KERJA) || 0,
+        HARI_LIBUR: parseInt(row.HARI_LIBUR) || 0,
+        TOTAL_HARI_KOREKSI: parseInt(row.TOTAL_HARI_KOREKSI) || 0,
+        KOREKSI_IN: parseInt(row.KOREKSI_IN) || 0,
+        KOREKSI_OUT: parseInt(row.KOREKSI_OUT) || 0,
+        KOREKSI_IN_OUT: parseInt(row.KOREKSI_IN_OUT) || 0,
+        TOTAL_JAM_KERJA_NORMAL: parseInt(row.TOTAL_JAM_KERJA_NORMAL) || 0,
+        PIKET: parseInt(row.PIKET) || 0,
+        PDKB: parseInt(row.PDKB) || 0,
+        REGULER: parseInt(row.REGULER) || 0,
+        TOTAL_JAM_KERJA_SHIFT: parseInt(row.TOTAL_JAM_KERJA_SHIFT) || 0,
+        SHIFT_PAGI: parseInt(row.SHIFT_PAGI) || 0,
+        SHIFT_SIANG: parseInt(row.SHIFT_SIANG) || 0,
+        SHIFT_MALAM: parseInt(row.SHIFT_MALAM) || 0,
+        SHIFT_OFF: parseInt(row.SHIFT_OFF) || 0,
+        ABSEN_LENGKAP: parseInt(row.ABSEN_LENGKAP) || 0,
+        TIDAK_ABSEN: parseInt(row.TIDAK_ABSEN) || 0,
+        IN_KOSONG: parseInt(row.IN_KOSONG) || 0,
+        OUT_KOSONG: parseInt(row.OUT_KOSONG) || 0,
+        SPPD_TUGAS_LUAR_DLL: parseInt(row.SPPD_TUGAS_LUAR_DLL) || 0,
+        CUTI_IJIN: parseInt(row.CUTI_IJIN) || 0,
+        JAM_REALISASI: parseFloat(row.JAM_REALISASI) || 0.0,
+        JAM_SEHARUSNYA: parseFloat(row.JAM_SEHARUSNYA) || 0.0,
+        PERSENTASE_JKP: parseFloat(row.PERSENTASE_JKP) || 0.0,
+        RESULT_BLASTING: row.RESULT_BLASTING || null,
+      }));
+
+      res.json(formattedResults);
+    });
+  });
+});
+
+// ======================================================
+// BONUS: Test Endpoint untuk data_pegawai saja
+// ======================================================
+
+// 📊 GET: Test endpoint untuk lihat data_pegawai
+app.get("/testDataPegawai", (req, res) => {
+  console.log("🧪 Testing data_pegawai table...");
+
+  const sql =
+    "SELECT perner, nama, nip, bidang, no_telp FROM data_pegawai ORDER BY perner ASC";
+
+  conn.query(sql, (err, results) => {
+    if (err) {
+      console.error("❌ Error fetching data_pegawai:", err);
+      return res.status(500).json({
+        success: false,
+        message: "❌ Gagal mengambil data pegawai",
+        error: err.message,
+      });
+    }
+
+    console.log(`✅ data_pegawai fetched: ${results.length} records`);
+
+    res.json({
+      success: true,
+      message: `✅ Data pegawai berhasil diambil`,
+      count: results.length,
+      data: results,
+    });
+  });
+});
+
+// ======================================================
+// BONUS: Check PERNER yang tidak ada di data_pegawai
+// ======================================================
+
+// 📊 GET: Check PERNER yang missing
+app.get("/checkMissingPERNER", (req, res) => {
+  console.log("🔍 Checking missing PERNER in data_pegawai...");
+
+  const sql = `
+    SELECT 
+      r.PERNER,
+      CASE 
+        WHEN dp.perner IS NULL THEN 'MISSING'
+        ELSE 'FOUND'
+      END as status,
+      dp.nama,
+      dp.bidang
+    FROM rekap_absensi r
+    LEFT JOIN data_pegawai dp ON r.PERNER = dp.perner
+    ORDER BY status DESC, r.PERNER ASC
+  `;
+
+  conn.query(sql, (err, results) => {
+    if (err) {
+      console.error("❌ Error checking missing PERNER:", err);
+      return res.status(500).json({
+        success: false,
+        message: "❌ Gagal mengecek PERNER",
+        error: err.message,
+      });
+    }
+
+    const missingPERNER = results.filter((r) => r.status === "MISSING");
+    const foundPERNER = results.filter((r) => r.status === "FOUND");
+
+    // console.log(`✅ PERNER check completed:`);
+    // console.log(`   - Total PERNER: ${results.length}`);
+    // console.log(`   - Found: ${foundPERNER.length}`);
+    // console.log(`   - Missing: ${missingPERNER.length}`);
+
+    res.json({
+      success: true,
+      summary: {
+        total: results.length,
+        found: foundPERNER.length,
+        missing: missingPERNER.length,
+        match_percentage: ((foundPERNER.length / results.length) * 100).toFixed(
+          2
+        ),
+      },
+      missing_perner: missingPERNER.map((r) => r.PERNER),
+      details: results,
+    });
+  });
+});
+
+// ======================================================
+// BONUS: Test Endpoint untuk data_pegawai saja
+// ======================================================
+
+// 📊 GET: Test endpoint untuk lihat data_pegawai
+app.get("/testDataPegawai", (req, res) => {
+  console.log("🧪 Testing data_pegawai table...");
+
+  const sql =
+    "SELECT perner, nama, nip, bidang, no_telp FROM data_pegawai ORDER BY perner ASC";
+
+  conn.query(sql, (err, results) => {
+    if (err) {
+      console.error("❌ Error fetching data_pegawai:", err);
+      return res.status(500).json({
+        success: false,
+        message: "❌ Gagal mengambil data pegawai",
+        error: err.message,
+      });
+    }
+
+    console.log(`✅ data_pegawai fetched: ${results.length} records`);
+
+    res.json({
+      success: true,
+      message: `✅ Data pegawai berhasil diambil`,
+      count: results.length,
+      data: results,
+    });
+  });
+});
+
+// ======================================================
+// BONUS: Check PERNER yang tidak ada di data_pegawai
+// ======================================================
+
+// 📊 GET: Check PERNER yang missing
+app.get("/checkMissingPERNER", (req, res) => {
+  console.log("🔍 Checking missing PERNER in data_pegawai...");
+
+  const sql = `
+    SELECT 
+      r.PERNER,
+      CASE 
+        WHEN dp.perner IS NULL THEN 'MISSING'
+        ELSE 'FOUND'
+      END as status,
+      dp.nama,
+      dp.bidang
+    FROM rekap_absensi r
+    LEFT JOIN data_pegawai dp ON r.PERNER = dp.perner
+    ORDER BY status DESC, r.PERNER ASC
+  `;
+
+  conn.query(sql, (err, results) => {
+    if (err) {
+      console.error("❌ Error checking missing PERNER:", err);
+      return res.status(500).json({
+        success: false,
+        message: "❌ Gagal mengecek PERNER",
+        error: err.message,
+      });
+    }
+
+    const missingPERNER = results.filter((r) => r.status === "MISSING");
+    const foundPERNER = results.filter((r) => r.status === "FOUND");
+
+    console.log(`✅ PERNER check completed:`);
+    console.log(`   - Total PERNER: ${results.length}`);
+    console.log(`   - Found: ${foundPERNER.length}`);
+    console.log(`   - Missing: ${missingPERNER.length}`);
+
+    res.json({
+      success: true,
+      summary: {
+        total: results.length,
+        found: foundPERNER.length,
+        missing: missingPERNER.length,
+        match_percentage: ((foundPERNER.length / results.length) * 100).toFixed(
+          2
+        ),
+      },
+      missing_perner: missingPERNER.map((r) => r.PERNER),
+      details: results,
+    });
+  });
+});
+
+// 📱 PUT: Update RESULT_BLASTING untuk specific PERNER
+// 🔧 FIXED ENDPOINT: Update Result Blasting
+// 🔧 UPDATED ENDPOINT: Support Reset (NULL) Value
+app.put("/updateResultBlasting", (req, res) => {
+  const { perner, result_blasting } = req.body;
+  const startTime = Date.now();
+
+  console.log("🔄 updateResultBlasting called with:", {
+    perner,
+    result_blasting,
+  });
+
+  // Validasi input
+  if (!perner) {
+    console.log("❌ Validation failed: PERNER is required");
+    return res.status(400).json({
+      success: false,
+      message: "❌ PERNER tidak boleh kosong",
+    });
+  }
+
+  // Allow NULL for reset functionality
+  if (
+    result_blasting !== null &&
+    result_blasting !== undefined &&
+    result_blasting !== ""
+  ) {
+    // Validasi nilai result_blasting jika bukan NULL
+    const validResults = ["Terkirim", "Gagal"];
+    if (!validResults.includes(result_blasting)) {
+      console.log(
+        `❌ Validation failed: Invalid result_blasting value: ${result_blasting}`
+      );
+      return res.status(400).json({
+        success: false,
+        message: `❌ Result blasting harus salah satu dari: ${validResults.join(
+          ", "
+        )} atau NULL untuk reset`,
+      });
+    }
+  }
+
+  const actionType =
+    result_blasting === null ||
+    result_blasting === undefined ||
+    result_blasting === ""
+      ? "RESET"
+      : result_blasting;
+  console.log(`🔄 Processing update for PERNER: ${perner} → ${actionType}`);
+
+  // STEP 1: Check if table exists
+  const checkTableSQL = "SHOW TABLES LIKE 'rekap_absensi'";
+
+  conn.query(checkTableSQL, (checkTableErr, tableResults) => {
+    if (checkTableErr) {
+      console.error(
+        "❌ Error checking table existence:",
+        checkTableErr.message
+      );
+      return res.status(500).json({
+        success: false,
+        message: "❌ Database connection error",
+        error: checkTableErr.message,
+      });
+    }
+
+    if (tableResults.length === 0) {
+      console.log("❌ Table rekap_absensi not found");
+      return res.status(404).json({
+        success: false,
+        message: "❌ Tabel rekap_absensi tidak ditemukan",
+      });
+    }
+
+    // STEP 2: Check if RESULT_BLASTING column exists
+    const checkColumnSQL =
+      "SHOW COLUMNS FROM rekap_absensi LIKE 'RESULT_BLASTING'";
+
+    conn.query(checkColumnSQL, (checkColumnErr, columnResults) => {
+      if (checkColumnErr) {
+        console.error("❌ Error checking column:", checkColumnErr.message);
+        return res.status(500).json({
+          success: false,
+          message: "❌ Error checking database structure",
+          error: checkColumnErr.message,
+        });
+      }
+
+      // If RESULT_BLASTING column doesn't exist, create it
+      if (columnResults.length === 0) {
+        console.log("⚠️ RESULT_BLASTING column not found, creating it...");
+
+        const addColumnSQL =
+          "ALTER TABLE rekap_absensi ADD COLUMN RESULT_BLASTING VARCHAR(10) DEFAULT NULL";
+
+        conn.query(addColumnSQL, (addColumnErr) => {
+          if (addColumnErr) {
+            console.error(
+              "❌ Error adding RESULT_BLASTING column:",
+              addColumnErr.message
+            );
+            return res.status(500).json({
+              success: false,
+              message: "❌ Error creating RESULT_BLASTING column",
+              error: addColumnErr.message,
+            });
+          }
+
+          console.log("✅ RESULT_BLASTING column created successfully");
+          // Continue to update after creating column
+          performUpdate();
+        });
+      } else {
+        console.log("✅ RESULT_BLASTING column exists");
+        // Column exists, proceed with update
+        performUpdate();
+      }
+    });
+  });
+
+  // Function to perform the actual update
+  function performUpdate() {
+    // STEP 3: Check if PERNER exists
+    const checkPERNERSQL = "SELECT PERNER FROM rekap_absensi WHERE PERNER = ?";
+
+    conn.query(checkPERNERSQL, [perner], (checkErr, checkResults) => {
+      if (checkErr) {
+        console.error("❌ Error checking PERNER:", checkErr.message);
+        return res.status(500).json({
+          success: false,
+          message: "❌ Error checking PERNER",
+          error: checkErr.message,
+        });
+      }
+
+      if (checkResults.length === 0) {
+        console.log(`❌ PERNER not found: ${perner}`);
+        return res.status(404).json({
+          success: false,
+          message: `❌ PERNER ${perner} tidak ditemukan dalam database`,
+        });
+      }
+
+      console.log(`✅ PERNER ${perner} found, proceeding with update...`);
+
+      // STEP 4: Update RESULT_BLASTING (support NULL for reset)
+      const updateSQL =
+        "UPDATE rekap_absensi SET RESULT_BLASTING = ? WHERE PERNER = ?";
+
+      // Handle NULL value properly
+      const updateValue =
+        result_blasting === null ||
+        result_blasting === undefined ||
+        result_blasting === ""
+          ? null
+          : result_blasting;
+
+      conn.query(
+        updateSQL,
+        [updateValue, perner],
+        (updateErr, updateResult) => {
+          if (updateErr) {
+            console.error(
+              "❌ Error updating RESULT_BLASTING:",
+              updateErr.message
+            );
+            return res.status(500).json({
+              success: false,
+              message: "❌ Gagal mengupdate result blasting",
+              error: updateErr.message,
+            });
+          }
+
+          const endTime = Date.now();
+          const duration = endTime - startTime;
+
+          if (updateResult.affectedRows === 0) {
+            console.log(`⚠️ No rows updated for PERNER: ${perner}`);
+            return res.status(404).json({
+              success: false,
+              message: `❌ Tidak ada data yang diupdate untuk PERNER ${perner}`,
+            });
+          }
+
+          const displayValue =
+            updateValue === null ? "RESET (NULL)" : updateValue;
+          console.log(`✅ RESULT_BLASTING updated successfully!`);
+          console.log(`   - PERNER: ${perner}`);
+          console.log(`   - New Status: ${displayValue}`);
+          console.log(`   - Affected Rows: ${updateResult.affectedRows}`);
+          console.log(`   - Duration: ${duration}ms`);
+
+          res.json({
+            success: true,
+            message:
+              updateValue === null
+                ? `✅ Status berhasil direset (kosong)`
+                : `✅ Status berhasil diupdate menjadi '${updateValue}'`,
+            data: {
+              perner: perner,
+              result_blasting: updateValue,
+              action_type: actionType,
+              affected_rows: updateResult.affectedRows,
+              duration_ms: duration,
+            },
+          });
+        }
+      );
+    });
+  }
+});
+
+// 📊 GET: Get blasting statistics (optional - untuk dashboard)
+app.get("/getBlastingStats", (req, res) => {
+  const startTime = Date.now();
+  console.log("📊 Generating blasting statistics...");
+
+  const sql = `
+    SELECT 
+      COUNT(*) as total_records,
+      SUM(CASE WHEN RESULT_BLASTING = 'Terkirim' THEN 1 ELSE 0 END) as terkirim_count,
+      SUM(CASE WHEN RESULT_BLASTING = 'Gagal' THEN 1 ELSE 0 END) as gagal_count,
+      SUM(CASE WHEN RESULT_BLASTING IS NULL OR RESULT_BLASTING = '' THEN 1 ELSE 0 END) as pending_count,
+      ROUND(
+        (SUM(CASE WHEN RESULT_BLASTING = 'Terkirim' THEN 1 ELSE 0 END) * 100.0 / COUNT(*)), 2
+      ) as success_rate
+    FROM rekap_absensi
+  `;
+
+  conn.query(sql, (err, results) => {
+    if (err) {
+      console.error("❌ Error generating blasting stats:", err);
+      return res.status(500).json({
+        message: "❌ Gagal mengambil statistik blasting",
+        error: err.message,
+      });
+    }
+
+    const endTime = Date.now();
+    const duration = endTime - startTime;
+    const stats = results[0];
+
+    console.log(`✅ Blasting stats generated in ${duration}ms`);
+    console.log(`   - Total Records: ${stats.total_records}`);
+    console.log(`   - Terkirim: ${stats.terkirim_count}`);
+    console.log(`   - Gagal: ${stats.gagal_count}`);
+    console.log(`   - Pending: ${stats.pending_count}`);
+    console.log(`   - Success Rate: ${stats.success_rate}%`);
+
+    res.json({
+      message: "✅ Statistik blasting berhasil diambil",
+      data: {
+        total_records: parseInt(stats.total_records),
+        terkirim_count: parseInt(stats.terkirim_count),
+        gagal_count: parseInt(stats.gagal_count),
+        pending_count: parseInt(stats.pending_count),
+        success_rate: parseFloat(stats.success_rate),
+        generated_at: new Date().toISOString(),
+        duration_ms: duration,
+      },
+    });
+  });
+});
+
+// 🔄 POST: Bulk update RESULT_BLASTING (untuk update massal)
+app.post("/bulkUpdateResultBlasting", (req, res) => {
+  const { updates } = req.body; // Array of {perner, result_blasting}
+  const startTime = Date.now();
+
+  // Validasi input
+  if (!Array.isArray(updates)) {
+    return res.status(400).json({
+      message: "❌ Updates harus berupa array",
+    });
+  }
+
+  if (updates.length === 0) {
+    return res.status(400).json({
+      message: "❌ Data updates kosong",
+    });
+  }
+
+  // Validasi setiap item dalam updates
+  const validResults = ["Terkirim", "Gagal"];
+  for (let i = 0; i < updates.length; i++) {
+    const item = updates[i];
+    if (!item.perner || !item.result_blasting) {
+      return res.status(400).json({
+        message: `❌ Item ${
+          i + 1
+        }: PERNER dan result_blasting tidak boleh kosong`,
+      });
+    }
+    if (!validResults.includes(item.result_blasting)) {
+      return res.status(400).json({
+        message: `❌ Item ${
+          i + 1
+        }: Result blasting harus salah satu dari: ${validResults.join(", ")}`,
+      });
+    }
+  }
+
+  console.log(
+    `🔄 Processing ${updates.length} bulk RESULT_BLASTING updates...`
+  );
+
+  // Build batch update SQL
+  const batchSQL = `
+    UPDATE rekap_absensi 
+    SET RESULT_BLASTING = CASE 
+      ${updates.map(() => `WHEN PERNER = ? THEN ?`).join(" ")}
+      ELSE RESULT_BLASTING
+    END,
+    updated_at = NOW()
+    WHERE PERNER IN (${updates.map(() => "?").join(", ")})
+  `;
+
+  // Build parameters
+  const batchParams = [];
+  // Parameters for CASE statement
+  updates.forEach((item) => {
+    batchParams.push(item.perner, item.result_blasting);
+  });
+  // Parameters for WHERE clause
+  updates.forEach((item) => {
+    batchParams.push(item.perner);
+  });
+
+  conn.query(batchSQL, batchParams, (err, result) => {
+    if (err) {
+      console.error("❌ Error bulk updating RESULT_BLASTING:", err);
+      return res.status(500).json({
+        message: "❌ Gagal melakukan bulk update result blasting",
+        error: err.message,
+      });
+    }
+
+    const endTime = Date.now();
+    const duration = endTime - startTime;
+
+    console.log(`✅ Bulk RESULT_BLASTING update completed in ${duration}ms`);
+    console.log(`   - Requested Updates: ${updates.length}`);
+    console.log(`   - Affected Rows: ${result.affectedRows}`);
+
+    // Count by status
+    const terkirimCount = updates.filter(
+      (u) => u.result_blasting === "Terkirim"
+    ).length;
+    const gagalCount = updates.filter(
+      (u) => u.result_blasting === "Gagal"
+    ).length;
+
+    res.json({
+      success: true,
+      message: `✅ Bulk update result blasting berhasil diproses (${duration}ms)`,
+      data: {
+        requested_updates: updates.length,
+        affected_rows: result.affectedRows,
+        breakdown: {
+          terkirim: terkirimCount,
+          gagal: gagalCount,
+        },
+        duration_ms: duration,
+        method: "batch",
+      },
+    });
+  });
+});
+
+// 🗑️ DELETE: Reset RESULT_BLASTING (set to NULL untuk semua atau specific PERNER)
+app.delete("/resetResultBlasting", (req, res) => {
+  const { perner } = req.query; // Optional: reset specific PERNER only
+  const startTime = Date.now();
+
+  let sql,
+    params = [];
+
+  if (perner) {
+    console.log(`🗑️ Resetting RESULT_BLASTING for specific PERNER: ${perner}`);
+    sql = `
+      UPDATE rekap_absensi 
+      SET RESULT_BLASTING = NULL,
+          updated_at = NOW()
+      WHERE PERNER = ?
+    `;
+    params = [perner];
+  } else {
+    console.log("🗑️ Resetting ALL RESULT_BLASTING records...");
+    sql = `
+      UPDATE rekap_absensi 
+      SET RESULT_BLASTING = NULL,
+          updated_at = NOW()
+      WHERE RESULT_BLASTING IS NOT NULL
+    `;
+  }
+
+  conn.query(sql, params, (err, result) => {
+    if (err) {
+      console.error("❌ Error resetting RESULT_BLASTING:", err);
+      return res.status(500).json({
+        message: "❌ Gagal mereset result blasting",
+        error: err.message,
+      });
+    }
+
+    const endTime = Date.now();
+    const duration = endTime - startTime;
+
+    const scope = perner ? `untuk PERNER ${perner}` : "untuk semua records";
+
+    console.log(`✅ RESULT_BLASTING reset completed ${scope} in ${duration}ms`);
+    console.log(`   - Affected Rows: ${result.affectedRows}`);
+
+    if (result.affectedRows === 0) {
+      return res.json({
+        success: true,
+        message: perner
+          ? `⚠️ PERNER ${perner} tidak ditemukan atau sudah NULL`
+          : "⚠️ Tidak ada data yang perlu direset",
+        data: {
+          affected_rows: 0,
+          duration_ms: duration,
+        },
+      });
+    }
+
+    res.json({
+      success: true,
+      message: `✅ Result blasting berhasil direset ${scope}`,
+      data: {
+        scope: perner || "all_records",
+        affected_rows: result.affectedRows,
+        duration_ms: duration,
+      },
+    });
+  });
+});
+
+// ======================================================
+// DATA PEGAWAI MANAGEMENT ENDPOINTS
+// ======================================================
+
+// 📊 GET: Ambil semua data pegawai
+app.get("/getDataPegawai", (req, res) => {
+  const startTime = Date.now();
+  console.log("🚀 Fetching data_pegawai...");
+
+  const sql = `
+    SELECT 
+      perner,
+      nip,
+      nama,
+      bidang,
+      no_telp
+    FROM data_pegawai 
+    ORDER BY perner ASC
+  `;
+
+  conn.query(sql, (err, results) => {
+    if (err) {
+      console.error("❌ Error fetching data_pegawai:", err);
+      return res.status(500).json({
+        message: "❌ Gagal mengambil data pegawai",
+        error: err.message,
+      });
+    }
+
+    const endTime = Date.now();
+    const duration = endTime - startTime;
+
+    console.log(
+      `✅ Data pegawai fetched: ${results.length} records in ${duration}ms`
+    );
+
+    res.json(results);
+  });
+});
+
+// 📊 GET: Check matching PERNER antara rekap_absensi dan data_pegawai
+app.get("/checkPERNERMatch", (req, res) => {
+  const startTime = Date.now();
+  console.log("🔍 Checking PERNER match between tables...");
+
+  // Query untuk check PERNER yang ada di rekap_absensi tapi tidak ada di data_pegawai
+  const checkSQL = `
+    SELECT 
+      r.PERNER,
+      CASE 
+        WHEN dp.perner IS NULL THEN 'NOT_FOUND'
+        ELSE 'FOUND'
+      END as status,
+      dp.nama,
+      dp.nip,
+      dp.bidang,
+      dp.no_telp
+    FROM rekap_absensi r
+    LEFT JOIN data_pegawai dp ON r.PERNER = dp.perner
+    ORDER BY status DESC, r.PERNER ASC
+  `;
+
+  conn.query(checkSQL, (err, results) => {
+    if (err) {
+      console.error("❌ Error checking PERNER match:", err);
+      return res.status(500).json({
+        message: "❌ Gagal mengecek PERNER match",
+        error: err.message,
+      });
+    }
+
+    const endTime = Date.now();
+    const duration = endTime - startTime;
+
+    // Analyze results
+    const totalRecords = results.length;
+    const foundRecords = results.filter((r) => r.status === "FOUND").length;
+    const notFoundRecords = results.filter(
+      (r) => r.status === "NOT_FOUND"
+    ).length;
+    const matchPercentage =
+      totalRecords > 0 ? ((foundRecords / totalRecords) * 100).toFixed(2) : 0;
+
+    console.log(`✅ PERNER match check completed in ${duration}ms`);
+    console.log(`   - Total PERNER in rekap_absensi: ${totalRecords}`);
+    console.log(`   - Found in data_pegawai: ${foundRecords}`);
+    console.log(`   - Not found in data_pegawai: ${notFoundRecords}`);
+    console.log(`   - Match percentage: ${matchPercentage}%`);
+
+    res.json({
+      summary: {
+        total_perner: totalRecords,
+        found_in_data_pegawai: foundRecords,
+        not_found_in_data_pegawai: notFoundRecords,
+        match_percentage: parseFloat(matchPercentage),
+        duration_ms: duration,
+      },
+      details: results,
+      missing_perner: results
+        .filter((r) => r.status === "NOT_FOUND")
+        .map((r) => r.PERNER),
+    });
+  });
+});
+
+// 📝 POST: Tambah atau update data pegawai
+app.post("/addDataPegawai", (req, res) => {
+  const { perner, nip, nama, bidang, no_telp } = req.body;
+  const startTime = Date.now();
+
+  // Validasi input
+  if (!perner || !nip || !nama || !bidang || !no_telp) {
+    return res.status(400).json({
+      message: "❌ Semua field harus diisi: perner, nip, nama, bidang, no_telp",
+    });
+  }
+
+  console.log(`📝 Adding/updating data pegawai: ${perner} - ${nama}`);
+
+  // Insert atau update jika sudah ada
+  const sql = `
+    INSERT INTO data_pegawai (perner, nip, nama, bidang, no_telp) 
+    VALUES (?, ?, ?, ?, ?)
+    ON DUPLICATE KEY UPDATE
+      nip = VALUES(nip),
+      nama = VALUES(nama),
+      bidang = VALUES(bidang),
+      no_telp = VALUES(no_telp)
+  `;
+
+  conn.query(sql, [perner, nip, nama, bidang, no_telp], (err, result) => {
+    if (err) {
+      console.error("❌ Error adding data pegawai:", err);
+      return res.status(500).json({
+        message: "❌ Gagal menambah data pegawai",
+        error: err.message,
+      });
+    }
+
+    const endTime = Date.now();
+    const duration = endTime - startTime;
+    const isUpdate = result.affectedRows === 2; // MySQL returns 2 for UPDATE, 1 for INSERT
+
+    console.log(
+      `✅ Data pegawai ${
+        isUpdate ? "updated" : "added"
+      } successfully in ${duration}ms`
+    );
+    console.log(`   - PERNER: ${perner}`);
+    console.log(`   - Nama: ${nama}`);
+    console.log(`   - Bidang: ${bidang}`);
+
+    res.json({
+      success: true,
+      message: `✅ Data pegawai ${perner} berhasil ${
+        isUpdate ? "diupdate" : "ditambahkan"
+      }`,
+      data: {
+        perner,
+        nip,
+        nama,
+        bidang,
+        no_telp,
+        action: isUpdate ? "updated" : "inserted",
+        duration_ms: duration,
+      },
+    });
+  });
+});
+
+// 📦 POST: Bulk insert/update data pegawai dari array
+app.post("/bulkAddDataPegawai", (req, res) => {
+  const { pegawai_data } = req.body; // Array of pegawai objects
+  const startTime = Date.now();
+
+  if (!Array.isArray(pegawai_data) || pegawai_data.length === 0) {
+    return res.status(400).json({
+      message: "❌ pegawai_data harus berupa array yang tidak kosong",
+    });
+  }
+
+  console.log(`📦 Bulk adding ${pegawai_data.length} pegawai records...`);
+
+  // Validasi setiap item
+  for (let i = 0; i < pegawai_data.length; i++) {
+    const item = pegawai_data[i];
+    if (
+      !item.perner ||
+      !item.nip ||
+      !item.nama ||
+      !item.bidang ||
+      !item.no_telp
+    ) {
+      return res.status(400).json({
+        message: `❌ Item ${
+          i + 1
+        }: Semua field harus diisi (perner, nip, nama, bidang, no_telp)`,
+      });
+    }
+  }
+
+  // Build bulk insert SQL dengan ON DUPLICATE KEY UPDATE
+  const placeholders = pegawai_data.map(() => "(?, ?, ?, ?, ?)").join(", ");
+  const sql = `
+    INSERT INTO data_pegawai (perner, nip, nama, bidang, no_telp) 
+    VALUES ${placeholders}
+    ON DUPLICATE KEY UPDATE
+      nip = VALUES(nip),
+      nama = VALUES(nama),
+      bidang = VALUES(bidang),
+      no_telp = VALUES(no_telp)
+  `;
+
+  // Flatten data untuk parameters
+  const params = [];
+  pegawai_data.forEach((item) => {
+    params.push(item.perner, item.nip, item.nama, item.bidang, item.no_telp);
+  });
+
+  conn.query(sql, params, (err, result) => {
+    if (err) {
+      console.error("❌ Error bulk adding data pegawai:", err);
+      return res.status(500).json({
+        message: "❌ Gagal bulk insert data pegawai",
+        error: err.message,
+      });
+    }
+
+    const endTime = Date.now();
+    const duration = endTime - startTime;
+
+    console.log(`✅ Bulk data pegawai operation completed in ${duration}ms`);
+    console.log(`   - Requested records: ${pegawai_data.length}`);
+    console.log(`   - Affected rows: ${result.affectedRows}`);
+
+    res.json({
+      success: true,
+      message: `✅ Bulk operation completed: ${pegawai_data.length} records processed`,
+      data: {
+        requested_records: pegawai_data.length,
+        affected_rows: result.affectedRows,
+        duration_ms: duration,
+      },
+    });
+  });
+});
+
+// 🗑️ DELETE: Hapus data pegawai berdasarkan PERNER
+app.delete("/deleteDataPegawai/:perner", (req, res) => {
+  const { perner } = req.params;
+  const startTime = Date.now();
+
+  if (!perner) {
+    return res.status(400).json({
+      message: "❌ PERNER tidak boleh kosong",
+    });
+  }
+
+  console.log(`🗑️ Deleting data pegawai: ${perner}`);
+
+  const sql = "DELETE FROM data_pegawai WHERE perner = ?";
+
+  conn.query(sql, [perner], (err, result) => {
+    if (err) {
+      console.error("❌ Error deleting data pegawai:", err);
+      return res.status(500).json({
+        message: "❌ Gagal menghapus data pegawai",
+        error: err.message,
+      });
+    }
+
+    const endTime = Date.now();
+    const duration = endTime - startTime;
+
+    if (result.affectedRows === 0) {
+      console.log(`⚠️ PERNER not found: ${perner}`);
+      return res.status(404).json({
+        message: `❌ PERNER ${perner} tidak ditemukan`,
+      });
+    }
+
+    console.log(`✅ Data pegawai deleted successfully in ${duration}ms`);
+
+    res.json({
+      success: true,
+      message: `✅ Data pegawai ${perner} berhasil dihapus`,
+      data: {
+        perner,
+        affected_rows: result.affectedRows,
+        duration_ms: duration,
+      },
+    });
+  });
+});
+
+// 🔄 POST: Auto-generate missing data pegawai dari rekap_absensi
+app.post("/generateMissingDataPegawai", (req, res) => {
+  const startTime = Date.now();
+  console.log("🔄 Auto-generating missing data pegawai...");
+
+  // Get PERNER yang ada di rekap_absensi tapi tidak ada di data_pegawai
+  const findMissingSQL = `
+    SELECT DISTINCT r.PERNER
+    FROM rekap_absensi r
+    LEFT JOIN data_pegawai dp ON r.PERNER = dp.perner
+    WHERE dp.perner IS NULL
+    ORDER BY r.PERNER
+  `;
+
+  conn.query(findMissingSQL, (err, missingRecords) => {
+    if (err) {
+      console.error("❌ Error finding missing PERNER:", err);
+      return res.status(500).json({
+        message: "❌ Gagal mencari PERNER yang hilang",
+        error: err.message,
+      });
+    }
+
+    if (missingRecords.length === 0) {
+      console.log("✅ Tidak ada PERNER yang hilang");
+      return res.json({
+        success: true,
+        message: "✅ Semua PERNER sudah ada di data_pegawai",
+        data: {
+          missing_count: 0,
+          duration_ms: Date.now() - startTime,
+        },
+      });
+    }
+
+    console.log(
+      `🔄 Found ${missingRecords.length} missing PERNER, generating data...`
+    );
+
+    // Generate data dummy untuk PERNER yang hilang
+    const insertData = missingRecords.map((record) => {
+      const perner = record.PERNER;
+      return {
+        perner: perner,
+        nip: `99999${perner.slice(-4)}`, // Generate dummy NIP
+        nama: `Pegawai ${perner}`, // Generate dummy nama
+        bidang: "Belum Diisi", // Default bidang
+        no_telp: "081355265063", // Default phone
+      };
+    });
+
+    // Bulk insert
+    const placeholders = insertData.map(() => "(?, ?, ?, ?, ?)").join(", ");
+    const insertSQL = `
+      INSERT INTO data_pegawai (perner, nip, nama, bidang, no_telp) 
+      VALUES ${placeholders}
+    `;
+
+    const params = [];
+    insertData.forEach((item) => {
+      params.push(item.perner, item.nip, item.nama, item.bidang, item.no_telp);
+    });
+
+    conn.query(insertSQL, params, (insertErr, insertResult) => {
+      if (insertErr) {
+        console.error("❌ Error inserting missing data pegawai:", insertErr);
+        return res.status(500).json({
+          message: "❌ Gagal generate data pegawai",
+          error: insertErr.message,
+        });
+      }
+
+      const endTime = Date.now();
+      const duration = endTime - startTime;
+
+      console.log(
+        `✅ Generated ${insertResult.affectedRows} missing data pegawai in ${duration}ms`
+      );
+
+      res.json({
+        success: true,
+        message: `✅ Berhasil generate ${insertResult.affectedRows} data pegawai yang hilang`,
+        data: {
+          missing_count: missingRecords.length,
+          generated_count: insertResult.affectedRows,
+          generated_perner: missingRecords.map((r) => r.PERNER),
+          duration_ms: duration,
+        },
+      });
+    });
+  });
+});
+
+// ======================================================
+// AUTO POPULATE data_pegawai untuk PERNER yang ada
+// ======================================================
+
+// 🚀 POST: Auto generate data_pegawai untuk semua PERNER di rekap_absensi
+app.post("/autoPopulatePegawai", (req, res) => {
+  const startTime = Date.now();
+  console.log("🚀 Auto-populating data_pegawai for all PERNER...");
+
+  // Step 1: Get semua PERNER dari rekap_absensi yang belum ada di data_pegawai
+  const findMissingSQL = `
+    SELECT DISTINCT r.PERNER
+    FROM rekap_absensi r
+    LEFT JOIN data_pegawai dp ON r.PERNER = dp.perner
+    WHERE dp.perner IS NULL
+    ORDER BY r.PERNER
+  `;
+
+  conn.query(findMissingSQL, (err, missingRecords) => {
+    if (err) {
+      console.error("❌ Error finding missing PERNER:", err);
+      return res.status(500).json({
+        success: false,
+        message: "❌ Gagal mencari PERNER yang hilang",
+        error: err.message,
+      });
+    }
+
+    if (missingRecords.length === 0) {
+      console.log("✅ Semua PERNER sudah ada di data_pegawai");
+      return res.json({
+        success: true,
+        message: "✅ Semua PERNER sudah ada di data_pegawai",
+        missing_count: 0,
+        duration_ms: Date.now() - startTime,
+      });
+    }
+
+    console.log(
+      `🔄 Found ${missingRecords.length} missing PERNER, generating data...`
+    );
+
+    // Step 2: Generate data dummy untuk PERNER yang hilang
+    const insertData = missingRecords.map((record, index) => {
+      const perner = record.PERNER;
+      const bidangList = [
+        "IT & Digital",
+        "Keuangan",
+        "Human Resources",
+        "Marketing",
+        "Operasional",
+        "Procurement",
+        "Quality Control",
+        "Maintenance",
+        "Safety & Environment",
+        "General Affairs",
+        "Legal",
+        "Engineering",
+      ];
+
+      return {
+        perner: perner,
+        nip: `99${String(Date.now()).slice(-6)}${String(index).padStart(
+          2,
+          "0"
+        )}`, // Generate unique NIP
+        nama: `Pegawai ${perner}`, // Generate nama
+        bidang: bidangList[index % bidangList.length], // Rotate bidang
+        no_telp: `0813${String(
+          Math.floor(Math.random() * 90000000) + 10000000
+        )}`, // Generate random phone
+      };
+    });
+
+    // Step 3: Bulk insert
+    const placeholders = insertData.map(() => "(?, ?, ?, ?, ?)").join(", ");
+    const insertSQL = `
+      INSERT INTO data_pegawai (perner, nip, nama, bidang, no_telp) 
+      VALUES ${placeholders}
+    `;
+
+    const params = [];
+    insertData.forEach((item) => {
+      params.push(item.perner, item.nip, item.nama, item.bidang, item.no_telp);
+    });
+
+    conn.query(insertSQL, params, (insertErr, insertResult) => {
+      if (insertErr) {
+        console.error("❌ Error inserting data pegawai:", insertErr);
+        return res.status(500).json({
+          success: false,
+          message: "❌ Gagal generate data pegawai",
+          error: insertErr.message,
+        });
+      }
+
+      const endTime = Date.now();
+      const duration = endTime - startTime;
+
+      console.log(
+        `✅ Auto-populated ${insertResult.affectedRows} data pegawai in ${duration}ms`
+      );
+      console.log(
+        `📊 Generated for PERNER: ${insertData.map((d) => d.perner).join(", ")}`
+      );
+
+      res.json({
+        success: true,
+        message: `✅ Berhasil auto-populate ${insertResult.affectedRows} data pegawai`,
+        data: {
+          missing_count: missingRecords.length,
+          generated_count: insertResult.affectedRows,
+          generated_perner: insertData.map((d) => d.perner),
+          sample_data: insertData.slice(0, 3), // Show first 3 as sample
+          duration_ms: duration,
+        },
+      });
+    });
+  });
+});
+
+// ======================================================
+// ENHANCED ENDPOINT: getRekapAbsensi dengan Daily Details
+// ======================================================
+
+app.get("/getRekapAbsensiWithDaily", (req, res) => {
+  const startTime = Date.now();
+  console.log("🚀 Fetching rekap_absensi with daily details...");
+
+  // Step 1: Ambil periode bulan dari olah_absensi
+  const periodeSQL = `
+    SELECT tanggal 
+    FROM olah_absensi 
+    WHERE tanggal IS NOT NULL 
+    ORDER BY tanggal DESC 
+    LIMIT 1
+  `;
+
+  conn.query(periodeSQL, (periodeErr, periodeResults) => {
+    if (periodeErr) {
+      console.error("❌ Error getting periode:", periodeErr);
+      return res.status(500).json({
+        success: false,
+        message: "❌ Gagal mengambil periode bulan absensi",
+        error: periodeErr.message,
+      });
+    }
+
+    // Determine periode bulan dan tahun
+    let periodeBulan = "Tidak Diketahui";
+    let periodeTahun = new Date().getFullYear();
+    let startDate = null;
+    let endDate = null;
+
+    if (periodeResults.length > 0 && periodeResults[0].tanggal) {
+      const tanggalSample = new Date(periodeResults[0].tanggal);
+      const monthNames = [
+        "Januari",
+        "Februari",
+        "Maret",
+        "April",
+        "Mei",
+        "Juni",
+        "Juli",
+        "Agustus",
+        "September",
+        "Oktober",
+        "November",
+        "Desember",
+      ];
+      periodeBulan = monthNames[tanggalSample.getMonth()];
+      periodeTahun = tanggalSample.getFullYear();
+
+      // Set date range for the month
+      startDate = new Date(periodeTahun, tanggalSample.getMonth(), 1);
+      endDate = new Date(periodeTahun, tanggalSample.getMonth() + 2, 0);
+    }
+
+    console.log(`📅 Periode absensi: ${periodeBulan} ${periodeTahun}`);
+
+    // Step 2: Query dengan 3-way JOIN + daily details
+    const sql = `
+      SELECT 
+        -- Summary data dari rekap_absensi
+        r.PERNER,
+        r.TOTAL_HARI, r.HARI_KERJA, r.HARI_LIBUR,
+        r.TOTAL_HARI_KOREKSI, r.KOREKSI_IN, r.KOREKSI_OUT, r.KOREKSI_IN_OUT,
+        r.TOTAL_JAM_KERJA_NORMAL, r.PIKET, r.PDKB, r.REGULER,
+        r.TOTAL_JAM_KERJA_SHIFT, r.SHIFT_PAGI, r.SHIFT_SIANG, r.SHIFT_MALAM, r.SHIFT_OFF,
+        r.ABSEN_LENGKAP, r.TIDAK_ABSEN, r.IN_KOSONG, r.OUT_KOSONG,
+        r.SPPD_TUGAS_LUAR_DLL, r.CUTI_IJIN,
+        r.JAM_REALISASI, r.JAM_SEHARUSNYA, r.PERSENTASE_JKP,
+        r.RESULT_BLASTING,
+        
+        -- Data pegawai
+        dp.nama, dp.nip, dp.bidang, dp.no_telp,
+        
+        -- Daily details dari olah_absensi
+        od.tanggal, od.nama_hari, od.jenis_hari, od.status_jam_kerja,
+        od.daily_in_cleansing, od.daily_out_cleansing,
+        od.correction_in, od.correction_out,
+        od.value_att_abs, od.status_absen, od.status_in_out,
+        od.jam_kerja_pegawai_cleansing, od.jam_kerja_seharusnya
+        
+      FROM rekap_absensi r
+      LEFT JOIN data_pegawai dp ON r.PERNER = dp.perner
+      LEFT JOIN olah_absensi od ON r.PERNER = od.perner
+      WHERE od.tanggal IS NOT NULL
+        ${
+          startDate && endDate
+            ? `AND od.tanggal BETWEEN '${startDate
+                .toISOString()
+                .slice(0, 10)}' AND '${endDate.toISOString().slice(0, 10)}'`
+            : ""
+        }
+      ORDER BY r.PERNER, od.tanggal ASC
+    `;
+
+    conn.query(sql, (err, results) => {
+      if (err) {
+        console.error("❌ Error fetching data with daily details:", err);
+        return res.status(500).json({
+          success: false,
+          message: "❌ Gagal mengambil data rekap dengan daily details",
+          error: err.message,
+        });
+      }
+
+      const endTime = Date.now();
+      const duration = endTime - startTime;
+
+      console.log(
+        `✅ Data with daily details fetched: ${results.length} records in ${duration}ms`
+      );
+
+      // Step 3: Group data by PERNER (summary + daily_details array)
+      const groupedData = {};
+
+      results.forEach((row) => {
+        const perner = row.PERNER;
+
+        // Initialize summary data (only once per PERNER)
+        if (!groupedData[perner]) {
+          groupedData[perner] = {
+            // Summary fields
+            PERNER: row.PERNER,
+            nama: row.nama,
+            nip: row.nip,
+            bidang: row.bidang,
+            no_telp: row.no_telp,
+            periode_bulan: periodeBulan,
+            periode_tahun: periodeTahun,
+            TOTAL_HARI: parseInt(row.TOTAL_HARI) || 0,
+            HARI_KERJA: parseInt(row.HARI_KERJA) || 0,
+            HARI_LIBUR: parseInt(row.HARI_LIBUR) || 0,
+            TOTAL_HARI_KOREKSI: parseInt(row.TOTAL_HARI_KOREKSI) || 0,
+            KOREKSI_IN: parseInt(row.KOREKSI_IN) || 0,
+            KOREKSI_OUT: parseInt(row.KOREKSI_OUT) || 0,
+            KOREKSI_IN_OUT: parseInt(row.KOREKSI_IN_OUT) || 0,
+            TOTAL_JAM_KERJA_NORMAL: parseInt(row.TOTAL_JAM_KERJA_NORMAL) || 0,
+            PIKET: parseInt(row.PIKET) || 0,
+            PDKB: parseInt(row.PDKB) || 0,
+            REGULER: parseInt(row.REGULER) || 0,
+            TOTAL_JAM_KERJA_SHIFT: parseInt(row.TOTAL_JAM_KERJA_SHIFT) || 0,
+            SHIFT_PAGI: parseInt(row.SHIFT_PAGI) || 0,
+            SHIFT_SIANG: parseInt(row.SHIFT_SIANG) || 0,
+            SHIFT_MALAM: parseInt(row.SHIFT_MALAM) || 0,
+            SHIFT_OFF: parseInt(row.SHIFT_OFF) || 0,
+            ABSEN_LENGKAP: parseInt(row.ABSEN_LENGKAP) || 0,
+            TIDAK_ABSEN: parseInt(row.TIDAK_ABSEN) || 0,
+            IN_KOSONG: parseInt(row.IN_KOSONG) || 0,
+            OUT_KOSONG: parseInt(row.OUT_KOSONG) || 0,
+            SPPD_TUGAS_LUAR_DLL: parseInt(row.SPPD_TUGAS_LUAR_DLL) || 0,
+            CUTI_IJIN: parseInt(row.CUTI_IJIN) || 0,
+            JAM_REALISASI: parseFloat(row.JAM_REALISASI) || 0.0,
+            JAM_SEHARUSNYA: parseFloat(row.JAM_SEHARUSNYA) || 0.0,
+            PERSENTASE_JKP: parseFloat(row.PERSENTASE_JKP) || 0.0,
+            RESULT_BLASTING: row.RESULT_BLASTING || null,
+
+            // Daily details array
+            daily_details: [],
+          };
+        }
+
+        // Add daily detail if tanggal exists
+        if (row.tanggal) {
+          groupedData[perner].daily_details.push({
+            tanggal: row.tanggal,
+            nama_hari: row.nama_hari,
+            jenis_hari: row.jenis_hari,
+            status_jam_kerja: row.status_jam_kerja,
+            daily_in_cleansing: row.daily_in_cleansing,
+            daily_out_cleansing: row.daily_out_cleansing,
+            correction_in: row.correction_in,
+            correction_out: row.correction_out,
+            value_att_abs: row.value_att_abs,
+            status_absen: row.status_absen,
+            status_in_out: row.status_in_out,
+            jam_kerja_pegawai_cleansing:
+              parseFloat(row.jam_kerja_pegawai_cleansing) || 0.0,
+            jam_kerja_seharusnya: parseFloat(row.jam_kerja_seharusnya) || 0.0,
+          });
+        }
+      });
+
+      // Convert to array format
+      const finalResults = Object.values(groupedData);
+
+      // Debug statistics
+      if (finalResults.length > 0) {
+        const sampleData = finalResults[0];
+        const totalDailyRecords = finalResults.reduce(
+          (sum, item) => sum + item.daily_details.length,
+          0
+        );
+
+        console.log(`📊 Grouping Statistics:`);
+        console.log(`   - Total PERNER: ${finalResults.length}`);
+        console.log(`   - Total daily records: ${totalDailyRecords}`);
+        console.log(
+          `   - Sample daily details count: ${sampleData.daily_details.length}`
+        );
+        console.log(
+          `   - Sample PERNER: ${sampleData.PERNER} (${sampleData.nama})`
+        );
+      }
+
+      res.json(finalResults);
+    });
+  });
+});
+
+// ======================================================
+// ALTERNATIVE: Modify existing endpoint (commented out)
+// ======================================================
+
+/*
+// Uncomment this if you want to modify existing endpoint instead
+app.get("/getRekapAbsensi", (req, res) => {
+  // ... same implementation as above
+  // This will replace the existing /getRekapAbsensi endpoint
+});
+*/
+
+// Date Range Converter - API Endpoint
+// Add this to your Express.js application
+
+app.get("/getOlahAbsensiDateRange", (req, res) => {
+  const startTime = Date.now();
+  // console.log("🚀 Fetching olah_absensi data for Date Range Converter...");
+
+  // Step 1: Ambil periode bulan dari olah_absensi untuk menentukan range
+  const periodeSQL = `
+    SELECT 
+      MIN(tanggal) as start_date,
+      MAX(tanggal) as end_date,
+      COUNT(DISTINCT perner) as total_perner,
+      COUNT(*) as total_records
+    FROM olah_absensi 
+    WHERE tanggal IS NOT NULL 
+      AND value_att_abs IS NOT NULL
+      AND (
+        value_att_abs LIKE '%_daily_%' OR 
+        value_att_abs LIKE 'sppd_umum%'
+      )
+  `;
+
+  conn.query(periodeSQL, (periodeErr, periodeResults) => {
+    if (periodeErr) {
+      console.error("❌ Error getting periode info:", periodeErr);
+      return res.status(500).json({
+        success: false,
+        message: "❌ Gagal mengambil informasi periode absensi",
+        error: periodeErr.message,
+      });
+    }
+
+    if (periodeResults.length === 0 || !periodeResults[0].start_date) {
+      console.warn("⚠️ No data found in olah_absensi");
+      return res.json([]);
+    }
+
+    const periodeInfo = periodeResults[0];
+    // console.log(
+    //   `📅 Data periode: ${periodeInfo.start_date} to ${periodeInfo.end_date}`
+    // );
+    // console.log(
+    //   `📊 Found ${periodeInfo.total_records} records for ${periodeInfo.total_perner} PERNER`
+    // );
+
+    // Step 2: Query data yang akan digunakan untuk Date Range Converter
+    const sql = `
+      SELECT 
+        perner,
+        tanggal,
+        value_att_abs,
+        jenis_hari,
+        nama_hari,
+        status_jam_kerja,
+        daily_in_cleansing,
+        daily_out_cleansing,
+        correction_in,
+        correction_out,
+        status_absen,
+        status_in_out
+      FROM olah_absensi 
+      WHERE tanggal IS NOT NULL 
+        AND value_att_abs IS NOT NULL
+        AND (
+          value_att_abs LIKE 'abs_daily_%' OR 
+          value_att_abs LIKE 'att_daily_%' OR 
+          value_att_abs LIKE 'sppd_umum%'
+        )
+      ORDER BY perner ASC, tanggal ASC
+    `;
+
+    conn.query(sql, (err, results) => {
+      if (err) {
+        console.error("❌ Error fetching olah_absensi data:", err);
+        return res.status(500).json({
+          success: false,
+          message: "❌ Gagal mengambil data olah_absensi",
+          error: err.message,
+        });
+      }
+
+      const endTime = Date.now();
+      const duration = endTime - startTime;
+
+      // console.log(
+      //   `✅ Olah absensi data fetched: ${results.length} records in ${duration}ms`
+      // );
+
+      // Step 3: Process dan filter data sesuai requirements
+      const processedResults = [];
+      const stats = {
+        total_records: 0,
+        abs_daily_count: 0,
+        att_daily_count: 0,
+        sppd_umum_count: 0,
+        unique_perner: new Set(),
+        date_range: {
+          start: null,
+          end: null,
+        },
+      };
+
+      results.forEach((row) => {
+        const valueAttAbs = row.value_att_abs;
+
+        if (!valueAttAbs) return;
+
+        const valueLower = valueAttAbs.toLowerCase();
+        let shouldInclude = false;
+        let recordType = "";
+
+        // Filter berdasarkan pattern yang diinginkan
+        if (valueLower.includes("abs_daily_")) {
+          shouldInclude = true;
+          recordType = "abs_daily";
+          stats.abs_daily_count++;
+        } else if (valueLower.includes("att_daily_")) {
+          shouldInclude = true;
+          recordType = "att_daily";
+          stats.att_daily_count++;
+        } else if (valueLower.includes("sppd_umum")) {
+          shouldInclude = true;
+          recordType = "sppd_umum";
+          stats.sppd_umum_count++;
+        }
+
+        if (shouldInclude) {
+          processedResults.push({
+            perner: row.perner,
+            tanggal: row.tanggal,
+            value_att_abs: row.value_att_abs,
+            record_type: recordType,
+            // Additional fields untuk debugging/display
+            jenis_hari: row.jenis_hari,
+            nama_hari: row.nama_hari,
+            status_jam_kerja: row.status_jam_kerja,
+            daily_in_cleansing: row.daily_in_cleansing,
+            daily_out_cleansing: row.daily_out_cleansing,
+            correction_in: row.correction_in,
+            correction_out: row.correction_out,
+            status_absen: row.status_absen,
+            status_in_out: row.status_in_out,
+          });
+
+          // Update statistics
+          stats.unique_perner.add(row.perner);
+          stats.total_records++;
+
+          // Track date range
+          const currentDate = new Date(row.tanggal);
+          if (
+            !stats.date_range.start ||
+            currentDate < new Date(stats.date_range.start)
+          ) {
+            stats.date_range.start = row.tanggal;
+          }
+          if (
+            !stats.date_range.end ||
+            currentDate > new Date(stats.date_range.end)
+          ) {
+            stats.date_range.end = row.tanggal;
+          }
+        }
+      });
+
+      // Final statistics
+      const finalStats = {
+        ...stats,
+        unique_perner_count: stats.unique_perner.size,
+        processing_duration_ms: duration,
+      };
+
+      // Log detailed statistics
+      // console.log(`📊 Processing Statistics:`);
+      // console.log(`   - Total processed records: ${finalStats.total_records}`);
+      // console.log(`   - Unique PERNER: ${finalStats.unique_perner_count}`);
+      // console.log(`   - abs_daily_* records: ${finalStats.abs_daily_count}`);
+      // console.log(`   - att_daily_* records: ${finalStats.att_daily_count}`);
+      // console.log(`   - sppd_umum_* records: ${finalStats.sppd_umum_count}`);
+      // console.log(
+      //   `   - Date range: ${finalStats.date_range.start} to ${finalStats.date_range.end}`
+      // );
+
+      // Sample data untuk debugging
+      if (processedResults.length > 0) {
+        // console.log(`🔍 Sample processed data:`, {
+        //   first_record: {
+        //     perner: processedResults[0].perner,
+        //     tanggal: processedResults[0].tanggal,
+        //     value_att_abs: processedResults[0].value_att_abs,
+        //     record_type: processedResults[0].record_type,
+        //   },
+        //   last_record: {
+        //     perner: processedResults[processedResults.length - 1].perner,
+        //     tanggal: processedResults[processedResults.length - 1].tanggal,
+        //     value_att_abs:
+        //       processedResults[processedResults.length - 1].value_att_abs,
+        //     record_type:
+        //       processedResults[processedResults.length - 1].record_type,
+        //   },
+        // });
+      }
+
+      // Response dengan metadata
+      res.json({
+        success: true,
+        data: processedResults,
+        metadata: {
+          total_records: finalStats.total_records,
+          unique_perner: finalStats.unique_perner_count,
+          breakdown: {
+            abs_daily: finalStats.abs_daily_count,
+            att_daily: finalStats.att_daily_count,
+            sppd_umum: finalStats.sppd_umum_count,
+          },
+          date_range: finalStats.date_range,
+          processing_time_ms: finalStats.processing_duration_ms,
+          timestamp: new Date().toISOString(),
+        },
+      });
+    });
+  });
+});
+
+// Optional: Endpoint untuk mendapatkan statistik saja (lebih cepat)
+app.get("/getOlahAbsensiStats", (req, res) => {
+  console.log("📊 Fetching olah_absensi statistics...");
+
+  const statsSQL = `
+    SELECT 
+      COUNT(*) as total_records,
+      COUNT(DISTINCT perner) as unique_perner,
+      MIN(tanggal) as start_date,
+      MAX(tanggal) as end_date,
+      SUM(CASE WHEN value_att_abs LIKE 'abs_daily_%' THEN 1 ELSE 0 END) as abs_daily_count,
+      SUM(CASE WHEN value_att_abs LIKE 'att_daily_%' THEN 1 ELSE 0 END) as att_daily_count,
+      SUM(CASE WHEN value_att_abs LIKE 'sppd_umum%' THEN 1 ELSE 0 END) as sppd_umum_count
+    FROM olah_absensi 
+    WHERE tanggal IS NOT NULL 
+      AND value_att_abs IS NOT NULL
+      AND (
+        value_att_abs LIKE 'abs_daily_%' OR 
+        value_att_abs LIKE 'att_daily_%' OR 
+        value_att_abs LIKE 'sppd_umum%'
+      )
+  `;
+
+  conn.query(statsSQL, (err, results) => {
+    if (err) {
+      console.error("❌ Error fetching statistics:", err);
+      return res.status(500).json({
+        success: false,
+        message: "❌ Gagal mengambil statistik data",
+        error: err.message,
+      });
+    }
+
+    const stats = results[0] || {};
+
+    console.log("📊 Statistics retrieved:", stats);
+
+    res.json({
+      success: true,
+      statistics: {
+        total_records: parseInt(stats.total_records) || 0,
+        unique_perner: parseInt(stats.unique_perner) || 0,
+        breakdown: {
+          abs_daily: parseInt(stats.abs_daily_count) || 0,
+          att_daily: parseInt(stats.att_daily_count) || 0,
+          sppd_umum: parseInt(stats.sppd_umum_count) || 0,
+        },
+        date_range: {
+          start: stats.start_date,
+          end: stats.end_date,
+        },
+        timestamp: new Date().toISOString(),
+      },
+    });
+  });
+});
+
+// Optional: Health check endpoint untuk testing koneksi
+app.get("/api/ping-db", (req, res) => {
+  conn.query("SELECT 1 as ping", (err, results) => {
+    if (err) {
+      return res.status(500).json({
+        success: false,
+        message: "Database connection failed",
+        error: err.message,
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "Database connection OK",
+      timestamp: new Date().toISOString(),
+      ping: results[0].ping,
+    });
+  });
+});
+
+// Endpoint untuk mendapatkan data Input In Out SAP
+app.get("/getInputInOutSapData", (req, res) => {
+  const startTime = Date.now();
+  console.log("🚀 Fetching Input In Out SAP data...");
+
+  // Parse query parameters
+  const limit = parseInt(req.query.limit) || 50;
+  const offset = parseInt(req.query.offset) || 0;
+  const search = req.query.search || "";
+
+  console.log(
+    `📋 Query params: limit=${limit}, offset=${offset}, search="${search}"`
+  );
+
+  // Build WHERE clause for search
+  let whereClause = "WHERE oa.tanggal IS NOT NULL";
+  let searchParams = [];
+
+  if (search.trim()) {
+    whereClause += ` AND (oa.perner LIKE ? OR dp.nama LIKE ?)`;
+    const searchPattern = `%${search.trim()}%`;
+    searchParams = [searchPattern, searchPattern];
+  }
+
+  // Step 1: Get total count for pagination
+  const countSQL = `
+    SELECT COUNT(*) as total_count
+    FROM olah_absensi oa
+    LEFT JOIN data_pegawai dp ON oa.perner = dp.perner
+    ${whereClause}
+  `;
+
+  conn.query(countSQL, searchParams, (countErr, countResults) => {
+    if (countErr) {
+      console.error("❌ Error getting count:", countErr);
+      return res.status(500).json({
+        success: false,
+        message: "❌ Gagal mengambil jumlah data",
+        error: countErr.message,
+      });
+    }
+
+    const totalRecords = countResults[0].total_count;
+    const totalPages = Math.ceil(totalRecords / limit);
+
+    console.log(
+      `📊 Total records: ${totalRecords}, Total pages: ${totalPages}`
+    );
+
+    // Step 2: Get data with pagination
+    const dataSQL = `
+      SELECT 
+        oa.perner,
+        oa.tanggal,
+        oa.daily_in_cleansing,
+        oa.daily_out_cleansing,
+        dp.nip,
+        dp.nama
+      FROM olah_absensi oa
+      LEFT JOIN data_pegawai dp ON oa.perner = dp.perner
+      ${whereClause}
+      ORDER BY oa.perner ASC, oa.tanggal ASC
+      LIMIT ${limit} OFFSET ${offset}
+    `;
+
+    conn.query(dataSQL, searchParams, (dataErr, dataResults) => {
+      if (dataErr) {
+        console.error("❌ Error fetching data:", dataErr);
+        return res.status(500).json({
+          success: false,
+          message: "❌ Gagal mengambil data input in out",
+          error: dataErr.message,
+        });
+      }
+
+      const endTime = Date.now();
+      const duration = endTime - startTime;
+
+      // Step 3: Process data and calculate statistics
+      let recordsWithChanges = 0;
+      const uniquePerner = new Set();
+
+      const processedData = dataResults.map((row) => {
+        uniquePerner.add(row.perner);
+
+        // Calculate defaults and is_change
+        const { isChange } = calculateDefaults(
+          row.daily_in_cleansing,
+          row.daily_out_cleansing
+        );
+        if (isChange) {
+          recordsWithChanges++;
+        }
+
+        return {
+          perner: row.perner,
+          tanggal: row.tanggal,
+          daily_in_cleansing: row.daily_in_cleansing,
+          daily_out_cleansing: row.daily_out_cleansing,
+          nip: row.nip,
+          nama: row.nama,
+        };
+      });
+
+      // Step 4: Build metadata
+      const metadata = {
+        total_records: totalRecords,
+        unique_perner: uniquePerner.size,
+        records_with_changes: recordsWithChanges,
+        processing_time_ms: duration,
+        search_applied: search.trim() !== "",
+        search_term: search.trim(),
+        timestamp: new Date().toISOString(),
+      };
+
+      // Step 5: Build pagination info
+      const pagination = {
+        current_page: Math.floor(offset / limit) + 1,
+        total_pages: totalPages,
+        total_records: totalRecords,
+        limit: limit,
+        offset: offset,
+        has_next: offset + limit < totalRecords,
+        has_prev: offset > 0,
+      };
+
+      console.log(
+        `✅ Input In Out data fetched: ${processedData.length} records in ${duration}ms`
+      );
+      console.log(
+        `📊 Statistics: ${uniquePerner.size} unique PERNER, ${recordsWithChanges} records with changes`
+      );
+
+      // Step 6: Response
+      res.json({
+        success: true,
+        data: processedData,
+        metadata: metadata,
+        pagination: pagination,
+      });
+    });
+  });
+});
+
+// Helper function untuk calculate defaults (sama seperti di frontend)
+function calculateDefaults(clockIn, clockOut) {
+  function isValidTime(timeStr) {
+    return timeStr && timeStr !== null && timeStr !== "00:00:00";
+  }
+
+  const hasClockIn = isValidTime(clockIn);
+  const hasClockOut = isValidTime(clockOut);
+
+  let clockInDefault, clockOutDefault, isChange;
+
+  if (hasClockIn && hasClockOut) {
+    // Kedua ada nilai
+    clockInDefault = clockIn;
+    clockOutDefault = clockOut;
+    isChange = false;
+  } else if (hasClockIn && !hasClockOut) {
+    // Clock in ada, clock out kosong
+    clockInDefault = clockIn;
+    clockOutDefault = clockIn;
+    isChange = true;
+  } else if (!hasClockIn && hasClockOut) {
+    // Clock in kosong, clock out ada
+    clockInDefault = clockOut;
+    clockOutDefault = clockOut;
+    isChange = true;
+  } else {
+    // Kedua kosong
+    clockInDefault = "00:00:00";
+    clockOutDefault = "00:00:00";
+    isChange = true;
+  }
+
+  return { clockInDefault, clockOutDefault, isChange };
+}
+
+// Optional: Endpoint untuk mendapatkan statistik Input In Out SAP
+app.get("/getInputInOutSapStats", (req, res) => {
+  console.log("📊 Fetching Input In Out SAP statistics...");
+
+  const statsSQL = `
+    SELECT 
+      COUNT(*) as total_records,
+      COUNT(DISTINCT oa.perner) as unique_perner,
+      MIN(oa.tanggal) as start_date,
+      MAX(oa.tanggal) as end_date,
+      SUM(CASE WHEN oa.daily_in_cleansing IS NOT NULL AND oa.daily_in_cleansing != '00:00:00' THEN 1 ELSE 0 END) as records_with_clock_in,
+      SUM(CASE WHEN oa.daily_out_cleansing IS NOT NULL AND oa.daily_out_cleansing != '00:00:00' THEN 1 ELSE 0 END) as records_with_clock_out,
+      SUM(CASE WHEN (oa.daily_in_cleansing IS NOT NULL AND oa.daily_in_cleansing != '00:00:00') 
+                AND (oa.daily_out_cleansing IS NOT NULL AND oa.daily_out_cleansing != '00:00:00') THEN 1 ELSE 0 END) as records_complete,
+      COUNT(CASE WHEN dp.perner IS NULL THEN 1 END) as records_without_employee_data
+    FROM olah_absensi oa
+    LEFT JOIN data_pegawai dp ON oa.perner = dp.perner
+    WHERE oa.tanggal IS NOT NULL
+  `;
+
+  conn.query(statsSQL, (err, results) => {
+    if (err) {
+      console.error("❌ Error fetching Input In Out SAP statistics:", err);
+      return res.status(500).json({
+        success: false,
+        message: "❌ Gagal mengambil statistik data Input In Out SAP",
+        error: err.message,
+      });
+    }
+
+    const stats = results[0] || {};
+
+    // Calculate records with changes (estimasi berdasarkan data yang tidak complete)
+    const recordsWithChanges =
+      parseInt(stats.total_records) - parseInt(stats.records_complete);
+
+    console.log("📊 Input In Out SAP Statistics retrieved:", stats);
+
+    res.json({
+      success: true,
+      statistics: {
+        total_records: parseInt(stats.total_records) || 0,
+        unique_perner: parseInt(stats.unique_perner) || 0,
+        records_with_clock_in: parseInt(stats.records_with_clock_in) || 0,
+        records_with_clock_out: parseInt(stats.records_with_clock_out) || 0,
+        records_complete: parseInt(stats.records_complete) || 0,
+        records_with_changes: recordsWithChanges || 0,
+        records_without_employee_data:
+          parseInt(stats.records_without_employee_data) || 0,
+        date_range: {
+          start: stats.start_date,
+          end: stats.end_date,
+        },
+        timestamp: new Date().toISOString(),
+      },
+    });
+  });
+});
+
+app.listen(PORT, HOST, () => {
+  console.log(`✅ Server listening on http://${HOST}:${PORT}`);
+  // URL loopback untuk tes di mesin server
+  if (INTERNAL_BASE_URL) {
+    console.log(`🔗 Internal (loopback): ${INTERNAL_BASE_URL}/api/health`);
+  }
+  // URL LAN untuk HP/laptop lain di Wi-Fi yang sama (hanya log saat dev)
+  if (NODE_ENV === "development") {
+    const lan = getLanIPv4();
+    if (lan) {
+      console.log(
+        `📶 LAN (akses dari device lain): http://${lan}:${PORT}/api/health`
+      );
+    } else {
+      console.log(
+        "⚠️ Tidak menemukan IP LAN. Pastikan terhubung ke Wi-Fi/LAN."
+      );
+    }
+  }
 });
 
 // testcommit

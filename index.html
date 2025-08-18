@@ -8,14 +8,24 @@
     <!-- 1) Tetapkan BASE_URL lebih dulu (tidak deklarasi const lain agar tidak tabrakan) -->
     <script>
       // Pakai API Render saat online; localhost hanya untuk pengembangan
-      (function () {
-        var isLocal = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
-        window.BASE_URL =
-          window.BASE_URL ||
-          (isLocal
-            ? "http://localhost:3000"
-            : "https://absensi-db.onrender.com");
-      })();
+      // (function () {
+      //   var isLocal = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
+      //   window.BASE_URL =
+      //     window.BASE_URL ||
+      //     (isLocal
+      //       ? "http://localhost:3000"
+      //       : "https://absensi-db.onrender.com");
+      // })();
+
+      const BASE_URL =
+        (window.BASE_URL && window.BASE_URL.trim()) || window.location.origin;
+
+      // Helper fetch: aman jika path tanpa "/" di depan.
+      const api = (path, opts) => {
+        const p = path.startsWith("/") ? path : `/${path}`;
+        return fetch(`${BASE_URL}${p}`, opts);
+      };
+      // === END KONFIG ===
     </script>
 
     <!-- Chart.js Library -->
@@ -57,7 +67,7 @@
         height: 70px;
       }
       .nav-logo {
-        font-size: 1.8rem;
+        font-size: 1.2rem;
         font-weight: 700;
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         -webkit-background-clip: text;
@@ -400,28 +410,75 @@
         <a href="#" class="nav-logo">📊 Pelayanan HC</a>
         <ul class="nav-menu" id="navMenu">
           <li class="nav-item">
-            <a href="#" class="nav-link active">Dashboard</a>
+            <a
+              href="alldata.html"
+              class="nav-link"
+              target="_blank"
+              rel="noopener"
+              >📋 All Data</a
+            >
           </li>
           <li class="nav-item">
-            <a href="alldata.html" class="nav-link">📋 All Data</a>
+            <a
+              href="halamanrekap.html"
+              class="nav-link"
+              target="_blank"
+              rel="noopener"
+              >📊 Rekap Absensi</a
+            >
           </li>
           <li class="nav-item">
-            <a href="halamanrekap.html" class="nav-link">📊 Rekap Absensi</a>
+            <a
+              href="formatblasting.html"
+              target="_blank"
+              rel="noopener"
+              class="nav-link"
+              >📊 Format Blasting</a
+            >
           </li>
           <li class="nav-item">
-            <a href="hitungjkp.html" class="nav-link">🧮 Hitung JKP</a>
+            <a
+              href="hitungjkp.html"
+              target="_blank"
+              rel="noopener"
+              class="nav-link"
+              >🧮 Hitung JKP</a
+            >
           </li>
           <li class="nav-item">
-            <a href="input_data.html" class="nav-link">📝 Input Data</a>
+            <a
+              href="input_data.html"
+              target="_blank"
+              rel="noopener"
+              class="nav-link"
+              >📝 Input Data</a
+            >
           </li>
           <li class="nav-item">
-            <a href="pilih-data-ganda-sticky.html" class="nav-link"
+            <a
+              href="pilih-data-ganda-sticky.html"
+              target="_blank"
+              rel="noopener"
+              class="nav-link"
               >🔄 Data Ganda</a
             >
           </li>
           <li class="nav-item">
-            <a href="pilih-shift-ganda-modifikasi.html" class="nav-link"
+            <a
+              href="pilih-shift-ganda-modifikasi.html"
+              target="_blank"
+              rel="noopener"
+              class="nav-link"
               >⏰ Shift Ganda</a
+            >
+          </li>
+          <li class="nav-item">
+            <a
+              href="input_abs_att_sap.html"
+              class="nav-link"
+              target="_blank"
+              rel="noopener"
+              >📝att/abs to SAP</a
             >
           </li>
         </ul>

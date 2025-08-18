@@ -1,0 +1,2739 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Date Range Converter - Database Implementation</title>
+    <style>
+      /* Base Styles */
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        color: #333;
+        line-height: 1.6;
+        margin: 15px;
+        min-height: calc(100vh - 30px);
+      }
+
+      .container {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        overflow: hidden;
+        max-width: 1400px;
+        margin: 0 auto;
+      }
+
+      /* Header */
+      .header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 20px 25px;
+      }
+
+      .header h1 {
+        font-size: 24px;
+        font-weight: 600;
+        margin-bottom: 8px;
+      }
+
+      .header-info {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 15px;
+        font-size: 14px;
+        opacity: 0.9;
+      }
+
+      .db-info {
+        display: flex;
+        gap: 20px;
+        flex-wrap: wrap;
+      }
+
+      /* Controls Section */
+      .controls {
+        background: white;
+        padding: 20px 25px;
+        border-bottom: 1px solid #e2e8f0;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 15px;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .control-section {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+
+      .btn {
+        padding: 10px 16px;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .btn-primary {
+        background: #667eea;
+        color: white;
+      }
+
+      .btn-primary:hover {
+        background: #5a67d8;
+        transform: translateY(-1px);
+      }
+
+      .btn-secondary {
+        background: #48bb78;
+        color: white;
+      }
+
+      .btn-secondary:hover {
+        background: #38a169;
+        transform: translateY(-1px);
+      }
+
+      .btn-danger {
+        background: #e53e3e;
+        color: white;
+      }
+
+      .btn-danger:hover {
+        background: #c53030;
+        transform: translateY(-1px);
+      }
+
+      /* Status Messages */
+      .status-message {
+        padding: 10px 15px;
+        border-radius: 6px;
+        margin-bottom: 15px;
+        font-size: 14px;
+        font-weight: 500;
+      }
+
+      .status-success {
+        background: #f0fff4;
+        color: #22543d;
+        border: 1px solid #9ae6b4;
+      }
+
+      .status-error {
+        background: #fed7d7;
+        color: #742a2a;
+        border: 1px solid #feb2b2;
+      }
+
+      .status-info {
+        background: #ebf8ff;
+        color: #2a4365;
+        border: 1px solid #90cdf4;
+      }
+
+      /* Filter Dropdown Styles */
+      .filter-dropdown {
+        position: relative;
+        display: inline-block;
+        width: 100%;
+        margin-top: 4px;
+      }
+
+      .filter-btn {
+        background: rgba(255, 255, 255, 0.2);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        color: white;
+        padding: 3px 6px;
+        cursor: pointer;
+        border-radius: 3px;
+        font-size: 9px;
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        transition: all 0.2s ease;
+      }
+
+      .filter-btn:hover {
+        background: rgba(255, 255, 255, 0.3);
+      }
+
+      .filter-content {
+        display: none;
+        position: absolute;
+        background: white;
+        min-width: 200px;
+        max-width: 300px;
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+        z-index: 1000;
+        border-radius: 6px;
+        border: 1px solid #e2e8f0;
+        max-height: 300px;
+        overflow-y: auto;
+        top: 100%;
+        left: 0;
+      }
+
+      .filter-content.show {
+        display: block;
+      }
+
+      .filter-search {
+        padding: 8px;
+        border-bottom: 1px solid #e2e8f0;
+      }
+
+      .filter-search input {
+        width: 100%;
+        padding: 6px 8px;
+        border: 1px solid #cbd5e0;
+        border-radius: 4px;
+        font-size: 12px;
+      }
+
+      .filter-options {
+        padding: 4px 0;
+        max-height: 200px;
+        overflow-y: auto;
+      }
+
+      .filter-option {
+        padding: 6px 12px;
+        cursor: pointer;
+        font-size: 11px;
+        color: #2d3748;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .filter-option:hover {
+        background: #f7fafc;
+      }
+
+      .filter-option.selected {
+        background: #e6fffa;
+        color: #234e52;
+      }
+
+      .filter-checkbox {
+        width: 14px;
+        height: 14px;
+      }
+
+      .filter-actions {
+        padding: 8px;
+        border-top: 1px solid #e2e8f0;
+        display: flex;
+        gap: 6px;
+      }
+
+      .filter-actions button {
+        flex: 1;
+        padding: 4px 8px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 10px;
+        font-weight: 500;
+      }
+
+      .btn-apply-filter {
+        background: #48bb78;
+        color: white;
+      }
+
+      .btn-clear-filter {
+        background: #e2e8f0;
+        color: #4a5568;
+      }
+
+      .filter-indicator {
+        background: #48bb78;
+        color: white;
+        border-radius: 50%;
+        width: 16px;
+        height: 16px;
+        font-size: 9px;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        margin-left: 4px;
+      }
+
+      /* Header content styling */
+      .header-content {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+      }
+
+      /* Filter status bar */
+      .filter-status {
+        background: #f0f8f0;
+        border: 1px solid #9ae6b4;
+        border-radius: 6px;
+        padding: 8px 12px;
+        margin: 10px 25px;
+        font-size: 12px;
+        color: #2f855a;
+        display: none;
+      }
+
+      .filter-status.active {
+        display: block;
+      }
+
+      .clear-all-filters {
+        background: #e53e3e;
+        color: white;
+        border: none;
+        padding: 4px 8px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 11px;
+        margin-left: 8px;
+      }
+
+      /* Table Sections */
+      .table-section {
+        margin: 0;
+      }
+
+      .section-header {
+        background: #f8fafc;
+        padding: 15px 25px;
+        border-bottom: 1px solid #e2e8f0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .section-title {
+        font-size: 18px;
+        font-weight: 600;
+        color: #2d3748;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .section-stats {
+        display: flex;
+        gap: 15px;
+        font-size: 12px;
+        color: #4a5568;
+      }
+
+      .stat-item {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+
+      /* Table Container */
+      .table-container {
+        overflow: auto;
+        max-height: 400px;
+        border-bottom: 1px solid #e2e8f0;
+      }
+
+      .data-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+      }
+
+      .data-table th {
+        background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%);
+        color: white;
+        padding: 10px 8px;
+        text-align: center;
+        font-weight: 600;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        white-space: nowrap;
+      }
+
+      .data-table td {
+        padding: 8px;
+        border-bottom: 1px solid #e2e8f0;
+        border-right: 1px solid #f1f5f9;
+        text-align: center;
+        vertical-align: middle;
+      }
+
+      .data-table tbody tr:nth-child(even) {
+        background-color: #f8fafc;
+      }
+
+      .data-table tbody tr:hover {
+        background-color: #edf2f7;
+      }
+
+      /* Loading States */
+      .loading {
+        text-align: center;
+        padding: 40px;
+        font-size: 16px;
+        color: #666;
+      }
+
+      .loading::after {
+        content: "";
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 2px solid #ddd;
+        border-radius: 50%;
+        border-top-color: #667eea;
+        animation: spin 1s ease-in-out infinite;
+        margin-left: 10px;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      .empty-state {
+        text-align: center;
+        padding: 40px 20px;
+        color: #718096;
+        font-style: italic;
+      }
+
+      /* Processing Info */
+      .processing-info {
+        background: #e6fffa;
+        border: 1px solid #81e6d9;
+        border-radius: 6px;
+        padding: 12px 15px;
+        font-size: 12px;
+        color: #234e52;
+        margin: 15px 25px;
+      }
+
+      .processing-info strong {
+        color: #065f46;
+      }
+
+      /* Type Badges */
+      .type-badge {
+        padding: 3px 8px;
+        border-radius: 4px;
+        font-weight: bold;
+        font-size: 10px;
+        color: white;
+        display: inline-block;
+      }
+
+      .type-att {
+        background: #2d69e0;
+      }
+
+      .type-abs {
+        background: #e53e3e;
+      }
+
+      .type-sppd {
+        background: #38a169;
+      }
+
+      .code-badge {
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-weight: bold;
+        font-size: 11px;
+        color: white;
+        display: inline-block;
+      }
+
+      /* Individual table export buttons */
+      .table-export-btn {
+        background: #667eea;
+        color: white;
+        border: none;
+        padding: 6px 12px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+
+      .table-export-btn:hover {
+        background: #5a67d8;
+        transform: translateY(-1px);
+      }
+
+      .table-export-btn:disabled {
+        background: #cbd5e0;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      /* Button Loading State */
+      .btn-loading {
+        opacity: 0.6;
+        cursor: not-allowed;
+        position: relative;
+      }
+
+      .btn-loading::after {
+        content: "";
+        position: absolute;
+        width: 12px;
+        height: 12px;
+        margin: auto;
+        border: 2px solid transparent;
+        border-top-color: #ffffff;
+        border-radius: 50%;
+        animation: spin 1s ease infinite;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+      }
+
+      /* Responsive Design */
+      @media (max-width: 768px) {
+        body {
+          margin: 10px;
+        }
+
+        .header {
+          padding: 15px 20px;
+        }
+
+        .header h1 {
+          font-size: 20px;
+        }
+
+        .controls {
+          flex-direction: column;
+          align-items: stretch;
+        }
+
+        .control-section {
+          justify-content: center;
+        }
+
+        .section-header {
+          flex-direction: column;
+          gap: 10px;
+          align-items: stretch;
+        }
+
+        .section-stats {
+          justify-content: center;
+          flex-wrap: wrap;
+        }
+
+        .table-container {
+          max-height: 300px;
+        }
+
+        .data-table {
+          font-size: 11px;
+        }
+
+        .data-table th,
+        .data-table td {
+          padding: 6px 4px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <!-- Header -->
+      <div class="header">
+        <h1>📊 Date Range Converter - Database Implementation</h1>
+        <div class="header-info">
+          <div class="db-info">
+            <span><strong>Database:</strong> absensi_db</span>
+            <span><strong>Table:</strong> olah_absensi</span>
+            <span id="totalInputRecords"
+              ><strong>Input Records:</strong> Loading...</span
+            >
+            <span id="totalOutputRecords"
+              ><strong>Output Periods:</strong> Loading...</span
+            >
+          </div>
+          <div id="lastUpdated">
+            <strong>Last Updated:</strong> <span id="updateTime">-</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Controls -->
+      <div class="controls">
+        <div class="control-section">
+          <button
+            class="btn btn-primary"
+            onclick="loadAndProcessData()"
+            id="refreshBtn"
+          >
+            🔄 Refresh Data
+          </button>
+          <button class="btn btn-danger" onclick="clearData()">
+            🗑️ Clear Data
+          </button>
+        </div>
+        <div class="control-section">
+          <button
+            class="btn btn-secondary"
+            onclick="exportResults('csv')"
+            id="exportCsvBtn"
+            disabled
+          >
+            📊 Export All CSV
+          </button>
+          <button
+            class="btn btn-secondary"
+            onclick="exportResults('excel')"
+            id="exportExcelBtn"
+            disabled
+          >
+            📈 Export All Excel
+          </button>
+        </div>
+      </div>
+
+      <!-- Processing Info -->
+      <div class="processing-info">
+        <strong>📋 Data Processing Rules:</strong><br />
+        • Input: <code>*_daily_*</code> and <code>sppd_umum_*</code> from
+        value_att_abs<br />
+        • Conversion: <code>sppd_umum_*</code> → <code>att_daily_*</code><br />
+        • Output: Only ATT and ABS types with consecutive date ranges<br />
+        • ABS codes: 3-digit → 4-digit with leading zero (101 → 0101)
+      </div>
+
+      <!-- Status Messages -->
+      <div id="statusMessage"></div>
+
+      <!-- Input Data Table -->
+      <div class="table-section">
+        <div class="section-header">
+          <h2 class="section-title">📥 Input Data (from olah_absensi)</h2>
+          <div style="display: flex; align-items: center; gap: 15px">
+            <div class="section-stats" id="inputStats">
+              <span class="stat-item"
+                >📊 <span id="inputTotalRecords">0</span> records</span
+              >
+              <span class="stat-item"
+                >👥 <span id="inputTotalPerner">0</span> PERNER</span
+              >
+              <span class="stat-item" style="color: #2d69e0"
+                >📋 <span id="inputAttRecords">0</span> ATT</span
+              >
+              <span class="stat-item" style="color: #e53e3e"
+                >📋 <span id="inputAbsRecords">0</span> ABS</span
+              >
+              <span class="stat-item" style="color: #38a169"
+                >📋 <span id="inputSppdRecords">0</span> SPPD</span
+              >
+            </div>
+            <button
+              class="table-export-btn"
+              onclick="exportInputTable()"
+              id="exportInputBtn"
+              disabled
+            >
+              📊 Export Input Excel
+            </button>
+          </div>
+        </div>
+        <div id="inputFilterStatus" class="filter-status"></div>
+        <div class="table-container">
+          <div id="inputTableContent">
+            <div class="loading">Loading input data from database...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Output Data Table -->
+      <div class="table-section">
+        <div class="section-header">
+          <h2 class="section-title">📤 Output Data (Date Ranges)</h2>
+          <div style="display: flex; align-items: center; gap: 15px">
+            <div class="section-stats" id="outputStats">
+              <span class="stat-item"
+                >📊 <span id="outputTotalPeriods">0</span> periods</span
+              >
+              <span class="stat-item"
+                >👥 <span id="outputTotalPerner">0</span> PERNER</span
+              >
+              <span class="stat-item" style="color: #2d69e0"
+                >📋 <span id="outputAttPeriods">0</span> ATT</span
+              >
+              <span class="stat-item" style="color: #e53e3e"
+                >📋 <span id="outputAbsPeriods">0</span> ABS</span
+              >
+            </div>
+            <button
+              class="table-export-btn"
+              onclick="exportOutputTable()"
+              id="exportOutputBtn"
+              disabled
+            >
+              📈 Export Output Excel
+            </button>
+          </div>
+        </div>
+        <div id="outputFilterStatus" class="filter-status"></div>
+        <div class="table-container">
+          <div id="outputTableContent">
+            <div class="empty-state">
+              Data will appear after processing input data
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // BASE URL untuk API calls - pastikan mengarah ke server Express.js
+      const BASE_URL = "http://127.0.0.1:3000";
+
+      // Helper fetch function
+      const api = (path, opts) => {
+        const p = path.startsWith("/") ? path : `/${path}`;
+        return fetch(`${BASE_URL}${p}`, opts);
+      };
+
+      // Global Variables
+      let inputData = [];
+      let outputData = [];
+      let processedStats = {};
+      let filteredInputData = [];
+      let filteredOutputData = [];
+      let inputFilters = {};
+      let outputFilters = {};
+
+      // Tipe mapping reference
+      const tipeMap = {
+        101: ["Cuti Tahunan", "abs"],
+        201: ["Cuti Besar", "abs"],
+        301: ["Pernikhn pkrj/anak dlm kt", "abs"],
+        302: ["Pernikhn pkrj/anak lr kt", "abs"],
+        303: ["Pernkhn sdr dlm kota", "abs"],
+        304: ["Pernkhn sdr lr kota", "abs"],
+        305: ["Isteri melahirkan anak", "abs"],
+        306: ["Absen tanpa alasan", "abs"],
+        307: ["Istri/ suami/ anak wafat", "abs"],
+        308: ["Orang tua/ mertua wafat", "abs"],
+        309: ["Sdr kandung pekerja wafat", "abs"],
+        310: ["Menantu pekerja wafat", "abs"],
+        311: ["Ibadah Haji/Lainnya", "abs"],
+        312: ["Khitan/BaptisAnk/Upc.Gigi", "abs"],
+        313: ["Cuti Alasan Pribadi", "abs"],
+        314: ["Haid", "abs"],
+        315: ["Pekerja Melahirkan", "abs"],
+        316: ["Melahirkan anak ke 4 dst", "abs"],
+        319: ["Khitn/Bptis/UpGigi lrKota", "abs"],
+        320: ["Istri/ suami/ anak sakit", "abs"],
+        321: ["Orang tua/ mertua sakit", "abs"],
+        322: ["Keluarga sakit luar kota", "abs"],
+        323: ["Pegawai/Anak Wisuda", "abs"],
+        324: ["Pgawai/Ank Wisuda lr kota", "abs"],
+        325: ["Keadaan Kahar", "abs"],
+        326: ["Sdr kandung wafat lr kota", "abs"],
+        327: ["Anak/Mnantu wafat lr kota", "abs"],
+        328: ["Ortu/Mertua wafat lr kota", "abs"],
+        329: ["Suami/Istri wafat lr kota", "abs"],
+        501: ["Keguguran", "abs"],
+        502: ["Sakit tanpa surat dokter", "abs"],
+        503: ["Sakit dengan surat dokter", "abs"],
+        504: ["Sakit berkelanjutan", "abs"],
+        601: ["Skorsing", "abs"],
+        701: ["Tugas Belajar", "abs"],
+        901: ["Penahanan", "abs"],
+        902: ["Penahanan dan Proses PHK", "abs"],
+        903: ["Penahanan Tindak Pidana", "abs"],
+        904: ["Penahanan Lakalantas", "abs"],
+        9001: ["Seminar", "att"],
+        9002: ["Workshop", "att"],
+        9003: ["Perjalanan dinas", "att"],
+        9004: ["Rapat di luar kantor", "att"],
+        9005: ["Acara di luar kantor", "att"],
+        9006: ["Pelatihan dengan kuota", "att"],
+        9007: ["Pelatihan tanpa kuota", "att"],
+        9008: ["Tugas di luar kantor", "att"],
+        9009: ["Tugas Belajar", "att"],
+      };
+
+      // Create reverse mapping for description to code
+
+      const descriptionToCode = {};
+      Object.keys(tipeMap).forEach((code) => {
+        const [description, type] = tipeMap[code];
+        descriptionToCode[description.toLowerCase()] = {
+          code: parseInt(code),
+          type: type,
+        };
+      });
+
+      // Load data from database
+      async function loadAndProcessData() {
+        try {
+          showStatus("Loading data from database...", "info");
+          setLoadingState(true);
+
+          console.log("🚀 Loading data from olah_absensi...");
+
+          // Call API to get olah_absensi data
+          const response = await api("/getOlahAbsensiDateRange");
+
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+
+          const apiResponse = await response.json();
+
+          if (!apiResponse.success) {
+            throw new Error(apiResponse.message || "API returned error");
+          }
+
+          const data = apiResponse.data || [];
+          const metadata = apiResponse.metadata || {};
+
+          console.log(`✅ Raw data loaded: ${data.length} records`);
+          console.log("📊 API Metadata:", metadata);
+
+          // Process input data
+          inputData = processInputData(data);
+          console.log(`📊 Processed input data: ${inputData.length} records`);
+
+          // Convert to date ranges
+          outputData = convertToDateRanges(inputData);
+          console.log(
+            `📅 Generated output periods: ${outputData.length} periods`
+          );
+
+          // Display both tables
+          displayInputTable(inputData);
+          displayOutputTable(outputData);
+
+          // Update statistics
+          updateAllStats();
+
+          // Update timestamps
+          document.getElementById("updateTime").textContent =
+            new Date().toLocaleString("id-ID");
+
+          // Enable export buttons
+          toggleExportButtons(true);
+
+          showStatus(
+            `✅ Processing complete! ${inputData.length} input records → ${outputData.length} periods`,
+            "success"
+          );
+        } catch (error) {
+          console.error("❌ Error loading data:", error);
+          showStatus(`❌ Error: ${error.message}`, "error");
+          clearData();
+        } finally {
+          setLoadingState(false);
+        }
+      }
+
+      // Process input data from database
+      function processInputData(rawData) {
+        console.log("🔄 Processing input data...");
+
+        const processed = [];
+        const stats = {
+          att_count: 0,
+          abs_count: 0,
+          sppd_count: 0,
+          total_perner: new Set(),
+        };
+
+        rawData.forEach((row) => {
+          const perner = row.perner;
+          const tanggal = row.tanggal;
+          const valueAttAbs = row.value_att_abs;
+
+          // Skip if missing required fields
+          if (!perner || !tanggal || !valueAttAbs) {
+            console.warn("⚠️ Skipping incomplete row:", row);
+            return;
+          }
+
+          // Parse value_att_abs to determine type and description
+          const parsedValue = parseValueAttAbs(valueAttAbs);
+
+          if (parsedValue) {
+            // Map to code
+            const kode = mapDescriptionToCode(
+              parsedValue.description,
+              parsedValue.att_type
+            );
+            const formattedKode = formatCode(kode, parsedValue.att_type);
+
+            processed.push({
+              perner: perner,
+              tanggal: tanggal,
+              original_value: valueAttAbs,
+              att_type: parsedValue.att_type,
+              description: parsedValue.description,
+              kode: formattedKode,
+            });
+
+            // Update stats
+            stats.total_perner.add(perner);
+            if (parsedValue.att_type === "att") {
+              stats.att_count++;
+            } else if (parsedValue.att_type === "abs") {
+              stats.abs_count++;
+            }
+
+            if (parsedValue.original_type === "sppd") {
+              stats.sppd_count++;
+            }
+          }
+        });
+
+        processedStats = {
+          ...stats,
+          total_perner: stats.total_perner.size,
+          total_records: processed.length,
+        };
+
+        console.log("📊 Input processing stats:", processedStats);
+        return processed;
+      }
+
+      // Parse value_att_abs field
+      // Parse value_att_abs field yang menggunakan format "prefix => description"
+      function parseValueAttAbs(valueAttAbs) {
+        if (!valueAttAbs || typeof valueAttAbs !== "string") {
+          return null;
+        }
+
+        const value = valueAttAbs.trim();
+
+        // Split berdasarkan "=>" untuk mendapatkan prefix dan description
+        const parts = value.split("=>").map((part) => part.trim());
+
+        if (parts.length < 2) {
+          console.warn('⚠️ Invalid format, no "=>" found:', valueAttAbs);
+          return null;
+        }
+
+        const prefix = parts[0].toLowerCase();
+        const description = parts[1]; // Deskripsi asli setelah "=>"
+
+        // Tentukan att_type berdasarkan prefix
+        let att_type = null;
+        let original_type = null;
+
+        if (prefix.includes("abs_daily_")) {
+          att_type = "abs";
+          original_type = "abs";
+        } else if (prefix.includes("att_daily_")) {
+          att_type = "att";
+          original_type = "att";
+        } else if (prefix.includes("sppd_umum")) {
+          // Convert sppd_umum ke att_daily
+          att_type = "att";
+          original_type = "sppd";
+        } else {
+          console.warn("⚠️ Unknown prefix:", prefix);
+          return null;
+        }
+
+        return {
+          att_type: att_type,
+          description: description,
+          original_type: original_type,
+          original_prefix: parts[0],
+        };
+      }
+
+      // Definisi tipeMap yang lengkap
+      // const tipeMap = {
+      //   101: ["Cuti Tahunan", "abs"],
+      //   201: ["Cuti Besar", "abs"],
+      //   301: ["Pernikhn pkrj/anak dlm kt", "abs"],
+      //   302: ["Pernikhn pkrj/anak lr kt", "abs"],
+      //   303: ["Pernkhn sdr dlm kota", "abs"],
+      //   304: ["Pernkhn sdr lr kota", "abs"],
+      //   305: ["Isteri melahirkan anak", "abs"],
+      //   306: ["Absen tanpa alasan", "abs"],
+      //   307: ["Istri/ suami/ anak wafat", "abs"],
+      //   308: ["Orang tua/ mertua wafat", "abs"],
+      //   309: ["Sdr kandung pekerja wafat", "abs"],
+      //   310: ["Menantu pekerja wafat", "abs"],
+      //   311: ["Ibadah Haji/Lainnya", "abs"],
+      //   312: ["Khitan/BaptisAnk/Upc.Gigi", "abs"],
+      //   313: ["Cuti Alasan Pribadi", "abs"],
+      //   314: ["Haid", "abs"],
+      //   315: ["Pekerja Melahirkan", "abs"],
+      //   316: ["Melahirkan anak ke 4 dst", "abs"],
+      //   319: ["Khitn/Bptis/UpGigi lrKota", "abs"],
+      //   320: ["Istri/ suami/ anak sakit", "abs"],
+      //   321: ["Orang tua/ mertua sakit", "abs"],
+      //   322: ["Keluarga sakit luar kota", "abs"],
+      //   323: ["Pegawai/Anak Wisuda", "abs"],
+      //   324: ["Pgawai/Ank Wisuda lr kota", "abs"],
+      //   325: ["Keadaan Kahar", "abs"],
+      //   326: ["Sdr kandung wafat lr kota", "abs"],
+      //   327: ["Anak/Mnantu wafat lr kota", "abs"],
+      //   328: ["Ortu/Mertua wafat lr kota", "abs"],
+      //   329: ["Suami/Istri wafat lr kota", "abs"],
+      //   501: ["Keguguran", "abs"],
+      //   502: ["Sakit tanpa surat dokter", "abs"],
+      //   503: ["Sakit dengan surat dokter", "abs"],
+      //   504: ["Sakit berkelanjutan", "abs"],
+      //   601: ["Skorsing", "abs"],
+      //   701: ["Tugas Belajar", "abs"],
+      //   901: ["Penahanan", "abs"],
+      //   902: ["Penahanan dan Proses PHK", "abs"],
+      //   903: ["Penahanan Tindak Pidana", "abs"],
+      //   904: ["Penahanan Lakalantas", "abs"],
+      //   9001: ["Seminar", "att"],
+      //   9002: ["Workshop", "att"],
+      //   9003: ["Perjalanan dinas", "att"],
+      //   9004: ["Rapat di luar kantor", "att"],
+      //   9005: ["Acara di luar kantor", "att"],
+      //   9006: ["Pelatihan dengan kuota", "att"],
+      //   9007: ["Pelatihan tanpa kuota", "att"],
+      //   9008: ["Tugas di luar kantor", "att"],
+      //   9009: ["Tugas Belajar", "att"],
+      // };
+
+      // Map description ke code menggunakan referensi tipeMap
+      function mapDescriptionToCode(description, attType) {
+        const descLower = description.toLowerCase().trim();
+
+        // 1. Exact match dengan tipeMap
+        for (const [code, [mapDescription, mapType]] of Object.entries(
+          tipeMap
+        )) {
+          const mapDescLower = mapDescription.toLowerCase();
+
+          if (mapDescLower === descLower && mapType === attType) {
+            console.log(`✅ Exact match: "${description}" → Code ${code}`);
+            return parseInt(code);
+          }
+        }
+
+        // 2. Normalize spasi dan karakter khusus untuk matching yang lebih fleksibel
+        const normalizeText = (text) => {
+          return text
+            .toLowerCase()
+            .replace(/\s+/g, " ") // Normalize spasi
+            .replace(/[\/\-_]/g, " ") // Ganti /, -, _ dengan spasi
+            .replace(/\s+/g, " ") // Hapus spasi berlebih
+            .trim();
+        };
+
+        const normalizedDesc = normalizeText(description);
+
+        // 3. Flexible matching dengan normalisasi
+        for (const [code, [mapDescription, mapType]] of Object.entries(
+          tipeMap
+        )) {
+          const normalizedMapDesc = normalizeText(mapDescription);
+
+          if (normalizedMapDesc === normalizedDesc && mapType === attType) {
+            console.log(
+              `✅ Normalized match: "${description}" → "${mapDescription}" → Code ${code}`
+            );
+            return parseInt(code);
+          }
+        }
+
+        // 4. Partial matching untuk kasus-kasus khusus
+        const partialMappings = [
+          // ABS mappings
+          { keywords: ["cuti", "tahunan"], code: 101, type: "abs" },
+          { keywords: ["cuti", "besar"], code: 201, type: "abs" },
+          { keywords: ["cuti", "pribadi"], code: 313, type: "abs" },
+          { keywords: ["sakit", "surat", "dokter"], code: 503, type: "abs" },
+          { keywords: ["sakit", "tanpa", "surat"], code: 502, type: "abs" },
+          { keywords: ["sakit", "berkelanjutan"], code: 504, type: "abs" },
+          { keywords: ["haid"], code: 314, type: "abs" },
+          { keywords: ["melahirkan"], code: 315, type: "abs" },
+          { keywords: ["keguguran"], code: 501, type: "abs" },
+          { keywords: ["skorsing"], code: 601, type: "abs" },
+          { keywords: ["penahanan"], code: 901, type: "abs" },
+          { keywords: ["tugas", "belajar"], code: 701, type: "abs" },
+          { keywords: ["absen", "tanpa", "alasan"], code: 306, type: "abs" },
+          { keywords: ["kahar"], code: 325, type: "abs" },
+          { keywords: ["haji"], code: 311, type: "abs" },
+          { keywords: ["wisuda"], code: 323, type: "abs" },
+
+          // Pernikahan
+          {
+            keywords: ["pernikahan", "pekerja", "dalam", "kota"],
+            code: 301,
+            type: "abs",
+          },
+          {
+            keywords: ["pernikahan", "pekerja", "luar", "kota"],
+            code: 302,
+            type: "abs",
+          },
+          {
+            keywords: ["pernikahan", "saudara", "dalam", "kota"],
+            code: 303,
+            type: "abs",
+          },
+          {
+            keywords: ["pernikahan", "saudara", "luar", "kota"],
+            code: 304,
+            type: "abs",
+          },
+
+          // Kematian
+          { keywords: ["istri", "wafat"], code: 307, type: "abs" },
+          { keywords: ["suami", "wafat"], code: 307, type: "abs" },
+          { keywords: ["anak", "wafat"], code: 307, type: "abs" },
+          { keywords: ["orang", "tua", "wafat"], code: 308, type: "abs" },
+          { keywords: ["mertua", "wafat"], code: 308, type: "abs" },
+          { keywords: ["saudara", "kandung", "wafat"], code: 309, type: "abs" },
+          { keywords: ["menantu", "wafat"], code: 310, type: "abs" },
+
+          // Sakit keluarga
+          { keywords: ["istri", "sakit"], code: 320, type: "abs" },
+          { keywords: ["suami", "sakit"], code: 320, type: "abs" },
+          { keywords: ["anak", "sakit"], code: 320, type: "abs" },
+          { keywords: ["orang", "tua", "sakit"], code: 321, type: "abs" },
+          { keywords: ["mertua", "sakit"], code: 321, type: "abs" },
+          { keywords: ["keluarga", "sakit"], code: 322, type: "abs" },
+
+          // ATT mappings
+          { keywords: ["seminar"], code: 9001, type: "att" },
+          { keywords: ["workshop"], code: 9002, type: "att" },
+          { keywords: ["perjalanan", "dinas"], code: 9003, type: "att" },
+          { keywords: ["dinas"], code: 9003, type: "att" },
+          { keywords: ["sppd"], code: 9003, type: "att" },
+          { keywords: ["rapat", "luar", "kantor"], code: 9004, type: "att" },
+          { keywords: ["acara", "luar", "kantor"], code: 9005, type: "att" },
+          { keywords: ["pelatihan", "kuota"], code: 9006, type: "att" },
+          { keywords: ["pelatihan", "tanpa"], code: 9007, type: "att" },
+          { keywords: ["tugas", "luar", "kantor"], code: 9008, type: "att" },
+          { keywords: ["tugas", "belajar"], code: 9009, type: "att" },
+        ];
+
+        // 5. Cari dengan partial matching
+        for (const mapping of partialMappings) {
+          if (mapping.type === attType) {
+            const allKeywordsFound = mapping.keywords.every((keyword) =>
+              normalizedDesc.includes(keyword.toLowerCase())
+            );
+
+            if (allKeywordsFound) {
+              console.log(
+                `✅ Partial match: "${description}" → Code ${
+                  mapping.code
+                } (keywords: ${mapping.keywords.join(", ")})`
+              );
+              return mapping.code;
+            }
+          }
+        }
+
+        // 6. Jika tidak ditemukan, berikan default code
+        console.warn(`⚠️ No mapping found for: "${description}" (${attType})`);
+        return attType === "abs" ? 999 : 9999; // Default codes
+      }
+
+      // Update process input data function
+      function processInputData(rawData) {
+        console.log("🔄 Processing input data...");
+
+        const processed = [];
+        const stats = {
+          att_count: 0,
+          abs_count: 0,
+          sppd_count: 0,
+          total_perner: new Set(),
+          unmapped_descriptions: new Set(),
+        };
+
+        rawData.forEach((row) => {
+          const perner = row.perner;
+          const tanggal = row.tanggal;
+          const valueAttAbs = row.value_att_abs;
+
+          // Skip if missing required fields
+          if (!perner || !tanggal || !valueAttAbs) {
+            console.warn("⚠️ Skipping incomplete row:", row);
+            return;
+          }
+
+          // Parse value_att_abs menggunakan format "prefix => description"
+          const parsedValue = parseValueAttAbs(valueAttAbs);
+
+          if (parsedValue) {
+            // Map description ke code
+            const kode = mapDescriptionToCode(
+              parsedValue.description,
+              parsedValue.att_type
+            );
+            const formattedKode = formatCode(kode, parsedValue.att_type);
+
+            // Track unmapped untuk debugging
+            if (kode === 999 || kode === 9999) {
+              stats.unmapped_descriptions.add(
+                `${parsedValue.description} (${parsedValue.att_type})`
+              );
+            }
+
+            processed.push({
+              perner: perner,
+              tanggal: tanggal,
+              original_value: valueAttAbs,
+              original_prefix: parsedValue.original_prefix,
+              att_type: parsedValue.att_type,
+              description: parsedValue.description,
+              kode: formattedKode,
+              mapped_code: kode,
+            });
+
+            // Update stats
+            stats.total_perner.add(perner);
+            if (parsedValue.att_type === "att") {
+              stats.att_count++;
+            } else if (parsedValue.att_type === "abs") {
+              stats.abs_count++;
+            }
+
+            if (parsedValue.original_type === "sppd") {
+              stats.sppd_count++;
+            }
+          } else {
+            console.warn("⚠️ Could not parse value_att_abs:", valueAttAbs);
+          }
+        });
+
+        // Log unmapped descriptions untuk debugging
+        if (stats.unmapped_descriptions.size > 0) {
+          console.warn("⚠️ Unmapped descriptions found:");
+          stats.unmapped_descriptions.forEach((desc) => {
+            console.warn(`   - ${desc}`);
+          });
+        }
+
+        processedStats = {
+          ...stats,
+          total_perner: stats.total_perner.size,
+          total_records: processed.length,
+          unmapped_count: stats.unmapped_descriptions.size,
+        };
+
+        console.log("📊 Input processing stats:", processedStats);
+        return processed;
+      }
+
+      // Contoh penggunaan dan testing
+      function testParsing() {
+        const testCases = [
+          "abs_daily_new => Sakit dengan surat dokter",
+          "abs_daily_sick => Sakit tanpa surat dokter",
+          "abs_daily_leave => Cuti Tahunan",
+          "abs_daily_personal => Cuti Alasan Pribadi",
+          "abs_daily_haid => Haid",
+          "abs_daily_maternity => Pekerja Melahirkan",
+          "att_daily_meeting => Seminar",
+          "att_daily_training => Workshop",
+          "att_daily_conference => Pelatihan dengan kuota",
+          "sppd_umum_jakarta => Perjalanan dinas",
+          "sppd_umum_bandung => Dinas",
+          "att_daily_task => Tugas di luar kantor",
+          "abs_daily_family => Istri/ suami/ anak wafat",
+          "abs_daily_parent => Orang tua/ mertua sakit",
+        ];
+
+        console.log("🧪 Testing parsing function with tipeMap reference:");
+        console.log("=".repeat(80));
+
+        testCases.forEach((testCase, index) => {
+          console.log(`\n${index + 1}. Testing: "${testCase}"`);
+
+          const parsed = parseValueAttAbs(testCase);
+          if (parsed) {
+            const code = mapDescriptionToCode(
+              parsed.description,
+              parsed.att_type
+            );
+            const formattedCode = formatCode(code, parsed.att_type);
+
+            console.log(`   📄 Prefix: "${parsed.original_prefix}"`);
+            console.log(`   📝 Description: "${parsed.description}"`);
+            console.log(`   🏷️  Type: ${parsed.att_type.toUpperCase()}`);
+            console.log(`   🔢 Code: ${formattedCode}`);
+
+            // Cek apakah ada di tipeMap
+            if (tipeMap[code]) {
+              console.log(
+                `   ✅ Mapped to: "${tipeMap[code][0]}" (${tipeMap[code][1]})`
+              );
+
+              // Validasi apakah mapping benar
+              if (tipeMap[code][1] === parsed.att_type) {
+                console.log(`   ✅ Type validation: PASSED`);
+              } else {
+                console.log(
+                  `   ❌ Type validation: FAILED - Expected ${parsed.att_type}, got ${tipeMap[code][1]}`
+                );
+              }
+            } else {
+              console.log(`   ⚠️  Using default code (not found in tipeMap)`);
+            }
+          } else {
+            console.log(`   ❌ Failed to parse`);
+          }
+        });
+
+        console.log("\n" + "=".repeat(80));
+        console.log("📊 Available codes in tipeMap:");
+        console.log(
+          "ABS codes:",
+          Object.keys(tipeMap).filter((code) => tipeMap[code][1] === "abs")
+            .length
+        );
+        console.log(
+          "ATT codes:",
+          Object.keys(tipeMap).filter((code) => tipeMap[code][1] === "att")
+            .length
+        );
+        console.log("Total codes:", Object.keys(tipeMap).length);
+      }
+
+      // Jalankan test (optional)
+      // testParsing();
+      // Extract description from value_att_abs
+      function extractDescription(valueAttAbs, prefix) {
+        // Try to extract description after the prefix
+        const parts = valueAttAbs.split(prefix);
+        if (parts.length > 1) {
+          let description = parts[1].trim();
+
+          // Remove common separators
+          description = description.replace(/^[_\-=>\s]+/, "");
+          description = description.replace(/[_\-\s]+$/, "");
+
+          // If description is empty or too short, return default
+          if (description.length < 3) {
+            return getDefaultDescription(prefix);
+          }
+
+          return description;
+        }
+
+        return getDefaultDescription(prefix);
+      }
+
+      // Get default description based on prefix
+      function getDefaultDescription(prefix) {
+        switch (prefix) {
+          case "abs_daily_":
+            return "Tidak hadir";
+          case "att_daily_":
+            return "Hadir";
+          case "sppd_umum_":
+            return "Perjalanan dinas";
+          default:
+            return "Aktivitas";
+        }
+      }
+
+      // Map description to code
+      function mapDescriptionToCode(description, attType) {
+        const descLower = description.toLowerCase();
+
+        // Direct lookup
+        if (descriptionToCode[descLower]) {
+          const mapping = descriptionToCode[descLower];
+          if (mapping.type === attType) {
+            return mapping.code;
+          }
+        }
+
+        // Fuzzy matching for common variations
+        const fuzzyMappings = {
+          "cuti tahunan": 101,
+          "sakit dengan surat dokter": 503,
+          "sakit tanpa surat dokter": 502,
+          "cuti alasan pribadi": 313,
+          "perjalanan dinas": 9003,
+          seminar: 9001,
+          workshop: 9002,
+          "rapat di luar kantor": 9004,
+          "tugas belajar": 9009,
+          "tidak hadir": 306,
+          hadir: 9008,
+        };
+
+        if (fuzzyMappings[descLower]) {
+          return fuzzyMappings[descLower];
+        }
+
+        // Default codes based on type
+        return attType === "abs" ? 999 : 9999;
+      }
+
+      // Format code (add leading zero for ABS 3-digit codes)
+      function formatCode(code, attType) {
+        if (attType === "abs" && code < 1000) {
+          return code.toString().padStart(4, "0");
+        }
+        return code.toString();
+      }
+
+      // Convert to date ranges
+      function convertToDateRanges(inputData) {
+        console.log("🔄 Converting to date ranges...");
+
+        const groupedByPerner = {};
+        inputData.forEach((row) => {
+          const perner = row.perner;
+          if (!groupedByPerner[perner]) {
+            groupedByPerner[perner] = {};
+          }
+          if (!groupedByPerner[perner][row.att_type]) {
+            groupedByPerner[perner][row.att_type] = [];
+          }
+          groupedByPerner[perner][row.att_type].push(row);
+        });
+
+        const result = [];
+
+        Object.keys(groupedByPerner).forEach((perner) => {
+          Object.keys(groupedByPerner[perner]).forEach((attType) => {
+            const sortedData = groupedByPerner[perner][attType].sort(
+              (a, b) => new Date(a.tanggal) - new Date(b.tanggal)
+            );
+
+            let currentPeriod = null;
+
+            sortedData.forEach((row, index) => {
+              const currentDate = new Date(row.tanggal);
+
+              if (!currentPeriod) {
+                currentPeriod = {
+                  perner: perner,
+                  tanggal_mulai: row.tanggal,
+                  tanggal_akhir: row.tanggal,
+                  att_type: row.att_type,
+                  description: row.description,
+                  kode: row.kode,
+                };
+              } else {
+                const lastDate = new Date(currentPeriod.tanggal_akhir);
+                const daysDiff =
+                  Math.abs(currentDate - lastDate) / (1000 * 60 * 60 * 24);
+
+                const isConsecutive = daysDiff <= 1;
+                const isSameType = row.att_type === currentPeriod.att_type;
+                const isSameDescription =
+                  row.description === currentPeriod.description;
+                const isSameKode = row.kode === currentPeriod.kode;
+
+                if (
+                  isConsecutive &&
+                  isSameType &&
+                  isSameDescription &&
+                  isSameKode
+                ) {
+                  currentPeriod.tanggal_akhir = row.tanggal;
+                } else {
+                  result.push({ ...currentPeriod });
+                  currentPeriod = {
+                    perner: perner,
+                    tanggal_mulai: row.tanggal,
+                    tanggal_akhir: row.tanggal,
+                    att_type: row.att_type,
+                    description: row.description,
+                    kode: row.kode,
+                  };
+                }
+              }
+
+              if (index === sortedData.length - 1) {
+                result.push({ ...currentPeriod });
+              }
+            });
+          });
+        });
+
+        console.log(
+          `✅ Date range conversion complete: ${result.length} periods`
+        );
+        return result;
+      }
+
+      // Display input table with filters
+      function displayInputTable(data) {
+        if (data.length === 0) {
+          document.getElementById("inputTableContent").innerHTML =
+            '<div class="empty-state">No input data found</div>';
+          return;
+        }
+
+        let tableHTML = `
+                <table class="data-table" id="inputDataTable">
+                    <thead>
+                        <tr>
+                            <th style="width: 50px;">
+                                <div class="header-content">
+                                    <span>No</span>
+                                </div>
+                            </th>
+                            <th style="width: 100px;">
+                                <div class="header-content">
+                                    <span>PERNER</span>
+                                    <div class="filter-dropdown">
+                                        <button class="filter-btn" id="input-filter-btn-perner" onclick="toggleFilter('input', 'perner')">
+                                            Filter <span>▼</span>
+                                        </button>
+                                        <span class="filter-indicator" id="input-filter-indicator-perner"></span>
+                                        <div class="filter-content" id="input-filter-perner">
+                                            <div class="filter-search">
+                                                <input type="text" id="input-filter-search-perner" placeholder="Search...">
+                                            </div>
+                                            <div class="filter-options" id="input-filter-options-perner"></div>
+                                            <div class="filter-actions">
+                                                <button class="btn-apply-filter" onclick="applyFilter('input', 'perner')">Apply</button>
+                                                <button class="btn-clear-filter" onclick="clearFilter('input', 'perner')">Clear</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </th>
+                            <th style="width: 100px;">
+                                <div class="header-content">
+                                    <span>Tanggal</span>
+                                    <div class="filter-dropdown">
+                                        <button class="filter-btn" id="input-filter-btn-tanggal" onclick="toggleFilter('input', 'tanggal')">
+                                            Filter <span>▼</span>
+                                        </button>
+                                        <span class="filter-indicator" id="input-filter-indicator-tanggal"></span>
+                                        <div class="filter-content" id="input-filter-tanggal">
+                                            <div class="filter-search">
+                                                <input type="text" id="input-filter-search-tanggal" placeholder="Search date...">
+                                            </div>
+                                            <div class="filter-options" id="input-filter-options-tanggal"></div>
+                                            <div class="filter-actions">
+                                                <button class="btn-apply-filter" onclick="applyFilter('input', 'tanggal')">Apply</button>
+                                                <button class="btn-clear-filter" onclick="clearFilter('input', 'tanggal')">Clear</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </th>
+                            <th style="width: 80px;">
+                                <div class="header-content">
+                                    <span>Tipe</span>
+                                    <div class="filter-dropdown">
+                                        <button class="filter-btn" id="input-filter-btn-tipe" onclick="toggleFilter('input', 'tipe')">
+                                            Filter <span>▼</span>
+                                        </button>
+                                        <span class="filter-indicator" id="input-filter-indicator-tipe"></span>
+                                        <div class="filter-content" id="input-filter-tipe">
+                                            <div class="filter-options" id="input-filter-options-tipe"></div>
+                                            <div class="filter-actions">
+                                                <button class="btn-apply-filter" onclick="applyFilter('input', 'tipe')">Apply</button>
+                                                <button class="btn-clear-filter" onclick="clearFilter('input', 'tipe')">Clear</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </th>
+                            <th style="width: 80px;">
+                                <div class="header-content">
+                                    <span>Kode</span>
+                                    <div class="filter-dropdown">
+                                        <button class="filter-btn" id="input-filter-btn-kode" onclick="toggleFilter('input', 'kode')">
+                                            Filter <span>▼</span>
+                                        </button>
+                                        <span class="filter-indicator" id="input-filter-indicator-kode"></span>
+                                        <div class="filter-content" id="input-filter-kode">
+                                            <div class="filter-search">
+                                                <input type="text" id="input-filter-search-kode" placeholder="Search code...">
+                                            </div>
+                                            <div class="filter-options" id="input-filter-options-kode"></div>
+                                            <div class="filter-actions">
+                                                <button class="btn-apply-filter" onclick="applyFilter('input', 'kode')">Apply</button>
+                                                <button class="btn-clear-filter" onclick="clearFilter('input', 'kode')">Clear</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </th>
+                            <th style="width: 200px;">
+                                <div class="header-content">
+                                    <span>Deskripsi</span>
+                                    <div class="filter-dropdown">
+                                        <button class="filter-btn" id="input-filter-btn-description" onclick="toggleFilter('input', 'description')">
+                                            Filter <span>▼</span>
+                                        </button>
+                                        <span class="filter-indicator" id="input-filter-indicator-description"></span>
+                                        <div class="filter-content" id="input-filter-description">
+                                            <div class="filter-search">
+                                                <input type="text" id="input-filter-search-description" placeholder="Search description...">
+                                            </div>
+                                            <div class="filter-options" id="input-filter-options-description"></div>
+                                            <div class="filter-actions">
+                                                <button class="btn-apply-filter" onclick="applyFilter('input', 'description')">Apply</button>
+                                                <button class="btn-clear-filter" onclick="clearFilter('input', 'description')">Clear</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </th>
+                                                   </tr>
+                    </thead>
+                    <tbody id="inputTableBody"></tbody>
+                </table>
+            `;
+
+        document.getElementById("inputTableContent").innerHTML = tableHTML;
+
+        // Initialize filtered data
+        filteredInputData = [...data];
+        updateInputTableDisplay();
+      }
+
+      // Display output table with filters
+      function displayOutputTable(data) {
+        if (data.length === 0) {
+          document.getElementById("outputTableContent").innerHTML =
+            '<div class="empty-state">No output periods generated</div>';
+          return;
+        }
+
+        let tableHTML = `
+                <table class="data-table" id="outputDataTable">
+                    <thead>
+                        <tr>
+                            <th style="width: 50px;">
+                                <div class="header-content">
+                                    <span>No</span>
+                                </div>
+                            </th>
+                            <th style="width: 100px;">
+                                <div class="header-content">
+                                    <span>PERNER</span>
+                                    <div class="filter-dropdown">
+                                        <button class="filter-btn" id="output-filter-btn-perner" onclick="toggleFilter('output', 'perner')">
+                                            Filter <span>▼</span>
+                                        </button>
+                                        <span class="filter-indicator" id="output-filter-indicator-perner"></span>
+                                        <div class="filter-content" id="output-filter-perner">
+                                            <div class="filter-search">
+                                                <input type="text" id="output-filter-search-perner" placeholder="Search...">
+                                            </div>
+                                            <div class="filter-options" id="output-filter-options-perner"></div>
+                                            <div class="filter-actions">
+                                                <button class="btn-apply-filter" onclick="applyFilter('output', 'perner')">Apply</button>
+                                                <button class="btn-clear-filter" onclick="clearFilter('output', 'perner')">Clear</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </th>
+                            <th style="width: 110px;">
+                                <div class="header-content">
+                                    <span>Tanggal Mulai</span>
+                                    <div class="filter-dropdown">
+                                        <button class="filter-btn" id="output-filter-btn-start_date" onclick="toggleFilter('output', 'start_date')">
+                                            Filter <span>▼</span>
+                                        </button>
+                                        <span class="filter-indicator" id="output-filter-indicator-start_date"></span>
+                                        <div class="filter-content" id="output-filter-start_date">
+                                            <div class="filter-search">
+                                                <input type="text" id="output-filter-search-start_date" placeholder="Search date...">
+                                            </div>
+                                            <div class="filter-options" id="output-filter-options-start_date"></div>
+                                            <div class="filter-actions">
+                                                <button class="btn-apply-filter" onclick="applyFilter('output', 'start_date')">Apply</button>
+                                                <button class="btn-clear-filter" onclick="clearFilter('output', 'start_date')">Clear</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </th>
+                            <th style="width: 110px;">
+                                <div class="header-content">
+                                    <span>Tanggal Akhir</span>
+                                    <div class="filter-dropdown">
+                                        <button class="filter-btn" id="output-filter-btn-end_date" onclick="toggleFilter('output', 'end_date')">
+                                            Filter <span>▼</span>
+                                        </button>
+                                        <span class="filter-indicator" id="output-filter-indicator-end_date"></span>
+                                        <div class="filter-content" id="output-filter-end_date">
+                                            <div class="filter-search">
+                                                <input type="text" id="output-filter-search-end_date" placeholder="Search date...">
+                                            </div>
+                                            <div class="filter-options" id="output-filter-options-end_date"></div>
+                                            <div class="filter-actions">
+                                                <button class="btn-apply-filter" onclick="applyFilter('output', 'end_date')">Apply</button>
+                                                <button class="btn-clear-filter" onclick="clearFilter('output', 'end_date')">Clear</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </th>
+                            <th style="width: 80px;">
+                                <div class="header-content">
+                                    <span>Kode</span>
+                                    <div class="filter-dropdown">
+                                        <button class="filter-btn" id="output-filter-btn-kode" onclick="toggleFilter('output', 'kode')">
+                                            Filter <span>▼</span>
+                                        </button>
+                                        <span class="filter-indicator" id="output-filter-indicator-kode"></span>
+                                        <div class="filter-content" id="output-filter-kode">
+                                            <div class="filter-search">
+                                                <input type="text" id="output-filter-search-kode" placeholder="Search code...">
+                                            </div>
+                                            <div class="filter-options" id="output-filter-options-kode"></div>
+                                            <div class="filter-actions">
+                                                <button class="btn-apply-filter" onclick="applyFilter('output', 'kode')">Apply</button>
+                                                <button class="btn-clear-filter" onclick="clearFilter('output', 'kode')">Clear</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </th>
+                            <th style="width: 80px;">
+                                <div class="header-content">
+                                    <span>Tipe</span>
+                                    <div class="filter-dropdown">
+                                        <button class="filter-btn" id="output-filter-btn-tipe" onclick="toggleFilter('output', 'tipe')">
+                                            Filter <span>▼</span>
+                                        </button>
+                                        <span class="filter-indicator" id="output-filter-indicator-tipe"></span>
+                                        <div class="filter-content" id="output-filter-tipe">
+                                            <div class="filter-options" id="output-filter-options-tipe"></div>
+                                            <div class="filter-actions">
+                                                <button class="btn-apply-filter" onclick="applyFilter('output', 'tipe')">Apply</button>
+                                                <button class="btn-clear-filter" onclick="clearFilter('output', 'tipe')">Clear</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </th>
+                            <th style="width: 200px;">
+                                <div class="header-content">
+                                    <span>Deskripsi</span>
+                                    <div class="filter-dropdown">
+                                        <button class="filter-btn" id="output-filter-btn-description" onclick="toggleFilter('output', 'description')">
+                                            Filter <span>▼</span>
+                                        </button>
+                                        <span class="filter-indicator" id="output-filter-indicator-description"></span>
+                                        <div class="filter-content" id="output-filter-description">
+                                            <div class="filter-search">
+                                                <input type="text" id="output-filter-search-description" placeholder="Search description...">
+                                            </div>
+                                            <div class="filter-options" id="output-filter-options-description"></div>
+                                            <div class="filter-actions">
+                                                <button class="btn-apply-filter" onclick="applyFilter('output', 'description')">Apply</button>
+                                                <button class="btn-clear-filter" onclick="clearFilter('output', 'description')">Clear</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </th>
+                            <th style="width: 100px;">
+                                <div class="header-content">
+                                    <span>Durasi (Hari)</span>
+                                    <div class="filter-dropdown">
+                                        <button class="filter-btn" id="output-filter-btn-durasi" onclick="toggleFilter('output', 'durasi')">
+                                            Filter <span>▼</span>
+                                        </button>
+                                        <span class="filter-indicator" id="output-filter-indicator-durasi"></span>
+                                        <div class="filter-content" id="output-filter-durasi">
+                                            <div class="filter-options" id="output-filter-options-durasi"></div>
+                                            <div class="filter-actions">
+                                                <button class="btn-apply-filter" onclick="applyFilter('output', 'durasi')">Apply</button>
+                                                <button class="btn-clear-filter" onclick="clearFilter('output', 'durasi')">Clear</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody id="outputTableBody"></tbody>
+                </table>
+            `;
+
+        document.getElementById("outputTableContent").innerHTML = tableHTML;
+
+        // Initialize filtered data
+        filteredOutputData = [...data];
+        updateOutputTableDisplay();
+      }
+
+      // Update input table display
+      function updateInputTableDisplay() {
+        const tbody = document.getElementById("inputTableBody");
+        if (!tbody) return;
+
+        let tableHTML = "";
+
+        filteredInputData.forEach((row, index) => {
+          const formatDate = (dateStr) => {
+            const date = new Date(dateStr);
+            return date.toLocaleDateString("id-ID");
+          };
+
+          const typeClass = row.att_type === "att" ? "type-att" : "type-abs";
+          const originalType = row.original_value
+            .toLowerCase()
+            .includes("sppd_umum")
+            ? "type-sppd"
+            : typeClass;
+
+          tableHTML += `
+                    <tr data-perner="${row.perner}" data-tanggal="${
+            row.tanggal
+          }">
+                        <td>${index + 1}</td>
+                        <td><strong>${row.perner}</strong></td>
+                        <td>${formatDate(row.tanggal)}</td>
+                        <td>
+                            <span class="type-badge ${typeClass}">
+                                ${row.att_type.toUpperCase()}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="code-badge ${typeClass}">
+                                ${row.kode}
+                            </span>
+                        </td>
+                        <td title="${row.description}">${row.description}</td>
+                      
+                    </tr>
+                `;
+        });
+
+        tbody.innerHTML = tableHTML;
+        updateInputStats();
+      }
+
+      // Update output table display
+      function updateOutputTableDisplay() {
+        const tbody = document.getElementById("outputTableBody");
+        if (!tbody) return;
+
+        let tableHTML = "";
+
+        filteredOutputData.forEach((period, index) => {
+          const startDate = new Date(period.tanggal_mulai);
+          const endDate = new Date(period.tanggal_akhir);
+          const duration =
+            Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
+
+          const formatDate = (date) => date.toLocaleDateString("id-ID");
+          const typeClass = period.att_type === "att" ? "type-att" : "type-abs";
+
+          tableHTML += `
+                    <tr data-perner="${period.perner}" data-start="${
+            period.tanggal_mulai
+          }" data-end="${period.tanggal_akhir}">
+                        <td>${index + 1}</td>
+                        <td><strong>${period.perner}</strong></td>
+                        <td>${formatDate(startDate)}</td>
+                        <td>${formatDate(endDate)}</td>
+                        <td>
+                            <span class="code-badge ${typeClass}">
+                                ${period.kode}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="type-badge ${typeClass}">
+                                ${period.att_type.toUpperCase()}
+                            </span>
+                        </td>
+                        <td title="${period.description}">${
+            period.description
+          }</td>
+                        <td>${duration} hari</td>
+                    </tr>
+                `;
+        });
+
+        tbody.innerHTML = tableHTML;
+        updateOutputStats();
+      }
+
+      // Filter functionality
+      function toggleFilter(tableType, column) {
+        const dropdown = document.getElementById(
+          `${tableType}-filter-${column}`
+        );
+        const isVisible = dropdown.classList.contains("show");
+
+        // Close all other dropdowns
+        closeAllFilterDropdowns();
+
+        if (!isVisible) {
+          populateFilterOptions(tableType, column);
+          dropdown.classList.add("show");
+        }
+      }
+
+      function closeAllFilterDropdowns() {
+        document.querySelectorAll(".filter-content").forEach((dropdown) => {
+          dropdown.classList.remove("show");
+        });
+      }
+
+      function populateFilterOptions(tableType, column) {
+        const optionsContainer = document.getElementById(
+          `${tableType}-filter-options-${column}`
+        );
+        const searchInput = document.getElementById(
+          `${tableType}-filter-search-${column}`
+        );
+
+        const data = tableType === "input" ? inputData : outputData;
+        let uniqueValues = [];
+
+        switch (column) {
+          case "perner":
+            uniqueValues = [...new Set(data.map((r) => r.perner))].sort();
+            break;
+          case "tanggal":
+            uniqueValues = [
+              ...new Set(
+                data.map((r) => new Date(r.tanggal).toLocaleDateString("id-ID"))
+              ),
+            ].sort();
+            break;
+          case "start_date":
+            uniqueValues = [
+              ...new Set(
+                data.map((r) =>
+                  new Date(r.tanggal_mulai).toLocaleDateString("id-ID")
+                )
+              ),
+            ].sort();
+            break;
+          case "end_date":
+            uniqueValues = [
+              ...new Set(
+                data.map((r) =>
+                  new Date(r.tanggal_akhir).toLocaleDateString("id-ID")
+                )
+              ),
+            ].sort();
+            break;
+          case "tipe":
+            uniqueValues = [
+              ...new Set(data.map((r) => r.att_type.toUpperCase())),
+            ].sort();
+            break;
+          case "kode":
+            uniqueValues = [...new Set(data.map((r) => r.kode))].sort();
+            break;
+          case "description":
+            uniqueValues = [...new Set(data.map((r) => r.description))].sort();
+            break;
+          case "original":
+            uniqueValues = [
+              ...new Set(data.map((r) => r.original_value)),
+            ].sort();
+            break;
+          case "durasi":
+            const durations = data.map((r) => {
+              const startDate = new Date(r.tanggal_mulai);
+              const endDate = new Date(r.tanggal_akhir);
+              return (
+                Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1
+              );
+            });
+            uniqueValues = [...new Set(durations)].sort((a, b) => a - b);
+            break;
+        }
+
+        // Populate options
+        let optionsHTML = "";
+        uniqueValues.forEach((value) => {
+          const filters = tableType === "input" ? inputFilters : outputFilters;
+          const isSelected = filters[column] && filters[column].includes(value);
+          optionsHTML += `
+                    <div class="filter-option ${
+                      isSelected ? "selected" : ""
+                    }" onclick="toggleFilterOption('${tableType}', '${column}', '${value}')">
+                        <input type="checkbox" class="filter-checkbox" ${
+                          isSelected ? "checked" : ""
+                        } onchange="event.stopPropagation()">
+                        <span>${value}</span>
+                    </div>
+                `;
+        });
+
+        optionsContainer.innerHTML = optionsHTML;
+
+        // Setup search functionality
+        if (searchInput) {
+          searchInput.value = "";
+          searchInput.oninput = function () {
+            filterOptionsSearch(tableType, column, this.value);
+          };
+        }
+      }
+
+      function toggleFilterOption(tableType, column, value) {
+        const filters = tableType === "input" ? inputFilters : outputFilters;
+
+        if (!filters[column]) {
+          filters[column] = [];
+        }
+
+        const index = filters[column].indexOf(value);
+        if (index > -1) {
+          filters[column].splice(index, 1);
+        } else {
+          filters[column].push(value);
+        }
+
+        // Update checkbox state
+        const option = event.currentTarget;
+        const checkbox = option.querySelector(".filter-checkbox");
+        checkbox.checked = !checkbox.checked;
+        option.classList.toggle("selected");
+      }
+
+      function filterOptionsSearch(tableType, column, searchTerm) {
+        const options = document.querySelectorAll(
+          `#${tableType}-filter-options-${column} .filter-option`
+        );
+        options.forEach((option) => {
+          const text = option.textContent.toLowerCase();
+          const match = text.includes(searchTerm.toLowerCase());
+          option.style.display = match ? "flex" : "none";
+        });
+      }
+
+      function applyFilter(tableType, column) {
+        applyAllFilters(tableType);
+        closeAllFilterDropdowns();
+        updateFilterIndicators(tableType);
+      }
+
+      function clearFilter(tableType, column) {
+        const filters = tableType === "input" ? inputFilters : outputFilters;
+        delete filters[column];
+        applyAllFilters(tableType);
+        closeAllFilterDropdowns();
+        updateFilterIndicators(tableType);
+      }
+
+      function clearAllFilters(tableType) {
+        if (tableType === "input") {
+          inputFilters = {};
+          filteredInputData = [...inputData];
+          updateInputTableDisplay();
+        } else {
+          outputFilters = {};
+          filteredOutputData = [...outputData];
+          updateOutputTableDisplay();
+        }
+        updateFilterIndicators(tableType);
+        updateFilterStatus(tableType);
+      }
+
+      function applyAllFilters(tableType) {
+        const filters = tableType === "input" ? inputFilters : outputFilters;
+        const data = tableType === "input" ? inputData : outputData;
+
+        if (Object.keys(filters).length === 0) {
+          if (tableType === "input") {
+            filteredInputData = [...data];
+          } else {
+            filteredOutputData = [...data];
+          }
+        } else {
+          const filtered = data.filter((item) => {
+            return Object.keys(filters).every((column) => {
+              if (!filters[column] || filters[column].length === 0) {
+                return true;
+              }
+
+              let valueToCheck;
+              switch (column) {
+                case "perner":
+                  valueToCheck = item.perner;
+                  break;
+                case "tanggal":
+                  valueToCheck = new Date(item.tanggal).toLocaleDateString(
+                    "id-ID"
+                  );
+                  break;
+                case "start_date":
+                  valueToCheck = new Date(
+                    item.tanggal_mulai
+                  ).toLocaleDateString("id-ID");
+                  break;
+                case "end_date":
+                  valueToCheck = new Date(
+                    item.tanggal_akhir
+                  ).toLocaleDateString("id-ID");
+                  break;
+                case "tipe":
+                  valueToCheck = item.att_type.toUpperCase();
+                  break;
+                case "kode":
+                  valueToCheck = item.kode;
+                  break;
+                case "description":
+                  valueToCheck = item.description;
+                  break;
+                case "original":
+                  valueToCheck = item.original_value;
+                  break;
+                case "durasi":
+                  const startDate = new Date(item.tanggal_mulai);
+                  const endDate = new Date(item.tanggal_akhir);
+                  valueToCheck =
+                    Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)) +
+                    1;
+                  break;
+              }
+
+              return filters[column].includes(valueToCheck);
+            });
+          });
+
+          if (tableType === "input") {
+            filteredInputData = filtered;
+          } else {
+            filteredOutputData = filtered;
+          }
+        }
+
+        // Update display
+        if (tableType === "input") {
+          updateInputTableDisplay();
+        } else {
+          updateOutputTableDisplay();
+        }
+        updateFilterStatus(tableType);
+      }
+
+      function updateFilterIndicators(tableType) {
+        const filters = tableType === "input" ? inputFilters : outputFilters;
+        const columns =
+          tableType === "input"
+            ? ["perner", "tanggal", "tipe", "kode", "description", "original"]
+            : [
+                "perner",
+                "start_date",
+                "end_date",
+                "kode",
+                "tipe",
+                "description",
+                "durasi",
+              ];
+
+        columns.forEach((column) => {
+          const indicator = document.getElementById(
+            `${tableType}-filter-indicator-${column}`
+          );
+          const btn = document.getElementById(
+            `${tableType}-filter-btn-${column}`
+          );
+
+          if (indicator && btn) {
+            const count = filters[column] ? filters[column].length : 0;
+
+            if (count > 0) {
+              indicator.style.display = "flex";
+              indicator.textContent = count;
+              btn.innerHTML = `Filter (${count}) <span>▼</span>`;
+            } else {
+              indicator.style.display = "none";
+              btn.innerHTML = `Filter <span>▼</span>`;
+            }
+          }
+        });
+      }
+
+      function updateFilterStatus(tableType) {
+        const filters = tableType === "input" ? inputFilters : outputFilters;
+        const statusBar = document.getElementById(`${tableType}FilterStatus`);
+        const totalFilters = Object.keys(filters).length;
+        const filteredData =
+          tableType === "input" ? filteredInputData : filteredOutputData;
+        const originalData = tableType === "input" ? inputData : outputData;
+
+        if (totalFilters > 0) {
+          const totalResults = filteredData.length;
+          const totalOriginal = originalData.length;
+          statusBar.innerHTML = `
+                    🔍 Showing ${totalResults} of ${totalOriginal} ${tableType} records with ${totalFilters} active filter(s)
+                    <button class="clear-all-filters" onclick="clearAllFilters('${tableType}')">Clear All</button>
+                `;
+          statusBar.classList.add("active");
+        } else {
+          statusBar.classList.remove("active");
+        }
+      }
+
+      function updateInputStats() {
+        const inputAttCount = filteredInputData.filter(
+          (r) => r.att_type === "att"
+        ).length;
+        const inputAbsCount = filteredInputData.filter(
+          (r) => r.att_type === "abs"
+        ).length;
+        const inputSppdCount = filteredInputData.filter((r) =>
+          r.original_value.toLowerCase().includes("sppd_umum")
+        ).length;
+        const inputPernerCount = new Set(filteredInputData.map((r) => r.perner))
+          .size;
+
+        document.getElementById("inputTotalRecords").textContent =
+          filteredInputData.length;
+        document.getElementById("inputTotalPerner").textContent =
+          inputPernerCount;
+        document.getElementById("inputAttRecords").textContent = inputAttCount;
+        document.getElementById("inputAbsRecords").textContent = inputAbsCount;
+        document.getElementById("inputSppdRecords").textContent =
+          inputSppdCount;
+      }
+
+      function updateOutputStats() {
+        const outputAttCount = filteredOutputData.filter(
+          (r) => r.att_type === "att"
+        ).length;
+        const outputAbsCount = filteredOutputData.filter(
+          (r) => r.att_type === "abs"
+        ).length;
+        const outputPernerCount = new Set(
+          filteredOutputData.map((r) => r.perner)
+        ).size;
+
+        document.getElementById("outputTotalPeriods").textContent =
+          filteredOutputData.length;
+        document.getElementById("outputTotalPerner").textContent =
+          outputPernerCount;
+        document.getElementById("outputAttPeriods").textContent =
+          outputAttCount;
+        document.getElementById("outputAbsPeriods").textContent =
+          outputAbsCount;
+      }
+
+      // Export individual tables
+      function exportInputTable() {
+        if (filteredInputData.length === 0) {
+          showStatus("No input data to export", "error");
+          return;
+        }
+
+        // Normalizer & formatter tanggal → dd/mm/yyyy
+        const formatDateForExport = (val) => {
+          if (!val) return "";
+
+          // Jika sudah Date object yang valid
+          if (val instanceof Date && !isNaN(val.getTime())) {
+            const d = val;
+            const dd = String(d.getDate()).padStart(2, "0");
+            const mm = String(d.getMonth() + 1).padStart(2, "0");
+            const yyyy = d.getFullYear();
+            return `${dd}/${mm}/${yyyy}`;
+          }
+
+          // Pastikan string
+          let s = String(val).trim();
+
+          // Jika ISO (ada 'T'), ambil bagian tanggalnya saja untuk hindari offset timezone
+          if (s.includes("T")) s = s.split("T")[0];
+
+          // Pola YYYY-MM-DD atau YYYY/MM/DD
+          let m = s.match(/^(\d{4})[-/](\d{2})[-/](\d{2})$/);
+          if (m) return `${m[3]}/${m[2]}/${m[1]}`;
+
+          // Pola DD-MM-YYYY atau DD.MM.YYYY → ubah separator ke '/'
+          m = s.match(/^(\d{2})[-.](\d{2})[-.](\d{4})$/);
+          if (m) return `${m[1]}/${m[2]}/${m[3]}`;
+
+          // Kalau sudah dd/mm/yyyy atau format lain—biarkan apa adanya
+          return s;
+        };
+
+        const exportData = filteredInputData.map((row, index) => ({
+          No: index + 1,
+          PERNER: row.perner,
+          Tanggal: formatDateForExport(row.tanggal),
+          Tipe: row.att_type?.toUpperCase?.() || "",
+          Kode: row.kode ?? "",
+          Deskripsi: row.description ?? "",
+          // "Original Value": row.original_value ?? "",
+        }));
+
+        const timestamp = new Date()
+          .toISOString()
+          .replace(/[:.]/g, "-")
+          .slice(0, -5);
+        const filename = `input_data_${timestamp}`;
+        exportExcel(exportData, filename);
+
+        showStatus(
+          `📊 Exported ${filteredInputData.length} input records to Excel`,
+          "success"
+        );
+      }
+
+      function formatDate(value) {
+        if (!value) return "";
+        const date = new Date(value);
+        if (isNaN(date.getTime())) return value; // kalau bukan tanggal valid, biarkan apa adanya
+
+        const day = String(date.getDate()).padStart(2, "0");
+        const month = String(date.getMonth() + 1).padStart(2, "0");
+        const year = date.getFullYear();
+        return `${day}/${month}/${year}`;
+      }
+
+      function exportOutputTable() {
+        if (filteredOutputData.length === 0) {
+          showStatus("No output data to export", "error");
+          return;
+        }
+
+        const exportData = filteredOutputData.map((period, index) => {
+          // Hitung durasi
+          let duration = 1;
+          try {
+            const startDate = new Date(period.tanggal_mulai);
+            const endDate = new Date(period.tanggal_akhir);
+
+            if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
+              duration =
+                Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
+            }
+          } catch (error) {
+            console.warn("Duration calculation error:", error);
+          }
+
+          return {
+            No: index + 1,
+            PERNER: period.perner,
+            "Tanggal Mulai": formatDate(period.tanggal_mulai),
+            "Tanggal Akhir": formatDate(period.tanggal_akhir),
+            Kode: period.kode,
+            Tipe: period.att_type?.toUpperCase() || "",
+            Deskripsi: period.description,
+            "Durasi (Hari)": duration,
+          };
+        });
+
+        const timestamp = new Date()
+          .toISOString()
+          .replace(/[:.]/g, "-")
+          .slice(0, -5);
+        const filename = `output_periods_${timestamp}`;
+        exportExcel(exportData, filename);
+
+        showStatus(
+          `📈 Exported ${filteredOutputData.length} output periods to Excel`,
+          "success"
+        );
+      }
+
+      // Update all statistics
+      function updateAllStats() {
+        // Update both filtered and original stats
+        updateInputStats();
+        updateOutputStats();
+
+        // Header stats (original counts)
+        document.getElementById(
+          "totalInputRecords"
+        ).innerHTML = `<strong>Input Records:</strong> ${inputData.length.toLocaleString()}`;
+        document.getElementById(
+          "totalOutputRecords"
+        ).innerHTML = `<strong>Output Periods:</strong> ${outputData.length.toLocaleString()}`;
+      }
+
+      // Show status message
+      function showStatus(message, type) {
+        const statusDiv = document.getElementById("statusMessage");
+        statusDiv.innerHTML = `<div class="status-message status-${type}">${message}</div>`;
+
+        if (type === "success" || type === "info") {
+          setTimeout(() => {
+            statusDiv.innerHTML = "";
+          }, 5000);
+        }
+      }
+
+      // Set loading state
+      function setLoadingState(isLoading) {
+        const refreshBtn = document.getElementById("refreshBtn");
+        if (isLoading) {
+          refreshBtn.classList.add("btn-loading");
+          refreshBtn.disabled = true;
+        } else {
+          refreshBtn.classList.remove("btn-loading");
+          refreshBtn.disabled = false;
+        }
+      }
+
+      // Toggle export buttons
+      function toggleExportButtons(enabled) {
+        document.getElementById("exportCsvBtn").disabled = !enabled;
+        document.getElementById("exportExcelBtn").disabled = !enabled;
+        document.getElementById("exportInputBtn").disabled = !enabled;
+        document.getElementById("exportOutputBtn").disabled = !enabled;
+      }
+
+      // Clear all data
+      function clearData() {
+        inputData = [];
+        outputData = [];
+        filteredInputData = [];
+        filteredOutputData = [];
+        inputFilters = {};
+        outputFilters = {};
+
+        document.getElementById("inputTableContent").innerHTML =
+          '<div class="empty-state">No input data</div>';
+        document.getElementById("outputTableContent").innerHTML =
+          '<div class="empty-state">No output data</div>';
+
+        // Reset stats
+        const resetElements = [
+          "inputTotalRecords",
+          "inputTotalPerner",
+          "inputAttRecords",
+          "inputAbsRecords",
+          "inputSppdRecords",
+          "outputTotalPeriods",
+          "outputTotalPerner",
+          "outputAttPeriods",
+          "outputAbsPeriods",
+        ];
+
+        resetElements.forEach((id) => {
+          document.getElementById(id).textContent = "0";
+        });
+
+        document.getElementById("totalInputRecords").innerHTML =
+          "<strong>Input Records:</strong> 0";
+        document.getElementById("totalOutputRecords").innerHTML =
+          "<strong>Output Periods:</strong> 0";
+        document.getElementById("updateTime").textContent = "-";
+
+        // Reset filter status
+        document.getElementById("inputFilterStatus").classList.remove("active");
+        document
+          .getElementById("outputFilterStatus")
+          .classList.remove("active");
+
+        toggleExportButtons(false);
+        showStatus("Data cleared", "info");
+      }
+
+      // Export results (combined export)
+      function exportResults(format) {
+        if (outputData.length === 0) {
+          showStatus("No data to export", "error");
+          return;
+        }
+
+        const exportData = outputData.map((period, index) => {
+          // Fix date formatting - use original date string to avoid timezone issues
+          const formatDateForExport = (dateStr) => {
+            if (!dateStr) return "";
+
+            try {
+              // Handle different date formats
+              let date;
+
+              if (dateStr.includes("T")) {
+                // ISO format: 2025-07-06T16:00:00.000Z
+                date = new Date(dateStr);
+              } else if (dateStr.includes("-")) {
+                // YYYY-MM-DD format
+                const [year, month, day] = dateStr.split("-");
+                date = new Date(
+                  parseInt(year),
+                  parseInt(month) - 1,
+                  parseInt(day)
+                );
+              } else {
+                // Try parsing as is
+                date = new Date(dateStr);
+              }
+
+              // Check if date is valid
+              if (isNaN(date.getTime())) {
+                return dateStr; // Return original if parsing fails
+              }
+
+              // Format as DD/MM/YYYY
+              const day = date.getDate().toString().padStart(2, "0");
+              const month = (date.getMonth() + 1).toString().padStart(2, "0");
+              const year = date.getFullYear();
+
+              return `${day}/${month}/${year}`;
+            } catch (error) {
+              console.warn(
+                "Date formatting error:",
+                error,
+                "for date:",
+                dateStr
+              );
+              return dateStr; // Return original on error
+            }
+          };
+
+          const startDate = new Date(period.tanggal_mulai);
+          const endDate = new Date(period.tanggal_akhir);
+          const duration =
+            Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
+
+          return {
+            No: index + 1,
+            PERNER: period.perner,
+            "Tanggal Mulai": formatDateForExport(period.tanggal_mulai),
+            "Tanggal Akhir": formatDateForExport(period.tanggal_akhir),
+            kode: period.kode,
+            tipe: period.att_type.toUpperCase(),
+            Deskripsi: period.description,
+            "Durasi (Hari)": duration,
+          };
+        });
+
+        const timestamp = new Date()
+          .toISOString()
+          .replace(/[:.]/g, "-")
+          .slice(0, -5);
+        const filename = `date_ranges_all_${timestamp}`;
+
+        if (format === "csv") {
+          exportCSV(exportData, filename);
+        } else if (format === "excel") {
+          exportExcel(exportData, filename);
+        }
+
+        showStatus(
+          `📁 Exported ${outputData.length} records as ${format.toUpperCase()}`,
+          "success"
+        );
+      }
+
+      // Export to CSV
+      function exportCSV(data, filename) {
+        const headers = Object.keys(data[0]);
+        let csvContent = headers.join(",") + "\n";
+
+        data.forEach((row) => {
+          const values = headers.map((header) => {
+            let value = row[header];
+            if (value == null) value = "";
+            value = String(value).replace(/"/g, '""');
+            if (
+              value.includes(",") ||
+              value.includes("\n") ||
+              value.includes('"')
+            ) {
+              value = `"${value}"`;
+            }
+            return value;
+          });
+          csvContent += values.join(",") + "\n";
+        });
+
+        const blob = new Blob([csvContent], {
+          type: "text/csv;charset=utf-8;",
+        });
+        const link = document.createElement("a");
+        const url = URL.createObjectURL(blob);
+        link.setAttribute("href", url);
+        link.setAttribute("download", filename + ".csv");
+        link.style.visibility = "hidden";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+
+      // Export to Excel
+      function exportExcel(data, filename) {
+        const headers = Object.keys(data[0]);
+        let htmlContent = "<table><thead><tr>";
+        headers.forEach((header) => {
+          htmlContent += `<th>${header}</th>`;
+        });
+        htmlContent += "</tr></thead><tbody>";
+
+        data.forEach((row) => {
+          htmlContent += "<tr>";
+          headers.forEach((header) => {
+            let value = row[header];
+            if (value == null) value = "";
+
+            // Add single quote prefix for 'kode' column to preserve leading zeros in Excel
+            if (header === "kode" || header === "Kode") {
+              if (value !== "" && value !== null && value !== undefined) {
+                value = `'${value}`;
+              }
+            }
+
+            htmlContent += `<td>${value}</td>`;
+          });
+          htmlContent += "</tr>";
+        });
+        htmlContent += "</tbody></table>";
+
+        const blob = new Blob([htmlContent], {
+          type: "application/vnd.ms-excel;charset=utf-8;",
+        });
+        const link = document.createElement("a");
+        const url = URL.createObjectURL(blob);
+        link.setAttribute("href", url);
+        link.setAttribute("download", filename + ".xls");
+        link.style.visibility = "hidden";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+
+      // Initialize page
+      document.addEventListener("DOMContentLoaded", function () {
+        console.log(
+          "🚀 Date Range Converter - Database Implementation with Filters initialized"
+        );
+
+        // Initialize global click handler for filter dropdowns
+        document.addEventListener("click", function (event) {
+          if (!event.target.closest(".filter-dropdown")) {
+            closeAllFilterDropdowns();
+          }
+        });
+
+        // Auto-load data when page loads
+        loadAndProcessData();
+      });
+
+      // Auto-refresh every 10 minutes
+      setInterval(loadAndProcessData, 10 * 60 * 1000);
+
+      // Debug helper functions (optional)
+      window.debugFilters = function () {
+        console.log("Input Filters:", inputFilters);
+        console.log("Output Filters:", outputFilters);
+        console.log(
+          "Filtered Input Data:",
+          filteredInputData.length,
+          "of",
+          inputData.length
+        );
+        console.log(
+          "Filtered Output Data:",
+          filteredOutputData.length,
+          "of",
+          outputData.length
+        );
+      };
+
+      window.debugData = function () {
+        console.log("Input Data Sample:", inputData.slice(0, 3));
+        console.log("Output Data Sample:", outputData.slice(0, 3));
+        console.log("Processing Stats:", processedStats);
+      };
+
+      // Keyboard shortcuts (optional)
+      document.addEventListener("keydown", function (e) {
+        if (e.ctrlKey || e.metaKey) {
+          switch (e.key) {
+            case "r":
+              e.preventDefault();
+              loadAndProcessData();
+              break;
+            case "e":
+              e.preventDefault();
+              if (outputData.length > 0) {
+                exportResults("excel");
+              }
+              break;
+          }
+        }
+      });
+
+      // Additional utility functions
+      function formatFileSize(bytes) {
+        if (bytes === 0) return "0 Bytes";
+        const k = 1024;
+        const sizes = ["Bytes", "KB", "MB", "GB"];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+      }
+
+      function getDataSummary() {
+        return {
+          input: {
+            total: inputData.length,
+            filtered: filteredInputData.length,
+            att: filteredInputData.filter((r) => r.att_type === "att").length,
+            abs: filteredInputData.filter((r) => r.att_type === "abs").length,
+            sppd: filteredInputData.filter((r) =>
+              r.original_value.toLowerCase().includes("sppd_umum")
+            ).length,
+          },
+          output: {
+            total: outputData.length,
+            filtered: filteredOutputData.length,
+            att: filteredOutputData.filter((r) => r.att_type === "att").length,
+            abs: filteredOutputData.filter((r) => r.att_type === "abs").length,
+          },
+          filters: {
+            input_active: Object.keys(inputFilters).length,
+            output_active: Object.keys(outputFilters).length,
+          },
+        };
+      }
+
+      // Expose utility functions to window for debugging
+      window.getDataSummary = getDataSummary;
+      window.clearAllData = clearData;
+      window.forceRefresh = loadAndProcessData;
+
+      console.log("📋 Date Range Converter fully loaded!");
+      console.log(
+        "🔧 Debug commands: debugFilters(), debugData(), getDataSummary()"
+      );
+      console.log(
+        "⌨️ Keyboard shortcuts: Ctrl+R (refresh), Ctrl+E (export excel)"
+      );
+    </script>
+  </body>
+</html>
