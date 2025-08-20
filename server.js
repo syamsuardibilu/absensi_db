@@ -514,7 +514,8 @@ app.post("/hapus-data-db", (req, res) => {
       kolom = "jenis_hari = NULL";
       break;
     case "ci_co_daily":
-      kolom = "daily_in = NULL, daily_out = NULL";
+      kolom =
+        "daily_in = NULL, daily_out = NULL, daily_in_cleansing = NULL, daily_out_cleansing = NULL";
       break;
     case "att_abs_daily":
       kolom = "att_daily = NULL, abs_daily = NULL";

@@ -784,6 +784,24 @@
         color: #2d3748;
         font-weight: 500;
       }
+
+      .btn-copy-pesan {
+        background: #48bb78;
+        color: white;
+        border: none;
+        padding: 6px 10px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 11px;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        align-self: flex-start;
+      }
+
+      .btn-copy-pesan:hover {
+        background: #38a169;
+        transform: translateY(-1px);
+      }
     </style>
   </head>
   <body>
@@ -1563,18 +1581,23 @@ ${totalHariKoreksi} dari ${hariKerja} hari kerja`;
             <td class="field-nip">${row.nip || "-"}</td>
             <td class="field-nama">${row.nama || "-"}</td>
             <td class="field-phone">${phoneNumber}</td>
-            <td class="field-pesan">
-                <div class="pesan-container">
-                <div class="pesan-preview" id="pesan-preview-${perner}">${pesanGenerated.substring(
+         <td class="field-pesan">
+              <div class="pesan-container">
+              <div class="pesan-preview" id="pesan-preview-${perner}">${pesanGenerated.substring(
             0,
             100
           )}...
-                </div>
+              </div>
+              <div style="display: flex; gap: 5px;">
                 <button class="btn-view-pesan" onclick="viewFullPesan('${perner}')">
                   📄 Lihat Pesan
                 </button>
+                <button class="btn-copy-pesan" onclick="copyPesanDirect('${perner}')">
+                  📋 Copy
+                </button>
               </div>
-            </td>
+            </div>
+        </td>
             <td class="field-wa">
               <a 
                 id="wa-${perner}" 
@@ -2107,6 +2130,46 @@ ${totalHariKoreksi} dari ${hariKerja} hari kerja`;
         }
 
         return stats;
+      }
+
+      // Copy pesan directly without opening modal
+      async function copyPesanDirect(perner) {
+        console.log(`📋 Direct copy pesan for PERNER: ${perner}`);
+
+        // Find the row data
+        const rowData = allData.find((row) => row.PERNER === perner);
+
+        if (!rowData) {
+          showNotification(`❌ Data untuk ${perner} tidak ditemukan`, "error");
+          return;
+        }
+
+        // Generate enhanced message
+        const fullPesan = generatePesan(rowData);
+
+        if (!fullPesan) {
+          showNotification(`❌ Gagal generate pesan untuk ${perner}`, "error");
+          return;
+        }
+
+        try {
+          await navigator.clipboard.writeText(fullPesan);
+          showNotification(`✅ Pesan ${perner} berhasil dicopy!`, "success");
+        } catch (err) {
+          console.error("Error copying to clipboard:", err);
+
+          // Fallback for older browsers
+          const textArea = document.createElement("textarea");
+          textArea.value = fullPesan;
+          textArea.style.position = "fixed";
+          textArea.style.opacity = "0";
+          document.body.appendChild(textArea);
+          textArea.select();
+          document.execCommand("copy");
+          document.body.removeChild(textArea);
+
+          showNotification(`✅ Pesan ${perner} berhasil dicopy!`, "success");
+        }
       }
 
       // Keyboard navigation
