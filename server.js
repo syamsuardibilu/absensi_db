@@ -6507,6 +6507,9 @@ app.listen(PORT, HOST, () => {
       console.log(
         `📶 LAN (akses dari device lain): http://${lan}:${PORT}/api/health`
       );
+      console.log(
+        `📟 LAN (akses dari device lain) untuk beranda: http://${lan}:${PORT}/`
+      );
     } else {
       console.log(
         "⚠️ Tidak menemukan IP LAN. Pastikan terhubung ke Wi-Fi/LAN."
