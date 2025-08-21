@@ -1,0 +1,459 @@
+<div class="content">
+        <div class="test-controls">
+            <div class="control-card">
+                <h3>🔍 Test All Cases</h3>
+                <p>Menjalankan semua test cases untuk validasi logic secara menyeluruh</p>
+                <button class="btn" onclick="runAllTests()">
+                    🧪 Run All Test Cases
+                </button>
+            </div>
+
+            <div class="control-card">
+                <h3>🎯 Test Single Case</h3>
+                <p>Test dengan data real PERNER 91125200 yang bermasalah</p>
+                <button class="btn test-single" onclick="testSingleCase()">
+                    🔍 Test Real Data Case
+                </button>
+            </div>
+        </div>
+
+        <div class="real-data-input">
+            <h3>📝 Custom Test Data (JSON Format)</h3>
+            <p>Masukkan data custom dalam format JSON untuk test individual:</p>
+            <textarea id="customDataInput" placeholder='{"perner": "91125200", "status_jam_kerja": "Normal => (08:00-16:30)", "jenis_hari": "HARI KERJA", "status_absen": "Tidak lengkap -> tidak absen", "value_att_abs": "—"}'></textarea>
+            <button class="btn" onclick="testCustomData()">🔬 Test Custom Data</button>
+        </div>
+
+        <div class="results">
+            <h3>📊 Test Results</h3>
+            <div id="resultsContainer"></div>
+            <button class="clear-btn" onclick="clearResults()">🗑️ Clear Results</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ===================================================================
+    // 🎯 LOGIC FUNCTIONS (FIXED VERSION)
+    // ===================================================================
+
+    function cekWajibKerja(status_jam_kerja, jenis_hari) {
+        if (!status_jam_kerja) return false;
+        
+        const statusLower = String(status_jam_kerja).toLowerCase();
+        const jenisHariLower = String(jenis_hari || '').toLowerCase();
+        
+        // Shift OFF = tidak wajib kerja
+        if (statusLower.includes('off')) {
+            return false;
+        }
+        
+        // Normal (termasuk PIKET/PDKB) di hari libur = tidak wajib kerja  
+        if (statusLower.includes('normal') && jenisHariLower.includes('libur')) {
+            return false;
+        }
+        
+        // Selain itu = wajib kerja
+        return true;
+    }
+
+    function tentukanKeteranganKehadiran(row) {
+        try {
+            const { 
+                status_jam_kerja, 
+                jenis_hari, 
+                status_absen, 
+                value_att_abs 
+            } = row;
+            
+            // STEP 1: Cek apakah wajib kerja
+            const isWajibKerja = cekWajibKerja(status_jam_kerja, jenis_hari);
+            
+            // Jika tidak wajib kerja = otomatis OK
+            if (!isWajibKerja) {
+                return {
+                    result: 'Dengan Absen/Dengan Keterangan',
+                    reason: 'Tidak wajib kerja',
+                    details: { isWajibKerja, adaAbsenLengkap: null, adaKeteranganValid: null }
+                };
+            }
+            
+            // STEP 2: Wajib kerja - cek ada absen lengkap
+            const adaAbsenLengkap = status_absen === 'Lengkap';
+            
+            // STEP 3: Wajib kerja - cek ada keterangan valid
+            let adaKeteranganValid = false;
+            
+            // 🔧 FIX: Normalisasi value_att_abs untuk handle berbagai format kosong
+            if (value_att_abs && 
+                value_att_abs.trim() !== '' && 
+                value_att_abs !== '—' &&           // Dash
+                value_att_abs !== '-' &&           // Minus
+                value_att_abs !== 'null' &&        // String 'null'
+                value_att_abs !== 'undefined' &&   // String 'undefined'
+                value_att_abs !== 'NULL' &&        // Upper case NULL
+                value_att_abs !== 'UNDEFINED') {   // Upper case UNDEFINED
+                
+                const valueAttAbs = String(value_att_abs).toLowerCase();
+                
+                adaKeteranganValid = (
+                    valueAttAbs.includes('abs_') ||     
+                    valueAttAbs.includes('sppd_') ||    
+                    valueAttAbs.includes('att_') ||     
+                    valueAttAbs.includes('cuti') ||     
+                    valueAttAbs.includes('ijin') ||     
+                    valueAttAbs.includes('sakit')       
+                );
+            }
+            
+            // STEP 4: Final decision
+            const result = (adaAbsenLengkap || adaKeteranganValid) 
+                ? 'Dengan Absen/Dengan Keterangan'
+                : 'Tanpa Keterangan';
+            
+            const reason = adaAbsenLengkap ? 'Ada absen lengkap' : 
+                          adaKeteranganValid ? 'Ada keterangan valid' : 
+                          'Tidak ada absen dan tidak ada keterangan';
+            
+            return {
+                result,
+                reason,
+                details: { isWajibKerja, adaAbsenLengkap, adaKeteranganValid }
+            };
+            
+        } catch (error) {
+            console.error(`❌ Error dalam tentukanKeteranganKehadiran:`, error);
+            return {
+                result: 'Dengan Absen/Dengan Keterangan',
+                reason: 'Error - default to safe value',
+                details: { error: error.message }
+            };
+        }
+    }
+
+    // ===================================================================
+    // 🧪 TEST CASES
+    // ===================================================================
+
+    const testCases = [
+        {
+            name: "Normal worker, hari kerja, absen lengkap",
+            data: {
+                perner: "TEST001",
+                status_jam_kerja: 'Normal => (08:00-17:00)', 
+                jenis_hari: 'HARI KERJA', 
+                status_absen: 'Lengkap', 
+                value_att_abs: null
+            },
+            expected: 'Dengan Absen/Dengan Keterangan'
+        },
+        {
+            name: "Normal worker, hari kerja, tidak absen, tanpa keterangan",
+            data: {
+                perner: "TEST002",
+                status_jam_kerja: 'Normal => (08:00-17:00)', 
+                jenis_hari: 'HARI KERJA', 
+                status_absen: 'Tidak lengkap -> tidak absen', 
+                value_att_abs: null
+            },
+            expected: 'Tanpa Keterangan'
+        },
+        {
+            name: "Normal worker, hari kerja, tidak absen, tapi ada cuti",
+            data: {
+                perner: "TEST003",
+                status_jam_kerja: 'Normal => (08:00-17:00)', 
+                jenis_hari: 'HARI KERJA', 
+                status_absen: 'Tidak lengkap -> tidak absen', 
+                value_att_abs: 'abs_sap_new => Cuti'
+            },
+            expected: 'Dengan Absen/Dengan Keterangan'
+        },
+        {
+            name: "Shift worker, hari libur, ada jadwal",
+            data: {
+                perner: "TEST004",
+                status_jam_kerja: 'Shift => Pagi (08:00-16:00)', 
+                jenis_hari: 'HARI LIBUR', 
+                status_absen: 'Tidak lengkap -> tidak absen', 
+                value_att_abs: null
+            },
+            expected: 'Tanpa Keterangan'
+        },
+        {
+            name: "Shift OFF",
+            data: {
+                perner: "TEST005",
+                status_jam_kerja: 'Shift => OFF', 
+                jenis_hari: 'HARI KERJA', 
+                status_absen: 'Tidak lengkap -> tidak absen', 
+                value_att_abs: null
+            },
+            expected: 'Dengan Absen/Dengan Keterangan'
+        },
+        {
+            name: "Normal worker di hari libur",
+            data: {
+                perner: "TEST006",
+                status_jam_kerja: 'Normal => (08:00-17:00)', 
+                jenis_hari: 'HARI LIBUR', 
+                status_absen: 'Tidak lengkap -> tidak absen', 
+                value_att_abs: null
+            },
+            expected: 'Dengan Absen/Dengan Keterangan'
+        },
+        {
+            name: "PIKET di hari libur (FIXED)",
+            data: {
+                perner: "TEST007",
+                status_jam_kerja: 'Normal => PIKET (08:00-17:00)', 
+                jenis_hari: 'HARI LIBUR', 
+                status_absen: 'Tidak lengkap -> tidak absen', 
+                value_att_abs: null
+            },
+            expected: 'Dengan Absen/Dengan Keterangan' // ✅ FIXED
+        },
+        {
+            name: "Worker dengan SPPD",
+            data: {
+                perner: "TEST008",
+                status_jam_kerja: 'Normal => (08:00-17:00)', 
+                jenis_hari: 'HARI KERJA', 
+                status_absen: 'Tidak lengkap -> tidak absen', 
+                value_att_abs: 'sppd_umum_new => Perjalanan dinas'
+            },
+            expected: 'Dengan Absen/Dengan Keterangan'
+        },
+        {
+            name: "PDKB di hari libur (FIXED)",
+            data: {
+                perner: "TEST009",
+                status_jam_kerja: 'Normal => PDKB (08:00-17:00)', 
+                jenis_hari: 'HARI LIBUR', 
+                status_absen: 'Tidak lengkap -> tidak absen', 
+                value_att_abs: null
+            },
+            expected: 'Dengan Absen/Dengan Keterangan' // ✅ FIXED
+        },
+        {
+            name: "Real Data Case - PERNER 91125200",
+            data: {
+                perner: "91125200",
+                tanggal: "7/31/2025, 12:00:00 AM",
+                status_jam_kerja: 'Normal => (08:00-16:30)', 
+                jenis_hari: 'HARI KERJA', 
+                status_absen: 'Tidak lengkap -> tidak absen', 
+                value_att_abs: '—' // Dash character
+            },
+            expected: 'Tanpa Keterangan' // ⚠️ Should be this!
+        }
+    ];
+
+    // ===================================================================
+    // 🧪 TEST RUNNER FUNCTIONS
+    // ===================================================================
+
+    function runAllTests() {
+        const container = document.getElementById('resultsContainer');
+        container.innerHTML = '';
+
+        let passedTests = 0;
+        let failedTests = 0;
+
+        const startTime = Date.now();
+
+        testCases.forEach((testCase, index) => {
+            const testDiv = document.createElement('div');
+            
+            try {
+                const result = tentukanKeteranganKehadiran(testCase.data);
+                const isPass = result.result === testCase.expected;
+                
+                testDiv.className = `test-case ${isPass ? 'pass' : 'fail'}`;
+                
+                testDiv.innerHTML = `
+                    <div class="test-header">
+                        ${isPass ? '✅' : '❌'} Test ${index + 1}: ${testCase.name}
+                    </div>
+                    <div class="test-details">
+                        <strong>Input:</strong><br>
+                        • PERNER: ${testCase.data.perner}<br>
+                        • Status Jam Kerja: ${testCase.data.status_jam_kerja}<br>
+                        • Jenis Hari: ${testCase.data.jenis_hari}<br>
+                        • Status Absen: ${testCase.data.status_absen}<br>
+                        • Value Att Abs: ${testCase.data.value_att_abs || 'NULL'}<br><br>
+                        
+                        <strong>Logic Breakdown:</strong><br>
+                        • Is Wajib Kerja: ${result.details.isWajibKerja}<br>
+                        • Ada Absen Lengkap: ${result.details.adaAbsenLengkap}<br>
+                        • Ada Keterangan Valid: ${result.details.adaKeteranganValid}<br>
+                        • Reason: ${result.reason}<br><br>
+                        
+                        <strong>Results:</strong><br>
+                        • Expected: "${testCase.expected}"<br>
+                        • Actual: "${result.result}"<br>
+                        • Status: <strong>${isPass ? 'PASS' : 'FAIL'}</strong>
+                    </div>
+                `;
+                
+                if (isPass) passedTests++;
+                else failedTests++;
+                
+            } catch (error) {
+                testDiv.className = 'test-case error';
+                testDiv.innerHTML = `
+                    <div class="test-header">
+                        ⚠️ Test ${index + 1}: ${testCase.name} - ERROR
+                    </div>
+                    <div class="test-details">
+                        Error: ${error.message}
+                    </div>
+                `;
+                failedTests++;
+            }
+            
+            container.appendChild(testDiv);
+        });
+
+        const duration = Date.now() - startTime;
+        const successRate = ((passedTests / testCases.length) * 100).toFixed(1);
+
+        const summaryDiv = document.createElement('div');
+        summaryDiv.className = 'summary';
+        summaryDiv.innerHTML = `
+            <h3>📊 Test Summary</h3>
+            <p><strong>Passed:</strong> ${passedTests}/${testCases.length}</p>
+            <p><strong>Failed:</strong> ${failedTests}/${testCases.length}</p>
+            <p><strong>Success Rate:</strong> ${successRate}%</p>
+            <p><strong>Duration:</strong> ${duration}ms</p>
+        `;
+        
+        container.insertBefore(summaryDiv, container.firstChild);
+    }
+
+    function testSingleCase() {
+        const container = document.getElementById('resultsContainer');
+        container.innerHTML = '';
+
+        // Real data case from your example
+        const realData = {
+            perner: "91125200",
+            tanggal: "7/31/2025, 12:00:00 AM",
+            jenis_hari: "HARI KERJA",
+            status_jam_kerja: "Normal => (08:00-16:30)",
+            status_absen: "Tidak lengkap -> tidak absen",
+            value_att_abs: "—" // Dash character
+        };
+
+        const result = tentukanKeteranganKehadiran(realData);
+        const expected = 'Tanpa Keterangan';
+        const isCorrect = result.result === expected;
+
+        const testDiv = document.createElement('div');
+        testDiv.className = `test-case ${isCorrect ? 'pass' : 'fail'}`;
+        
+        testDiv.innerHTML = `
+            <div class="test-header">
+                ${isCorrect ? '✅' : '❌'} Real Data Test - PERNER 91125200
+            </div>
+            <div class="test-details">
+                <strong>🔍 Original Data Analysis:</strong><br>
+                • PERNER: ${realData.perner}<br>
+                • Tanggal: ${realData.tanggal}<br>
+                • Jenis Hari: ${realData.jenis_hari}<br>
+                • Status Jam Kerja: ${realData.status_jam_kerja}<br>
+                • Status Absen: ${realData.status_absen}<br>
+                • Value Att Abs: "${realData.value_att_abs}" (Dash character)<br><br>
+                
+                <strong>🔧 Logic Processing:</strong><br>
+                • Is Wajib Kerja: ${result.details.isWajibKerja}<br>
+                • Ada Absen Lengkap: ${result.details.adaAbsenLengkap}<br>
+                • Ada Keterangan Valid: ${result.details.adaKeteranganValid}<br>
+                • Logic Reason: ${result.reason}<br><br>
+                
+                <strong>🎯 Final Assessment:</strong><br>
+                • Expected: "${expected}"<br>
+                • Actual Result: "${result.result}"<br>
+                • Logic Status: <strong style="color: ${isCorrect ? 'green' : 'red'}">${isCorrect ? 'CORRECT ✅' : 'INCORRECT ❌'}</strong><br><br>
+                
+                <strong>💡 Business Interpretation:</strong><br>
+                ${isCorrect ? 
+                    '• This employee should be flagged as "Tanpa Keterangan"<br>• Action required: Follow up with employee/supervisor<br>• This is a legitimate attendance issue' :
+                    '• Logic error detected - fix required in implementation<br>• Current result is masking a real attendance problem'
+                }
+            </div>
+        `;
+        
+        container.appendChild(testDiv);
+    }
+
+    function testCustomData() {
+        const container = document.getElementById('resultsContainer');
+        const input = document.getElementById('customDataInput').value.trim();
+        
+        if (!input) {
+            alert('Please enter JSON data to test');
+            return;
+        }
+        
+        try {
+            const customData = JSON.parse(input);
+            const result = tentukanKeteranganKehadiran(customData);
+            
+            const testDiv = document.createElement('div');
+            testDiv.className = 'test-case pass';
+            testDiv.innerHTML = `
+                <div class="test-header">
+                    🔬 Custom Data Test
+                </div>
+                <div class="test-details">
+                    <strong>Input Data:</strong><br>
+                    ${Object.keys(customData).map(key => `• ${key}: ${customData[key] || 'NULL'}`).join('<br>')}<br><br>
+                    
+                    <strong>Logic Analysis:</strong><br>
+                    • Is Wajib Kerja: ${result.details.isWajibKerja}<br>
+                    • Ada Absen Lengkap: ${result.details.adaAbsenLengkap}<br>
+                    • Ada Keterangan Valid: ${result.details.adaKeteranganValid}<br>
+                    • Reason: ${result.reason}<br><br>
+                    
+                    <strong>Result:</strong><br>
+                    • Keterangan Kehadiran: <strong>"${result.result}"</strong>
+                </div>
+            `;
+            
+            container.innerHTML = '';
+            container.appendChild(testDiv);
+            
+        } catch (error) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'test-case error';
+            errorDiv.innerHTML = `
+                <div class="test-header">⚠️ JSON Parse Error</div>
+                <div class="test-details">Error: ${error.message}</div>
+            `;
+            container.innerHTML = '';
+            container.appendChild(errorDiv);
+        }
+    }
+
+    function clearResults() {
+        document.getElementById('resultsContainer').innerHTML = '';
+    }
+
+    // ===================================================================
+    // 🚀 INITIALIZE
+    // ===================================================================
+
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('🧪 Test Keterangan Kehadiran page loaded');
+        
+        // Set default custom data
+        document.getElementById('customDataInput').value = JSON.stringify({
+            "perner": "91125200",
+            "status_jam_kerja": "Normal => (08:00-16:30)",
+            "jenis_hari": "HARI KERJA", 
+            "status_absen": "Tidak lengkap -> tidak absen",
+            "value_att_abs": "—"
+        }, null, 2);
+    });
+</script>

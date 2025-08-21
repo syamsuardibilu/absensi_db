@@ -2356,9 +2356,13 @@ app.post("/ambil-data-absensi-untuk-jkp", (req, res) => {
            att_daily_new, abs_daily_new, att_sap_new, abs_sap_new, sppd_umum_new,
            jenis_hari, ws_rule, is_jumat,
            daily_in, daily_out,
-           jenis_jam_kerja_shift_daily_new, jenis_jam_kerja_shift_sap_new
+           jenis_jam_kerja_shift_daily_new, jenis_jam_kerja_shift_sap_new,
+           status_jam_kerja,
+           status_absen,
+           value_att_abs
     FROM olah_absensi
   `;
+  // ... rest of function
   console.log("SQL Query untuk ambil-data-absensi-untuk-jkp:", sql);
 
   conn.query(sql, (err, results) => {
@@ -2653,6 +2657,125 @@ Values: ${JSON.stringify(values)}
   }
 });
 
+// ===================================================================
+// 🎯 HELPER FUNCTION: Menentukan Keterangan Kehadiran
+// ===================================================================
+
+/**
+ * Fungsi untuk menentukan apakah hari tersebut wajib kerja atau tidak
+ * Tidak wajib kerja: Shift OFF, Normal+Hari Libur, PIKET (penugasan opsional)
+ * Wajib kerja: Shift (Pagi/Siang/Malam), PDKB, Normal+Hari Kerja
+ */
+function cekWajibKerja(status_jam_kerja, jenis_hari) {
+  if (!status_jam_kerja) return false;
+
+  const statusLower = String(status_jam_kerja).toLowerCase();
+  const jenisHariLower = String(jenis_hari || "").toLowerCase();
+
+  // 🧪 TEMPORARY DEBUG - HAPUS SETELAH TESTING
+  console.log(`🔍 DEBUG cekWajibKerja: ${status_jam_kerja} + ${jenis_hari}`);
+
+  // Shift OFF = tidak wajib kerja
+  if (statusLower.includes("off")) {
+    return false;
+  }
+
+  // Normal di hari libur = tidak wajib kerja
+  if (statusLower.includes("normal") && jenisHariLower.includes("libur")) {
+    return false;
+  }
+
+  // PIKET = tidak wajib kerja (penugasan opsional)
+  if (statusLower.includes("piket")) {
+    return false;
+  }
+
+  // Selain itu = wajib kerja
+  // Termasuk: Shift (Pagi/Siang/Malam), PDKB, Normal di hari kerja
+  return true;
+}
+/**
+ * Fungsi utama untuk menentukan keterangan_kehadiran
+ */
+function tentukanKeteranganKehadiran(row) {
+  try {
+    const { status_jam_kerja, jenis_hari, status_absen, value_att_abs } = row;
+
+    // Debug log untuk development
+    const isDebugMode = process.env.NODE_ENV === "development";
+
+    if (isDebugMode) {
+      console.log(
+        `🔍 Debug keterangan_kehadiran - PERNER: ${row.perner}, Tanggal: ${row.tanggal}`
+      );
+      console.log(`   status_jam_kerja: ${status_jam_kerja}`);
+      console.log(`   jenis_hari: ${jenis_hari}`);
+      console.log(`   status_absen: ${status_absen}`);
+      console.log(`   value_att_abs: ${value_att_abs}`);
+    }
+
+    // STEP 1: Cek apakah wajib kerja
+    const isWajibKerja = cekWajibKerja(status_jam_kerja, jenis_hari);
+
+    if (isDebugMode) {
+      console.log(`   isWajibKerja: ${isWajibKerja}`);
+    }
+
+    // Jika tidak wajib kerja = otomatis OK
+    // Tidak wajib kerja: Shift OFF, Normal+Libur, PIKET
+    if (!isWajibKerja) {
+      if (isDebugMode) {
+        console.log(
+          `   ✅ Result: Dengan Absen/Dengan Keterangan (tidak wajib kerja)`
+        );
+      }
+      return "Dengan Absen/Dengan Keterangan";
+    }
+
+    // STEP 2: Wajib kerja - cek ada absen lengkap
+    const adaAbsenLengkap = status_absen === "Lengkap";
+
+    // STEP 3: Wajib kerja - cek ada keterangan valid
+    let adaKeteranganValid = false;
+    if (value_att_abs && value_att_abs.trim() !== "") {
+      const valueAttAbs = String(value_att_abs).toLowerCase();
+
+      // Keterangan valid: cuti, ijin, SPPD, atau attendance yang dijustifikasi
+      adaKeteranganValid =
+        valueAttAbs.includes("abs_") || // Absence (cuti/ijin)
+        valueAttAbs.includes("sppd_") || // SPPD/tugas luar
+        valueAttAbs.includes("att_") || // Attendance justification
+        valueAttAbs.includes("cuti") || // Explicit cuti
+        valueAttAbs.includes("ijin") || // Explicit ijin
+        valueAttAbs.includes("sakit"); // Sakit
+    }
+
+    if (isDebugMode) {
+      console.log(`   adaAbsenLengkap: ${adaAbsenLengkap}`);
+      console.log(`   adaKeteranganValid: ${adaKeteranganValid}`);
+    }
+
+    // STEP 4: Final decision
+    const result =
+      adaAbsenLengkap || adaKeteranganValid
+        ? "Dengan Absen/Dengan Keterangan"
+        : "Tanpa Keterangan";
+
+    if (isDebugMode) {
+      console.log(`   🎯 Final Result: ${result}`);
+    }
+
+    return result;
+  } catch (error) {
+    console.error(
+      `❌ Error dalam tentukanKeteranganKehadiran untuk ${row.perner}:`,
+      error
+    );
+    // Default ke safe value jika ada error
+    return "Dengan Absen/Dengan Keterangan";
+  }
+}
+
 app.post("/proses-kalkulasi-jkp-backend-selective", async (req, res) => {
   try {
     console.log("🔄 Starting SIMPLIFIED JKP backend selective processing...");
@@ -2730,6 +2853,7 @@ app.post("/proses-kalkulasi-jkp-backend-selective", async (req, res) => {
         .json({ message: "❌ No filtered data to process" });
     }
 
+    // STEP 3: Process JKP calculations
     // STEP 3: Process JKP calculations
     console.log("🔧 Processing JKP calculations...");
     const processStart = Date.now();
@@ -2825,6 +2949,9 @@ app.post("/proses-kalkulasi-jkp-backend-selective", async (req, res) => {
           );
         }
 
+        // 🆕 TAMBAHAN BARU: Hitung keterangan_kehadiran
+        const keterangan_kehadiran = tentukanKeteranganKehadiran(row);
+
         processedResults.push({
           perner: row.perner,
           tanggal: formatTanggalSafe(row.tanggal),
@@ -2842,6 +2969,7 @@ app.post("/proses-kalkulasi-jkp-backend-selective", async (req, res) => {
           ket_in_out: ket_in_out_final || null,
           jam_kerja_seharusnya: jam_kerja_seharusnya,
           persentase: persentase,
+          keterangan_kehadiran: keterangan_kehadiran, // 🆕 FIELD BARU
         });
 
         // Progress for large datasets
@@ -2878,6 +3006,7 @@ app.post("/proses-kalkulasi-jkp-backend-selective", async (req, res) => {
     console.log(`📦 ${chunks.length} chunks to process`);
 
     // Group fields for simpler SQL
+    // Group fields for simpler SQL
     const fieldGroups = [
       // Group 1: Primary JKP fields
       {
@@ -2900,6 +3029,7 @@ app.post("/proses-kalkulasi-jkp-backend-selective", async (req, res) => {
           { field: "daily_out_cleansing", dataField: "daily_out_cleansing" },
           { field: "kategori_hit_jkp", dataField: "kategori_hit_jkp" },
           { field: "ket_in_out", dataField: "ket_in_out" },
+          { field: "keterangan_kehadiran", dataField: "keterangan_kehadiran" }, // 🆕 TAMBAHAN BARU
         ],
       },
     ];
@@ -2983,6 +3113,7 @@ app.post("/proses-kalkulasi-jkp-backend-selective", async (req, res) => {
     );
 
     // Calculate statistics
+    // Calculate statistics
     const persentaseData = processedResults.filter(
       (item) => item.persentase !== null
     );
@@ -2994,6 +3125,17 @@ app.post("/proses-kalkulasi-jkp-backend-selective", async (req, res) => {
       );
     }
 
+    // 🆕 STATISTIK BARU: Keterangan Kehadiran
+    const keteranganStats = {
+      tanpa_keterangan: processedResults.filter(
+        (item) => item.keterangan_kehadiran === "Tanpa Keterangan"
+      ).length,
+      dengan_keterangan: processedResults.filter(
+        (item) => item.keterangan_kehadiran === "Dengan Absen/Dengan Keterangan"
+      ).length,
+      total_processed: processedResults.length,
+    };
+
     console.log(`⚡ SIMPLIFIED JKP PROCESSING COMPLETED!`);
     console.log(`   ⏱️ Overall: ${overallDuration}ms`);
     console.log(`   📊 Fetch: ${fetchDuration}ms`);
@@ -3002,6 +3144,10 @@ app.post("/proses-kalkulasi-jkp-backend-selective", async (req, res) => {
     console.log(`   ✅ Updates: ${totalAffected}`);
     console.log(
       `   📦 Successful tasks: ${successfulTasks.length}/${allBatchTasks.length}`
+    );
+    // 🆕 LOG BARU
+    console.log(
+      `   🎯 Keterangan Kehadiran - Tanpa: ${keteranganStats.tanpa_keterangan}, Dengan: ${keteranganStats.dengan_keterangan}`
     );
 
     res.json({
@@ -3031,6 +3177,8 @@ app.post("/proses-kalkulasi-jkp-backend-selective", async (req, res) => {
         database_rate: `${Math.round(
           totalAffected / (batchDuration / 1000)
         )} updates/sec`,
+        // 🆕 STATISTIK BARU
+        keterangan_kehadiran: keteranganStats,
       },
     });
   } catch (err) {
