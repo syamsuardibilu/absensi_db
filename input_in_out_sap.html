@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Dashboard Input In Out SAP</title>
+    <title>Dashboard Input In Out SAP - Enhanced</title>
 
     <!-- SheetJS Library untuk Export Excel XLSX -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -148,27 +148,46 @@
 
       .stats-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: 20px;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 15px;
       }
 
       .stat-card {
-        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-        color: white;
-        padding: 20px;
+        padding: 15px;
         border-radius: 12px;
         text-align: center;
+        color: white;
+        font-weight: 600;
       }
 
       .stat-card h3 {
-        font-size: 0.9rem;
+        font-size: 0.8rem;
         margin-bottom: 8px;
         opacity: 0.9;
       }
 
       .stat-card p {
-        font-size: 1.5rem;
+        font-size: 1.3rem;
         font-weight: 700;
+      }
+
+      .stat-normal {
+        background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+      }
+      .stat-missing {
+        background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+      }
+      .stat-anomaly {
+        background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+      }
+      .stat-end-day {
+        background: linear-gradient(135deg, #f1c40f 0%, #f39c12 100%);
+      }
+      .stat-start-day {
+        background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+      }
+      .stat-total {
+        background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%);
       }
 
       .table-container {
@@ -236,7 +255,7 @@
         width: 100%;
         border-collapse: collapse;
         font-size: 12px;
-        min-width: 1200px;
+        min-width: 1400px;
       }
 
       th,
@@ -245,6 +264,7 @@
         padding: 12px 8px;
         text-align: center;
         white-space: nowrap;
+        position: relative;
       }
 
       thead th {
@@ -275,25 +295,35 @@
         z-index: 90;
       }
 
-      .is-change-true {
-        background: rgba(231, 76, 60, 0.1);
-        color: #e74c3c;
-        font-weight: 600;
-      }
-
-      .is-change-false {
+      /* Enhanced Change Status Colors */
+      .change-normal {
         background: rgba(39, 174, 96, 0.1);
         color: #27ae60;
         font-weight: 600;
       }
 
-      .time-input {
-        width: 80px;
-        padding: 4px;
-        border: 1px solid #ddd;
-        border-radius: 4px;
-        text-align: center;
-        font-size: 11px;
+      .change-missing {
+        background: rgba(231, 76, 60, 0.1);
+        color: #e74c3c;
+        font-weight: 600;
+      }
+
+      .change-anomaly {
+        background: rgba(243, 156, 18, 0.1);
+        color: #f39c12;
+        font-weight: 600;
+      }
+
+      .change-end-day {
+        background: rgba(241, 196, 15, 0.1);
+        color: #f1c40f;
+        font-weight: 600;
+      }
+
+      .change-start-day {
+        background: rgba(52, 152, 219, 0.1);
+        color: #3498db;
+        font-weight: 600;
       }
 
       .loading {
@@ -630,6 +660,47 @@
         border-radius: 12px;
       }
 
+      /* Tooltip Styles */
+      .tooltip {
+        position: relative;
+        cursor: help;
+      }
+
+      .tooltip .tooltip-text {
+        visibility: hidden;
+        width: 200px;
+        background-color: #333;
+        color: #fff;
+        text-align: center;
+        border-radius: 6px;
+        padding: 8px;
+        position: absolute;
+        z-index: 1000;
+        bottom: 125%;
+        left: 50%;
+        margin-left: -100px;
+        opacity: 0;
+        transition: opacity 0.3s;
+        font-size: 11px;
+        font-weight: normal;
+      }
+
+      .tooltip .tooltip-text::after {
+        content: "";
+        position: absolute;
+        top: 100%;
+        left: 50%;
+        margin-left: -5px;
+        border-width: 5px;
+        border-style: solid;
+        border-color: #333 transparent transparent transparent;
+      }
+
+      .tooltip:hover .tooltip-text {
+        visibility: visible;
+        opacity: 1;
+      }
+
       @media (max-width: 768px) {
         .controls {
           flex-direction: column;
@@ -654,8 +725,11 @@
     <div class="dashboard-container">
       <!-- Header -->
       <div class="header">
-        <h1>⏰ Dashboard Input In Out SAP</h1>
-        <p>Sistem Manajemen Data Clock In dan Clock Out untuk SAP</p>
+        <h1>⏰ Dashboard Input In Out SAP - Enhanced</h1>
+        <p>
+          Sistem Manajemen Data Clock In dan Clock Out untuk SAP dengan Logika
+          Lengkap
+        </p>
       </div>
 
       <!-- Controls -->
@@ -887,40 +961,136 @@
         .getElementById("nextPageBtn")
         .addEventListener("click", () => goToPage(currentPage + 1));
 
-      // Helper functions
+      // 🚀 ENHANCED HELPER FUNCTIONS WITH COMPLETE LOGIC
+
       function isValidTime(timeStr) {
-        return timeStr && timeStr !== null && timeStr !== "00:00:00";
+        return timeStr && timeStr !== null && timeStr.trim() !== "";
       }
 
-      function calculateDefaults(clockIn, clockOut) {
-        const hasClockIn = isValidTime(clockIn);
-        const hasClockOut = isValidTime(clockOut);
+      function timeToMinutes(timeStr) {
+        const [hours, minutes] = timeStr.split(":").map(Number);
+        return hours * 60 + minutes;
+      }
 
-        let clockInDefault, clockOutDefault, isChange;
+      // 🎯 ENHANCED CALCULATE DEFAULTS - CORRECTED BUSINESS LOGIC
+      function calculateDefaults(clockIn, clockOut) {
+        const hasClockIn = clockIn && clockIn !== null && clockIn.trim() !== "";
+        const hasClockOut =
+          clockOut && clockOut !== null && clockOut.trim() !== "";
+
+        let clockInDefault, clockOutDefault, isChange, changeType, changeReason;
 
         if (hasClockIn && hasClockOut) {
-          // Kedua ada nilai
+          // Initialize defaults
           clockInDefault = clockIn;
           clockOutDefault = clockOut;
           isChange = false;
+          changeType = "normal";
+          changeReason = "Normal working hours";
+
+          // SPECIAL CASE: Both are 00:00:00 → No change
+          if (clockIn === "00:00:00" && clockOut === "00:00:00") {
+            return {
+              clockInDefault,
+              clockOutDefault,
+              isChange,
+              changeType,
+              changeReason,
+            };
+          }
+
+          // PRIORITY 1: End Day Rule (Clock Out = 00:00:00 with valid Clock In)
+          if (clockOut === "00:00:00" && clockIn !== "00:00:00") {
+            clockOutDefault = "23:59:59";
+            isChange = true;
+            changeType = "end-day";
+            changeReason = "End of day: Clock Out adjusted to 23:59:59";
+          }
+
+          // PRIORITY 2: Start Day Rule (Clock In = 00:00:00 with valid Clock Out)
+          if (clockIn === "00:00:00" && clockOut !== "00:00:00") {
+            clockInDefault = "00:01:00";
+            isChange = true;
+            changeType = "start-day";
+            changeReason = "Start of day: Clock In adjusted to 00:01:00";
+          }
+
+          // PRIORITY 3: Time Anomaly (Clock In > Clock Out after adjustments)
+          if (timeToMinutes(clockInDefault) > timeToMinutes(clockOutDefault)) {
+            clockOutDefault = clockInDefault;
+            isChange = true;
+            changeType = "anomaly";
+            changeReason = "Time anomaly: Clock Out set to Clock In value";
+          }
         } else if (hasClockIn && !hasClockOut) {
-          // Clock in ada, clock out kosong
+          // Clock in ada, clock out kosong/null
           clockInDefault = clockIn;
           clockOutDefault = clockIn;
           isChange = true;
+          changeType = "missing";
+          changeReason = "Missing Clock Out: Set to Clock In value";
         } else if (!hasClockIn && hasClockOut) {
           // Clock in kosong, clock out ada
           clockInDefault = clockOut;
           clockOutDefault = clockOut;
           isChange = true;
+          changeType = "missing";
+          changeReason = "Missing Clock In: Set to Clock Out value";
         } else {
           // Kedua kosong
           clockInDefault = "00:00:00";
           clockOutDefault = "00:00:00";
           isChange = true;
+          changeType = "missing";
+          changeReason = "No attendance data available";
         }
 
-        return { clockInDefault, clockOutDefault, isChange };
+        return {
+          clockInDefault,
+          clockOutDefault,
+          isChange,
+          changeType,
+          changeReason,
+        };
+      }
+
+      // 📊 ENHANCED STATISTICS CALCULATION
+      function calculateStatistics(data) {
+        const stats = {
+          total: data.length,
+          normal: 0,
+          missing: 0,
+          anomaly: 0,
+          endDay: 0,
+          startDay: 0,
+        };
+
+        data.forEach((row) => {
+          const { changeType } = calculateDefaults(
+            row.daily_in_cleansing,
+            row.daily_out_cleansing
+          );
+
+          switch (changeType) {
+            case "normal":
+              stats.normal++;
+              break;
+            case "missing":
+              stats.missing++;
+              break;
+            case "anomaly":
+              stats.anomaly++;
+              break;
+            case "end-day":
+              stats.endDay++;
+              break;
+            case "start-day":
+              stats.startDay++;
+              break;
+          }
+        });
+
+        return stats;
       }
 
       // Load Input In Out Data Function
@@ -942,7 +1112,7 @@
           if (result.success) {
             displayInputInOutData(result.data);
             displayPagination(result.pagination);
-            displayStats(result.metadata);
+            displayEnhancedStats(result.data, result.metadata);
 
             if (result.data.length > 0) {
               noDataMessage.style.display = "none";
@@ -971,7 +1141,7 @@
         }
       }
 
-      // Display Input In Out Data in Table
+      // 🎨 ENHANCED DISPLAY INPUT IN OUT DATA WITH TOOLTIPS
       function displayInputInOutData(data) {
         if (!data || data.length === 0) {
           tableScrollWrapper.innerHTML = `<div class="no-data">📋 Tidak ada data untuk ditampilkan.</div>`;
@@ -996,19 +1166,29 @@
                 <th>Clock In Default</th>
                 <th>Clock Out Default</th>
                 <th>Is Change</th>
+                <th>Change Type</th>
+                <th>Reason</th>
               </tr>
             </thead>
             <tbody>
               ${data
                 .map((row, index) => {
-                  const { clockInDefault, clockOutDefault, isChange } =
-                    calculateDefaults(
-                      row.daily_in_cleansing,
-                      row.daily_out_cleansing
-                    );
+                  const {
+                    clockInDefault,
+                    clockOutDefault,
+                    isChange,
+                    changeType,
+                    changeReason,
+                  } = calculateDefaults(
+                    row.daily_in_cleansing,
+                    row.daily_out_cleansing
+                  );
 
                   const rowNumber =
                     (currentPage - 1) * itemsPerPage + index + 1;
+
+                  // Enhanced change class based on type
+                  const changeClass = `change-${changeType}`;
 
                   return `
                   <tr>
@@ -1025,9 +1205,14 @@
                     <td>${row.daily_out_cleansing || "-"}</td>
                     <td>${clockInDefault}</td>
                     <td>${clockOutDefault}</td>
-                    <td class="${
-                      isChange ? "is-change-true" : "is-change-false"
-                    }">${isChange ? "true" : "false"}</td>
+                    <td class="${changeClass}">${
+                    isChange ? "true" : "false"
+                  }</td>
+                    <td class="${changeClass}">${changeType}</td>
+                    <td class="tooltip ${changeClass}">
+                      ${changeType}
+                      <span class="tooltip-text">${changeReason}</span>
+                    </td>
                   </tr>
                 `;
                 })
@@ -1044,27 +1229,37 @@
         });
       }
 
-      // Display Statistics
-      function displayStats(metadata) {
-        if (!metadata) return;
+      // 📊 ENHANCED STATISTICS DISPLAY
+      function displayEnhancedStats(data, metadata) {
+        if (!data || data.length === 0) return;
+
+        const stats = calculateStatistics(data);
 
         const statsGrid = document.getElementById("statsGrid");
         statsGrid.innerHTML = `
-          <div class="stat-card">
+          <div class="stat-card stat-total">
             <h3>Total Records</h3>
-            <p>${metadata.total_records || 0}</p>
+            <p>${stats.total}</p>
           </div>
-          <div class="stat-card">
-            <h3>Unique PERNER</h3>
-            <p>${metadata.unique_perner || 0}</p>
+          <div class="stat-card stat-normal">
+            <h3>Normal</h3>
+            <p>${stats.normal}</p>
           </div>
-          <div class="stat-card">
-            <h3>Records with Changes</h3>
-            <p>${metadata.records_with_changes || 0}</p>
+          <div class="stat-card stat-missing">
+            <h3>Missing Data</h3>
+            <p>${stats.missing}</p>
           </div>
-          <div class="stat-card">
-            <h3>Processing Time</h3>
-            <p>${metadata.processing_time_ms || 0}ms</p>
+          <div class="stat-card stat-anomaly">
+            <h3>Time Anomaly</h3>
+            <p>${stats.anomaly}</p>
+          </div>
+          <div class="stat-card stat-end-day">
+            <h3>End of Day</h3>
+            <p>${stats.endDay}</p>
+          </div>
+          <div class="stat-card stat-start-day">
+            <h3>Start of Day</h3>
+            <p>${stats.startDay}</p>
           </div>
         `;
         statsContainer.style.display = "block";
@@ -1200,7 +1395,6 @@
 
         // Date range info
         if (pagination && pagination.total_records > 0) {
-          // You might want to add date range to metadata if available
           document.getElementById("dateRangeInfo").textContent =
             "Lihat data terbaru";
         } else {
@@ -1258,7 +1452,7 @@
         loadInputInOutData();
       }
 
-      // Download Excel Function
+      // 🚀 ENHANCED DOWNLOAD EXCEL WITH COMPLETE FORMATTING
       async function downloadExcel() {
         try {
           if (!currentData || currentData.length === 0) {
@@ -1267,35 +1461,68 @@
           }
 
           showLoading(true);
-          showAlert("📊 Mengunduh data dalam format Excel (.xlsx)...", "info");
-
-          // Get all data for export
-          const allDataResponse = await fetch(
-            `${BASE_URL}/getInputInOutSapData?limit=10000&offset=0&search=${encodeURIComponent(
-              searchQuery
-            )}`
+          showAlert(
+            "📊 Mengunduh semua data dalam format Excel (.xlsx)...",
+            "info"
           );
-          const allDataResult = await allDataResponse.json();
 
-          if (!allDataResult.success) {
-            throw new Error("Gagal mengambil data lengkap");
+          // 🔥 FETCH ALL DATA WITHOUT LIMIT
+          let allData = [];
+          let offset = 0;
+          const batchSize = 1000; // Batch size per request
+          let hasMoreData = true;
+
+          while (hasMoreData) {
+            const batchResponse = await fetch(
+              `${BASE_URL}/getInputInOutSapData?limit=${batchSize}&offset=${offset}&search=${encodeURIComponent(
+                searchQuery
+              )}`
+            );
+            const batchResult = await batchResponse.json();
+
+            if (!batchResult.success) {
+              throw new Error("Gagal mengambil data batch");
+            }
+
+            // Add batch data to allData
+            allData = allData.concat(batchResult.data);
+
+            // Check if we have more data
+            hasMoreData = batchResult.data.length === batchSize;
+            offset += batchSize;
+
+            // Update progress
+            showAlert(
+              `📊 Mengunduh data... (${allData.length} records)`,
+              "info"
+            );
           }
 
-          const data = allDataResult.data;
-          console.log(`📊 Exporting ${data.length} records to Excel (.xlsx)`);
+          console.log(
+            `📊 Exporting ALL ${allData.length} records to Excel (.xlsx)`
+          );
+
+          if (allData.length === 0) {
+            throw new Error("Tidak ada data untuk diexport");
+          }
 
           // Create workbook
           const wb = XLSX.utils.book_new();
 
-          // Prepare data for Excel with proper date formatting
+          // Prepare data for Excel with enhanced formatting
           const excelData = [];
 
-          data.forEach((row, index) => {
-            const { clockInDefault, clockOutDefault, isChange } =
-              calculateDefaults(
-                row.daily_in_cleansing,
-                row.daily_out_cleansing
-              );
+          allData.forEach((row, index) => {
+            const {
+              clockInDefault,
+              clockOutDefault,
+              isChange,
+              changeType,
+              changeReason,
+            } = calculateDefaults(
+              row.daily_in_cleansing,
+              row.daily_out_cleansing
+            );
 
             // Parse tanggal to proper Date object
             const tanggalDate = new Date(row.tanggal);
@@ -1311,13 +1538,15 @@
               "Clock In Default": clockInDefault,
               "Clock Out Default": clockOutDefault,
               "Is Change": isChange ? "true" : "false",
+              "Change Type": changeType,
+              "Change Reason": changeReason,
             });
           });
 
           // Create worksheet
           const ws = XLSX.utils.json_to_sheet(excelData);
 
-          // Apply custom formatting to worksheet cells
+          // Apply enhanced formatting to worksheet cells
           const range = XLSX.utils.decode_range(ws["!ref"]);
 
           // Apply formatting to each cell
@@ -1371,6 +1600,8 @@
                   "Clock In Default",
                   "Clock Out Default",
                   "Is Change",
+                  "Change Type",
+                  "Change Reason",
                 ];
                 const colHeader = colHeaders[colNum];
 
@@ -1387,65 +1618,78 @@
                   cell.s.numFmt = "dd/mm/yyyy";
                   cell.s.alignment.horizontal = "center";
                 } else if (
-                  colHeader === "Clock In" ||
-                  colHeader === "Clock Out" ||
-                  colHeader === "Clock In Default" ||
-                  colHeader === "Clock Out Default"
+                  colHeader === "Is Change" ||
+                  colHeader === "Change Type"
                 ) {
-                  // Time columns
-                  cell.s.alignment.horizontal = "center";
-                  if (cell.v && cell.v !== "" && cell.v !== "-") {
-                    cell.s.fill = { fgColor: { rgb: "F0F8FF" } };
-                  }
-                } else if (colHeader === "Is Change") {
-                  // Is Change column with conditional formatting
+                  // Enhanced conditional formatting based on change type
+                  const changeType = excelData[rowNum - 1]?.["Change Type"];
                   cell.s.font = { bold: true };
-                  if (cell.v === "true") {
-                    cell.s.fill = { fgColor: { rgb: "FFEBEE" } };
-                    cell.s.font.color = { rgb: "C62828" };
-                  } else {
-                    cell.s.fill = { fgColor: { rgb: "E8F5E8" } };
-                    cell.s.font.color = { rgb: "2E7D32" };
+
+                  switch (changeType) {
+                    case "normal":
+                      cell.s.fill = { fgColor: { rgb: "E8F5E8" } };
+                      cell.s.font.color = { rgb: "2E7D32" };
+                      break;
+                    case "missing":
+                      cell.s.fill = { fgColor: { rgb: "FFEBEE" } };
+                      cell.s.font.color = { rgb: "C62828" };
+                      break;
+                    case "anomaly":
+                      cell.s.fill = { fgColor: { rgb: "FFF3E0" } };
+                      cell.s.font.color = { rgb: "F57C00" };
+                      break;
+                    case "end-day":
+                      cell.s.fill = { fgColor: { rgb: "FFFDE7" } };
+                      cell.s.font.color = { rgb: "F9A825" };
+                      break;
+                    case "start-day":
+                      cell.s.fill = { fgColor: { rgb: "E3F2FD" } };
+                      cell.s.font.color = { rgb: "1976D2" };
+                      break;
                   }
+                } else if (colHeader === "Change Reason") {
+                  // Change reason with left alignment
+                  cell.s.alignment.horizontal = "left";
+                  cell.s.font = { italic: true };
                 }
               }
             }
           }
 
-          // Set column widths for better readability
+          // Set enhanced column widths
           const colWidths = [
-            { wch: 6 }, // No. - slightly wider
+            { wch: 6 }, // No.
             { wch: 12 }, // PERNER
             { wch: 15 }, // NIP
-            { wch: 30 }, // Nama - much wider for names
-            { wch: 14 }, // Tanggal - wider for dd/mm/yyyy format
+            { wch: 30 }, // Nama
+            { wch: 14 }, // Tanggal
             { wch: 12 }, // Clock In
             { wch: 12 }, // Clock Out
             { wch: 16 }, // Clock In Default
             { wch: 16 }, // Clock Out Default
             { wch: 12 }, // Is Change
+            { wch: 15 }, // Change Type
+            { wch: 40 }, // Change Reason
           ];
           ws["!cols"] = colWidths;
 
           // Set row heights for better appearance
-          ws["!rows"] = [
-            { hpt: 25 }, // Header row height
-          ];
+          ws["!rows"] = [{ hpt: 25 }]; // Header row height
 
           // Add worksheet to workbook
-          XLSX.utils.book_append_sheet(wb, ws, "Input In Out SAP");
+          XLSX.utils.book_append_sheet(wb, ws, "Input In Out SAP Enhanced");
 
-          // Generate filename
+          // Generate filename with record count
           const timestamp = new Date().toISOString().split("T")[0];
-          const filename = `Input_In_Out_SAP_${timestamp}${
-            searchQuery ? "_Filtered" : ""
-          }.xlsx`;
+          const filename = `Input_In_Out_SAP_Enhanced_${timestamp}_${
+            allData.length
+          }records${searchQuery ? "_Filtered" : ""}.xlsx`;
 
           // Write and download file
           XLSX.writeFile(wb, filename);
 
           showAlert(
-            `✅ File "${filename}" berhasil diunduh! (${data.length} records)`,
+            `✅ File "${filename}" berhasil diunduh! (${allData.length} records)`,
             "success"
           );
         } catch (error) {

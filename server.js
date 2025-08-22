@@ -2356,12 +2356,13 @@ app.post("/ambil-data-absensi-untuk-jkp", (req, res) => {
            att_daily_new, abs_daily_new, att_sap_new, abs_sap_new, sppd_umum_new,
            jenis_hari, ws_rule, is_jumat,
            daily_in, daily_out,
+           daily_in_cleansing, daily_out_cleansing,
+           daily_in_default, daily_out_default,
            jenis_jam_kerja_shift_daily_new, jenis_jam_kerja_shift_sap_new,
-           status_jam_kerja,
-           status_absen,
-           value_att_abs
+           status_jam_kerja, status_absen, value_att_abs
     FROM olah_absensi
   `;
+
   // ... rest of function
   console.log("SQL Query untuk ambil-data-absensi-untuk-jkp:", sql);
 
@@ -2661,49 +2662,98 @@ Values: ${JSON.stringify(values)}
 // 🎯 HELPER FUNCTION: Menentukan Keterangan Kehadiran
 // ===================================================================
 
+const VALID_KETERANGAN = {
+  ABSENCE: ["abs_", "cuti", "ijin", "sakit"],
+  BUSINESS_TRIP: ["sppd_"],
+  ATTENDANCE_JUSTIFICATION: ["att_"],
+};
+
 /**
  * Fungsi untuk menentukan apakah hari tersebut wajib kerja atau tidak
  * Tidak wajib kerja: Shift OFF, Normal+Hari Libur, PIKET (penugasan opsional)
  * Wajib kerja: Shift (Pagi/Siang/Malam), PDKB, Normal+Hari Kerja
  */
-function cekWajibKerja(status_jam_kerja, jenis_hari) {
-  if (!status_jam_kerja) return false;
+function cekWajibKerja(statusJamKerja, jenisHari) {
+  try {
+    const isDebugMode = process.env.NODE_ENV === "development";
 
-  const statusLower = String(status_jam_kerja).toLowerCase();
-  const jenisHariLower = String(jenis_hari || "").toLowerCase();
+    // Normalisasi input
+    const status = String(statusJamKerja || "").toLowerCase();
+    const hari = String(jenisHari || "").toLowerCase();
 
-  // 🧪 TEMPORARY DEBUG - HAPUS SETELAH TESTING
-  console.log(`🔍 DEBUG cekWajibKerja: ${status_jam_kerja} + ${jenis_hari}`);
+    if (isDebugMode) {
+      console.log(`🔍 cekWajibKerja - status: ${status}, hari: ${hari}`);
+    }
 
-  // Shift OFF = tidak wajib kerja
-  if (statusLower.includes("off")) {
-    return false;
+    // ATURAN BISNIS:
+    // 1. Shift OFF = tidak wajib kerja (apapun jenis harinya)
+    // 2. Mengandung "normal" = jam kerja normal:
+    //    - Normal + Hari kerja = WAJIB KERJA
+    //    - Normal + Hari libur = TIDAK wajib kerja
+    // 3. Shift lainnya (Pagi, Siang, Malam) = wajib kerja (apapun jenis harinya)
+
+    // Case 1: Shift OFF
+    if (status.includes("shift") && status.includes("off")) {
+      if (isDebugMode) console.log("   → Shift OFF: tidak wajib kerja");
+      return false;
+    }
+
+    // Case 2: Jam kerja Normal (mengandung kata "normal")
+    if (status.includes("normal")) {
+      const isHariKerja = hari.includes("kerja");
+      const result = isHariKerja; // Normal + Hari kerja = wajib kerja
+
+      if (isDebugMode) {
+        console.log(
+          `   → Normal + ${isHariKerja ? "Hari kerja" : "Hari libur"}: ${
+            result ? "wajib kerja" : "tidak wajib kerja"
+          }`
+        );
+      }
+      return result;
+    }
+
+    // Case 3: Shift lainnya (Pagi, Siang, Malam, dll)
+    if (isDebugMode) console.log("   → Shift non-Normal: wajib kerja");
+    return true;
+  } catch (error) {
+    console.error("❌ Error dalam cekWajibKerja:", error);
+    // Default ke wajib kerja untuk safety
+    return true;
   }
-
-  // Normal di hari libur = tidak wajib kerja
-  if (statusLower.includes("normal") && jenisHariLower.includes("libur")) {
-    return false;
-  }
-
-  // PIKET = tidak wajib kerja (penugasan opsional)
-  if (statusLower.includes("piket")) {
-    return false;
-  }
-
-  // Selain itu = wajib kerja
-  // Termasuk: Shift (Pagi/Siang/Malam), PDKB, Normal di hari kerja
-  return true;
 }
+
+function cekKeteranganValid(valueAttAbs) {
+  if (
+    !valueAttAbs ||
+    String(valueAttAbs).trim() === "" ||
+    valueAttAbs === "—"
+  ) {
+    return false;
+  }
+
+  const value = String(valueAttAbs).toLowerCase();
+
+  // Gabungkan semua keterangan valid
+  const allValidKeywords = [
+    ...VALID_KETERANGAN.ABSENCE,
+    ...VALID_KETERANGAN.BUSINESS_TRIP,
+    ...VALID_KETERANGAN.ATTENDANCE_JUSTIFICATION,
+  ];
+
+  return allValidKeywords.some((keyword) => value.includes(keyword));
+}
+
 /**
  * Fungsi utama untuk menentukan keterangan_kehadiran
  */
+
 function tentukanKeteranganKehadiran(row) {
   try {
     const { status_jam_kerja, jenis_hari, status_absen, value_att_abs } = row;
 
     // Debug log untuk development
     const isDebugMode = process.env.NODE_ENV === "development";
-
     if (isDebugMode) {
       console.log(
         `🔍 Debug keterangan_kehadiran - PERNER: ${row.perner}, Tanggal: ${row.tanggal}`
@@ -2716,53 +2766,41 @@ function tentukanKeteranganKehadiran(row) {
 
     // STEP 1: Cek apakah wajib kerja
     const isWajibKerja = cekWajibKerja(status_jam_kerja, jenis_hari);
-
     if (isDebugMode) {
       console.log(`   isWajibKerja: ${isWajibKerja}`);
     }
 
-    // Jika tidak wajib kerja = otomatis OK
-    // Tidak wajib kerja: Shift OFF, Normal+Libur, PIKET
+    // STEP 2: Jika tidak wajib kerja → "Bukan hari wajib kerja"
     if (!isWajibKerja) {
       if (isDebugMode) {
-        console.log(
-          `   ✅ Result: Dengan Absen/Dengan Keterangan (tidak wajib kerja)`
-        );
+        console.log(`   🔵 Result: Bukan hari wajib kerja`);
       }
-      return "Dengan Absen/Dengan Keterangan";
+      return "Bukan hari wajib kerja";
     }
 
-    // STEP 2: Wajib kerja - cek ada absen lengkap
+    // STEP 3: Wajib kerja - cek ada absen lengkap
     const adaAbsenLengkap = status_absen === "Lengkap";
 
-    // STEP 3: Wajib kerja - cek ada keterangan valid
-    let adaKeteranganValid = false;
-    if (value_att_abs && value_att_abs.trim() !== "") {
-      const valueAttAbs = String(value_att_abs).toLowerCase();
-
-      // Keterangan valid: cuti, ijin, SPPD, atau attendance yang dijustifikasi
-      adaKeteranganValid =
-        valueAttAbs.includes("abs_") || // Absence (cuti/ijin)
-        valueAttAbs.includes("sppd_") || // SPPD/tugas luar
-        valueAttAbs.includes("att_") || // Attendance justification
-        valueAttAbs.includes("cuti") || // Explicit cuti
-        valueAttAbs.includes("ijin") || // Explicit ijin
-        valueAttAbs.includes("sakit"); // Sakit
-    }
+    // STEP 4: Wajib kerja - cek ada keterangan valid
+    const adaKeteranganValid = cekKeteranganValid(value_att_abs);
 
     if (isDebugMode) {
       console.log(`   adaAbsenLengkap: ${adaAbsenLengkap}`);
       console.log(`   adaKeteranganValid: ${adaKeteranganValid}`);
     }
 
-    // STEP 4: Final decision
-    const result =
-      adaAbsenLengkap || adaKeteranganValid
-        ? "Dengan Absen/Dengan Keterangan"
-        : "Tanpa Keterangan";
-
-    if (isDebugMode) {
-      console.log(`   🎯 Final Result: ${result}`);
+    // STEP 5: Final decision untuk hari wajib kerja
+    let result;
+    if (adaAbsenLengkap || adaKeteranganValid) {
+      result = "Dengan Absen/Dengan Keterangan";
+      if (isDebugMode) {
+        console.log(`   ✅ Result: ${result} (ada bukti kehadiran)`);
+      }
+    } else {
+      result = "Tanpa Keterangan";
+      if (isDebugMode) {
+        console.log(`   ❌ Result: ${result} (tidak ada bukti kehadiran)`);
+      }
     }
 
     return result;
@@ -2775,10 +2813,100 @@ function tentukanKeteranganKehadiran(row) {
     return "Dengan Absen/Dengan Keterangan";
   }
 }
+// ===================================================================
+// 🎯 HELPER FUNCTIONS UNTUK DEFAULT VALUE CALCULATION
+// ===================================================================
 
+function timeToMinutes(timeStr) {
+  if (!timeStr) return 0;
+  const [hours, minutes] = timeStr.split(":").map(Number);
+  return hours * 60 + minutes;
+}
+
+function calculateInOutDefaults(clockIn, clockOut) {
+  const hasClockIn = clockIn && clockIn !== null && clockIn.trim() !== "";
+  const hasClockOut = clockOut && clockOut !== null && clockOut.trim() !== "";
+
+  let clockInDefault, clockOutDefault, isChange, changeType, changeReason;
+
+  if (hasClockIn && hasClockOut) {
+    // Initialize defaults
+    clockInDefault = clockIn;
+    clockOutDefault = clockOut;
+    isChange = false;
+    changeType = "normal";
+    changeReason = "Normal working hours";
+
+    // SPECIAL CASE: Both are 00:00:00 → No change
+    if (clockIn === "00:00:00" && clockOut === "00:00:00") {
+      return {
+        clockInDefault,
+        clockOutDefault,
+        isChange,
+        changeType,
+        changeReason,
+      };
+    }
+
+    // PRIORITY 1: End Day Rule (Clock Out = 00:00:00 with valid Clock In)
+    if (clockOut === "00:00:00" && clockIn !== "00:00:00") {
+      clockOutDefault = "23:59:59";
+      isChange = true;
+      changeType = "end-day";
+      changeReason = "End of day: Clock Out adjusted to 23:59:59";
+    }
+
+    // PRIORITY 2: Start Day Rule (Clock In = 00:00:00 with valid Clock Out)
+    if (clockIn === "00:00:00" && clockOut !== "00:00:00") {
+      clockInDefault = "00:01:00";
+      isChange = true;
+      changeType = "start-day";
+      changeReason = "Start of day: Clock In adjusted to 00:01:00";
+    }
+
+    // PRIORITY 3: Time Anomaly (Clock In > Clock Out after adjustments)
+    if (timeToMinutes(clockInDefault) > timeToMinutes(clockOutDefault)) {
+      clockOutDefault = clockInDefault;
+      isChange = true;
+      changeType = "anomaly";
+      changeReason = "Time anomaly: Clock Out set to Clock In value";
+    }
+  } else if (hasClockIn && !hasClockOut) {
+    // Clock in ada, clock out kosong/null
+    clockInDefault = clockIn;
+    clockOutDefault = clockIn;
+    isChange = true;
+    changeType = "missing";
+    changeReason = "Missing Clock Out: Set to Clock In value";
+  } else if (!hasClockIn && hasClockOut) {
+    // Clock in kosong, clock out ada
+    clockInDefault = clockOut;
+    clockOutDefault = clockOut;
+    isChange = true;
+    changeType = "missing";
+    changeReason = "Missing Clock In: Set to Clock Out value";
+  } else {
+    // Kedua kosong
+    clockInDefault = "00:00:00";
+    clockOutDefault = "00:00:00";
+    isChange = true;
+    changeType = "missing";
+    changeReason = "No attendance data available";
+  }
+
+  return {
+    clockInDefault,
+    clockOutDefault,
+    isChange,
+    changeType,
+    changeReason,
+  };
+}
 app.post("/proses-kalkulasi-jkp-backend-selective", async (req, res) => {
   try {
-    console.log("🔄 Starting SIMPLIFIED JKP backend selective processing...");
+    console.log(
+      "🔄 Starting ENHANCED JKP backend selective processing with Default Values..."
+    );
     const overallStartTime = Date.now();
 
     const { filterValue, targetRows } = req.body;
@@ -2853,13 +2981,21 @@ app.post("/proses-kalkulasi-jkp-backend-selective", async (req, res) => {
         .json({ message: "❌ No filtered data to process" });
     }
 
-    // STEP 3: Process JKP calculations
-    // STEP 3: Process JKP calculations
-    console.log("🔧 Processing JKP calculations...");
+    // STEP 3: Process JKP calculations with Default Values
+    console.log("🔧 Processing JKP calculations with Default Values...");
     const processStart = Date.now();
 
     const processedResults = [];
     let errorCount = 0;
+
+    // 📊 Statistics for Default Values
+    const defaultStats = {
+      normal: 0,
+      missing: 0,
+      anomaly: 0,
+      endDay: 0,
+      startDay: 0,
+    };
 
     for (let i = 0; i < filteredData.length; i++) {
       try {
@@ -2952,6 +3088,24 @@ app.post("/proses-kalkulasi-jkp-backend-selective", async (req, res) => {
         // 🆕 TAMBAHAN BARU: Hitung keterangan_kehadiran
         const keterangan_kehadiran = tentukanKeteranganKehadiran(row);
 
+        // 🆕 TAMBAHAN BARU: Hitung default values untuk Clock In/Out
+        const {
+          clockInDefault,
+          clockOutDefault,
+          isChange,
+          changeType,
+          changeReason,
+        } = calculateInOutDefaults(row.daily_in, row.daily_out);
+
+        // Update statistics
+        defaultStats[
+          changeType === "end-day"
+            ? "endDay"
+            : changeType === "start-day"
+            ? "startDay"
+            : changeType
+        ]++;
+
         processedResults.push({
           perner: row.perner,
           tanggal: formatTanggalSafe(row.tanggal),
@@ -2964,12 +3118,18 @@ app.post("/proses-kalkulasi-jkp-backend-selective", async (req, res) => {
             daily_out_raw && daily_out_raw !== "-"
               ? daily_out_raw.replace(/\./g, ":")
               : null,
+          // 🆕 FIELD BARU: Default values
+          daily_in_default: clockInDefault,
+          daily_out_default: clockOutDefault,
+          default_change_type: changeType,
+          default_change_reason: changeReason,
+          default_is_change: isChange,
           durasi_cleansing: jam_kerja_pegawai_cleansing,
           kategori_hit_jkp: hasilJKP.ket || null,
           ket_in_out: ket_in_out_final || null,
           jam_kerja_seharusnya: jam_kerja_seharusnya,
           persentase: persentase,
-          keterangan_kehadiran: keterangan_kehadiran, // 🆕 FIELD BARU
+          keterangan_kehadiran: keterangan_kehadiran,
         });
 
         // Progress for large datasets
@@ -2987,14 +3147,24 @@ app.post("/proses-kalkulasi-jkp-backend-selective", async (req, res) => {
       `✅ JKP calculations: ${processedResults.length} successful, ${errorCount} errors (${processDuration}ms)`
     );
 
+    // Log Default Values Statistics
+    console.log(`📊 Default Values Statistics:`);
+    console.log(`   - Normal: ${defaultStats.normal}`);
+    console.log(`   - Missing: ${defaultStats.missing}`);
+    console.log(`   - Anomaly: ${defaultStats.anomaly}`);
+    console.log(`   - End Day: ${defaultStats.endDay}`);
+    console.log(`   - Start Day: ${defaultStats.startDay}`);
+
     if (processedResults.length === 0) {
       return res
         .status(400)
         .json({ message: "❌ No successful JKP calculations" });
     }
 
-    // STEP 4: Simplified batch updates - separate by field groups
-    console.log("💾 Starting simplified batch database updates...");
+    // STEP 4: Enhanced batch updates with Default Values
+    console.log(
+      "💾 Starting enhanced batch database updates with Default Values..."
+    );
     const batchStart = Date.now();
 
     const chunkSize = 200;
@@ -3005,8 +3175,7 @@ app.post("/proses-kalkulasi-jkp-backend-selective", async (req, res) => {
 
     console.log(`📦 ${chunks.length} chunks to process`);
 
-    // Group fields for simpler SQL
-    // Group fields for simpler SQL
+    // Enhanced field groups with Default Values
     const fieldGroups = [
       // Group 1: Primary JKP fields
       {
@@ -3021,15 +3190,17 @@ app.post("/proses-kalkulasi-jkp-backend-selective", async (req, res) => {
           { field: "persentase", dataField: "persentase" },
         ],
       },
-      // Group 2: Cleansing fields
+      // Group 2: Cleansing and Default Values
       {
-        name: "Cleansing Data",
+        name: "Cleansing & Default Data",
         updates: [
           { field: "daily_in_cleansing", dataField: "daily_in_cleansing" },
           { field: "daily_out_cleansing", dataField: "daily_out_cleansing" },
+          { field: "daily_in_default", dataField: "daily_in_default" },
+          { field: "daily_out_default", dataField: "daily_out_default" },
           { field: "kategori_hit_jkp", dataField: "kategori_hit_jkp" },
           { field: "ket_in_out", dataField: "ket_in_out" },
-          { field: "keterangan_kehadiran", dataField: "keterangan_kehadiran" }, // 🆕 TAMBAHAN BARU
+          { field: "keterangan_kehadiran", dataField: "keterangan_kehadiran" },
         ],
       },
     ];
@@ -3039,7 +3210,7 @@ app.post("/proses-kalkulasi-jkp-backend-selective", async (req, res) => {
     fieldGroups.forEach((group) => {
       chunks.forEach((chunk, chunkIndex) => {
         const task = new Promise((resolve, reject) => {
-          // Simple field-by-field update
+          // Enhanced field-by-field update
           const setClauses = group.updates.map((update) => {
             return `${update.field} = CASE ${chunk
               .map(() => "WHEN perner = ? AND DATE(tanggal) = ? THEN ?")
@@ -3112,8 +3283,7 @@ app.post("/proses-kalkulasi-jkp-backend-selective", async (req, res) => {
       0
     );
 
-    // Calculate statistics
-    // Calculate statistics
+    // Calculate enhanced statistics
     const persentaseData = processedResults.filter(
       (item) => item.persentase !== null
     );
@@ -3125,18 +3295,32 @@ app.post("/proses-kalkulasi-jkp-backend-selective", async (req, res) => {
       );
     }
 
-    // 🆕 STATISTIK BARU: Keterangan Kehadiran
+    // 🆕 STATISTIK BARU: 3 Kategori Keterangan Kehadiran
     const keteranganStats = {
+      dengan_keterangan: processedResults.filter(
+        (item) => item.keterangan_kehadiran === "Dengan Absen/Dengan Keterangan"
+      ).length,
       tanpa_keterangan: processedResults.filter(
         (item) => item.keterangan_kehadiran === "Tanpa Keterangan"
       ).length,
-      dengan_keterangan: processedResults.filter(
-        (item) => item.keterangan_kehadiran === "Dengan Absen/Dengan Keterangan"
+      bukan_hari_wajib: processedResults.filter(
+        (item) => item.keterangan_kehadiran === "Bukan hari wajib kerja"
       ).length,
       total_processed: processedResults.length,
     };
 
-    console.log(`⚡ SIMPLIFIED JKP PROCESSING COMPLETED!`);
+    // 🆕 STATISTIK BARU: Default Values Changes
+    const defaultChangesStats = {
+      total_with_changes: processedResults.filter(
+        (item) => item.default_is_change
+      ).length,
+      total_no_changes: processedResults.filter(
+        (item) => !item.default_is_change
+      ).length,
+      by_type: defaultStats,
+    };
+
+    console.log(`⚡ ENHANCED JKP PROCESSING WITH DEFAULT VALUES COMPLETED!`);
     console.log(`   ⏱️ Overall: ${overallDuration}ms`);
     console.log(`   📊 Fetch: ${fetchDuration}ms`);
     console.log(`   🔧 Process: ${processDuration}ms`);
@@ -3145,13 +3329,15 @@ app.post("/proses-kalkulasi-jkp-backend-selective", async (req, res) => {
     console.log(
       `   📦 Successful tasks: ${successfulTasks.length}/${allBatchTasks.length}`
     );
-    // 🆕 LOG BARU
     console.log(
-      `   🎯 Keterangan Kehadiran - Tanpa: ${keteranganStats.tanpa_keterangan}, Dengan: ${keteranganStats.dengan_keterangan}`
+      `🎯 Keterangan Kehadiran - Dengan: ${keteranganStats.dengan_keterangan}, Tanpa: ${keteranganStats.tanpa_keterangan}, Bukan Wajib: ${keteranganStats.bukan_hari_wajib}`
+    );
+    console.log(
+      `   🔄 Default Values - Changed: ${defaultChangesStats.total_with_changes}, Normal: ${defaultChangesStats.total_no_changes}`
     );
 
     res.json({
-      message: `✅ Simplified JKP processing completed. ${processedResults.length} records processed, ${totalAffected} database updates (${overallDuration}ms).`,
+      message: `✅ Enhanced JKP processing with Default Values completed. ${processedResults.length} records processed, ${totalAffected} database updates (${overallDuration}ms).`,
       performance: {
         overall_duration_ms: overallDuration,
         fetch_duration_ms: fetchDuration,
@@ -3162,7 +3348,7 @@ app.post("/proses-kalkulasi-jkp-backend-selective", async (req, res) => {
         successful_tasks: successfulTasks.length,
         failed_tasks: failedTasks.length,
         total_batches: chunks.length * fieldGroups.length,
-        method: "simplified_field_group_batch_processing",
+        method: "enhanced_field_group_batch_processing_with_defaults",
       },
       statistics: {
         error_count: errorCount,
@@ -3177,14 +3363,16 @@ app.post("/proses-kalkulasi-jkp-backend-selective", async (req, res) => {
         database_rate: `${Math.round(
           totalAffected / (batchDuration / 1000)
         )} updates/sec`,
-        // 🆕 STATISTIK BARU
+        // 🆕 ENHANCED STATISTICS
         keterangan_kehadiran: keteranganStats,
+        default_values: defaultChangesStats,
       },
     });
   } catch (err) {
-    console.error("❌ Fatal error in simplified JKP processing:", err);
+    console.error("❌ Fatal error in enhanced JKP processing:", err);
     res.status(500).json({
-      message: "❌ Fatal error during simplified JKP processing.",
+      message:
+        "❌ Fatal error during enhanced JKP processing with Default Values.",
       error: err.message,
     });
   }
