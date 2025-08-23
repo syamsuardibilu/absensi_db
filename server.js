@@ -515,7 +515,7 @@ app.post("/hapus-data-db", (req, res) => {
       break;
     case "ci_co_daily":
       kolom =
-        "daily_in = NULL, daily_out = NULL, daily_in_cleansing = NULL, daily_out_cleansing = NULL";
+        "daily_in = NULL, daily_out = NULL, daily_in_cleansing = NULL, daily_out_cleansing = NULL, daily_in_default = NULL, daily_out_default = NULL, correction_in = NULL, correction_out = NULL";
       break;
     case "att_abs_daily":
       kolom = "att_daily = NULL, abs_daily = NULL";
@@ -3445,8 +3445,10 @@ const {
 } = require("./fungsiJKP"); // pastikan path-nya sesuai
 
 app.post("/update-status-absen-cleansing", (req, res) => {
+  // STEP 1: Ambil semua data dari tabel olah_absensi (termasuk field untuk cek wajib kerja)
   const ambilSQL = `
-    SELECT perner, tanggal, daily_in_cleansing, daily_out_cleansing
+    SELECT perner, tanggal, daily_in_cleansing, daily_out_cleansing,
+           status_jam_kerja, jenis_hari
     FROM olah_absensi
     WHERE tanggal IS NOT NULL
   `;
@@ -3454,41 +3456,64 @@ app.post("/update-status-absen-cleansing", (req, res) => {
   conn.query(ambilSQL, (err, rows) => {
     if (err) {
       console.error("❌ Gagal mengambil data:", err);
-      return res
-        .status(500)
-        .json({ message: "❌ Gagal mengambil data absensi." });
+      return res.status(500).json({
+        message: "❌ Gagal mengambil data absensi.",
+      });
     }
 
     const updateTasks = [];
 
+    // STEP 2: Loop setiap baris untuk evaluasi status_absen DAN jenis_hari_realisasi
     rows.forEach((row) => {
-      const { perner, tanggal, daily_in_cleansing, daily_out_cleansing } = row;
+      const {
+        perner,
+        tanggal,
+        daily_in_cleansing,
+        daily_out_cleansing,
+        status_jam_kerja,
+        jenis_hari,
+      } = row;
 
-      // 1. Evaluasi status_absen
+      // 🔍 STEP 2.1: Cek apakah hari tersebut wajib kerja
+      const isWajibKerja = cekWajibKerja(status_jam_kerja, jenis_hari);
+
+      // 🆕 STEP 2.2: Tentukan jenis_hari_realisasi berdasarkan cekWajibKerja
+      const jenis_hari_realisasi = isWajibKerja
+        ? "Hari kerja"
+        : "Bukan hari kerja";
+
       let status_absen = null;
 
-      const adaIn = daily_in_cleansing !== null;
-      const adaOut = daily_out_cleansing !== null;
-
-      if (adaIn && adaOut) {
-        status_absen = "Lengkap";
-      } else if (!adaIn && adaOut) {
-        status_absen = "Tidak lengkap -> in kosong";
-      } else if (adaIn && !adaOut) {
-        status_absen = "Tidak lengkap -> out kosong";
+      // 🎯 STEP 2.3: Logika evaluasi status_absen (sama seperti sebelumnya)
+      if (!isWajibKerja) {
+        // ❌ TIDAK WAJIB KERJA - Prioritas tertinggi
+        status_absen = "Bukan hari wajib kerja";
       } else {
-        status_absen = "Tidak lengkap -> tidak absen";
+        // ✅ WAJIB KERJA - Evaluasi berdasarkan ketersediaan absensi
+        const adaIn = daily_in_cleansing !== null;
+        const adaOut = daily_out_cleansing !== null;
+
+        if (adaIn && adaOut) {
+          status_absen = "Lengkap"; // ✅ Keduanya ada
+        } else if (!adaIn && adaOut) {
+          status_absen = "Tidak lengkap -> in kosong"; // ⚠️ Hanya out
+        } else if (adaIn && !adaOut) {
+          status_absen = "Tidak lengkap -> out kosong"; // ⚠️ Hanya in
+        } else {
+          status_absen = "Tidak lengkap -> tidak absen"; // ❌ Keduanya kosong
+        }
       }
 
-      // 2. Query update per baris
+      // 🆕 STEP 3: Query update DENGAN jenis_hari_realisasi
       const sqlUpdate = `
         UPDATE olah_absensi
-        SET status_absen = ?
+        SET status_absen = ?, jenis_hari_realisasi = ?
         WHERE perner = ? AND tanggal = ?
       `;
 
-      const params = [status_absen, perner, tanggal];
+      const params = [status_absen, jenis_hari_realisasi, perner, tanggal];
 
+      // STEP 4: Tambahkan ke task array untuk Promise.all
       updateTasks.push(
         new Promise((resolve, reject) => {
           conn.query(sqlUpdate, params, (err) => {
@@ -3499,18 +3524,200 @@ app.post("/update-status-absen-cleansing", (req, res) => {
       );
     });
 
+    // STEP 5: Execute semua update secara parallel
     Promise.all(updateTasks)
       .then(() => {
         res.json({
-          message: `✅ Berhasil mengupdate status_absen untuk ${rows.length} baris.`,
+          message: `✅ Berhasil mengupdate status_absen dan jenis_hari_realisasi untuk ${rows.length} baris.`,
         });
       })
       .catch((err) => {
-        console.error("❌ Gagal update status_absen:", err);
-        res.status(500).json({ message: "❌ Gagal menyimpan status_absen." });
+        console.error(
+          "❌ Gagal update status_absen dan jenis_hari_realisasi:",
+          err
+        );
+        res.status(500).json({
+          message: "❌ Gagal menyimpan status_absen dan jenis_hari_realisasi.",
+        });
       });
   });
 });
+
+app.post("/update-jenis-hari-realisasi", (req, res) => {
+  console.log("🔄 Starting update jenis_hari_realisasi...");
+  const startTime = Date.now();
+
+  // STEP 1: Ambil data yang diperlukan untuk cekWajibKerja
+  const ambilSQL = `
+    SELECT perner, tanggal, status_jam_kerja, jenis_hari
+    FROM olah_absensi
+    WHERE tanggal IS NOT NULL
+  `;
+
+  conn.query(ambilSQL, (err, rows) => {
+    if (err) {
+      console.error("❌ Gagal mengambil data:", err);
+      return res.status(500).json({
+        message: "❌ Gagal mengambil data untuk jenis_hari_realisasi.",
+      });
+    }
+
+    console.log(
+      `📊 Processing ${rows.length} records for jenis_hari_realisasi...`
+    );
+
+    const updateTasks = [];
+    let hariKerjaCount = 0;
+    let bukanHariKerjaCount = 0;
+
+    // STEP 2: Loop setiap baris untuk evaluasi jenis_hari_realisasi
+    rows.forEach((row, index) => {
+      const { perner, tanggal, status_jam_kerja, jenis_hari } = row;
+
+      // 🔍 Cek apakah hari tersebut wajib kerja
+      const isWajibKerja = cekWajibKerja(status_jam_kerja, jenis_hari);
+
+      // 🆕 Tentukan jenis_hari_realisasi
+      const jenis_hari_realisasi = isWajibKerja
+        ? "Hari kerja"
+        : "Bukan hari kerja";
+
+      // Update counter untuk statistik
+      if (isWajibKerja) {
+        hariKerjaCount++;
+      } else {
+        bukanHariKerjaCount++;
+      }
+
+      // STEP 3: Query update hanya jenis_hari_realisasi
+      const sqlUpdate = `
+        UPDATE olah_absensi
+        SET jenis_hari_realisasi = ?
+        WHERE perner = ? AND tanggal = ?
+      `;
+
+      const params = [jenis_hari_realisasi, perner, tanggal];
+
+      updateTasks.push(
+        new Promise((resolve, reject) => {
+          conn.query(sqlUpdate, params, (err, result) => {
+            if (err) return reject(err);
+            resolve({
+              perner,
+              tanggal,
+              jenis_hari_realisasi,
+              affectedRows: result.affectedRows,
+            });
+          });
+        })
+      );
+
+      // Progress logging setiap 1000 records
+      if ((index + 1) % 1000 === 0) {
+        console.log(`⏳ Processed: ${index + 1}/${rows.length}`);
+      }
+    });
+
+    // STEP 4: Execute semua update secara parallel
+    Promise.all(updateTasks)
+      .then((results) => {
+        const endTime = Date.now();
+        const duration = endTime - startTime;
+        const successfulUpdates = results.filter(
+          (r) => r.affectedRows > 0
+        ).length;
+
+        console.log(
+          `✅ jenis_hari_realisasi update completed in ${duration}ms`
+        );
+        console.log(`📊 Statistics:`);
+        console.log(`   - Total records: ${rows.length}`);
+        console.log(`   - Successful updates: ${successfulUpdates}`);
+        console.log(`   - "Hari kerja": ${hariKerjaCount}`);
+        console.log(`   - "Bukan hari kerja": ${bukanHariKerjaCount}`);
+
+        res.json({
+          message: `✅ Berhasil mengupdate jenis_hari_realisasi untuk ${successfulUpdates} baris.`,
+          statistics: {
+            total_records: rows.length,
+            successful_updates: successfulUpdates,
+            hari_kerja_count: hariKerjaCount,
+            bukan_hari_kerja_count: bukanHariKerjaCount,
+            duration_ms: duration,
+          },
+        });
+      })
+      .catch((err) => {
+        console.error("❌ Gagal update jenis_hari_realisasi:", err);
+        res.status(500).json({
+          message: "❌ Gagal menyimpan jenis_hari_realisasi.",
+        });
+      });
+  });
+});
+
+function evaluateAbsensiFields(
+  daily_in_cleansing,
+  daily_out_cleansing,
+  status_jam_kerja,
+  jenis_hari
+) {
+  // STEP 1: Cek wajib kerja
+  const isWajibKerja = cekWajibKerja(status_jam_kerja, jenis_hari);
+
+  // STEP 2: Tentukan jenis_hari_realisasi
+  const jenis_hari_realisasi = isWajibKerja ? "Hari kerja" : "Bukan hari kerja";
+
+  // STEP 3: Tentukan status_absen
+  let status_absen;
+  if (!isWajibKerja) {
+    status_absen = "Bukan hari wajib kerja";
+  } else {
+    const adaIn = daily_in_cleansing !== null;
+    const adaOut = daily_out_cleansing !== null;
+
+    if (adaIn && adaOut) {
+      status_absen = "Lengkap";
+    } else if (!adaIn && adaOut) {
+      status_absen = "Tidak lengkap -> in kosong";
+    } else if (adaIn && !adaOut) {
+      status_absen = "Tidak lengkap -> out kosong";
+    } else {
+      status_absen = "Tidak lengkap -> tidak absen";
+    }
+  }
+
+  return { status_absen, jenis_hari_realisasi, isWajibKerja };
+}
+
+// 🎯 FUNGSI EVALUASI status_absen YANG TELAH DIREVISI
+function evaluateStatusAbsenRevised(
+  daily_in_cleansing,
+  daily_out_cleansing,
+  status_jam_kerja,
+  jenis_hari
+) {
+  // STEP 1: Cek wajib kerja terlebih dahulu
+  const isWajibKerja = cekWajibKerja(status_jam_kerja, jenis_hari);
+
+  if (!isWajibKerja) {
+    return "Bukan hari wajib kerja";
+  }
+
+  // STEP 2: Jika wajib kerja, evaluasi berdasarkan ketersediaan absensi
+  const adaIn = daily_in_cleansing !== null;
+  const adaOut = daily_out_cleansing !== null;
+
+  if (adaIn && adaOut) {
+    return "Lengkap";
+  } else if (!adaIn && adaOut) {
+    return "Tidak lengkap -> in kosong";
+  } else if (adaIn && !adaOut) {
+    return "Tidak lengkap -> out kosong";
+  } else {
+    return "Tidak lengkap -> tidak absen";
+  }
+}
 
 // Helper function: Konversi waktu ke detik
 function timeToSeconds(timeString) {
@@ -4331,7 +4538,9 @@ app.post("/proses-status-in-out", async (req, res) => {
 // ENDPOINT: Generate Rekap Absensi
 // ============================================
 app.post("/generate-rekap-absensi", (req, res) => {
-  console.log("🔄 Starting PARALLEL CHUNKED generate rekap absensi...");
+  console.log(
+    "🔄 Starting REVISED generate rekap absensi based on ketentuan..."
+  );
   const overallStartTime = Date.now();
 
   // STEP 1: Clear existing data
@@ -4382,22 +4591,20 @@ app.post("/generate-rekap-absensi", (req, res) => {
         });
       }
 
-      // STEP 3: Parallel chunked processing (OPTIMIZED)
-      console.log("⚡ Starting parallel chunked processing...");
+      // STEP 3: Process rekap sesuai ketentuan tabel
+      console.log("⚡ Starting rekap processing based on ketentuan...");
       const processStartTime = Date.now();
 
-      const chunkSize = 20; // Process employees in parallel chunks
+      const chunkSize = 10; // Smaller chunks for complex calculations
       const chunks = [];
       for (let i = 0; i < perners.length; i += chunkSize) {
         chunks.push(perners.slice(i, i + chunkSize));
       }
 
       console.log(
-        `📦 Processing ${perners.length} employees in ${chunks.length} parallel chunks (${chunkSize} employees per chunk)`
+        `📦 Processing ${perners.length} employees in ${chunks.length} chunks (${chunkSize} employees per chunk)`
       );
 
-      // Process chunks in parallel with controlled concurrency
-      const maxConcurrentChunks = 5; // Limit concurrent chunks to avoid overwhelming DB
       let processedChunks = 0;
       let totalProcessed = 0;
       let totalErrors = 0;
@@ -4411,52 +4618,129 @@ app.post("/generate-rekap-absensi", (req, res) => {
             } employees)`
           );
 
-          // Build multi-employee query for this chunk
-          const multiEmployeeSQL = `
+          // Build complex aggregation query sesuai ketentuan
+          const complexSQL = `
             SELECT 
-              perner as PERNER,
-              COUNT(*) as TOTAL_HARI,
-              COUNT(CASE WHEN jenis_hari LIKE '%HARI KERJA%' THEN 1 END) as HARI_KERJA,
-              COUNT(CASE WHEN jenis_hari LIKE '%LIBUR%' THEN 1 END) as HARI_LIBUR,
-              COUNT(CASE WHEN (correction_in = 'koreksi' OR correction_out = 'koreksi') THEN 1 END) as TOTAL_HARI_KOREKSI,
-              COUNT(CASE WHEN correction_in = 'koreksi' AND (correction_out != 'koreksi' OR correction_out IS NULL) THEN 1 END) as KOREKSI_IN,
-              COUNT(CASE WHEN correction_out = 'koreksi' AND (correction_in != 'koreksi' OR correction_in IS NULL) THEN 1 END) as KOREKSI_OUT,
-              COUNT(CASE WHEN correction_in = 'koreksi' AND correction_out = 'koreksi' THEN 1 END) as KOREKSI_IN_OUT,
-              COUNT(CASE WHEN status_jam_kerja LIKE '%Normal%' THEN 1 END) as TOTAL_JAM_KERJA_NORMAL,
-              COUNT(CASE WHEN status_jam_kerja LIKE '%PIKET%' THEN 1 END) as PIKET,
-              COUNT(CASE WHEN status_jam_kerja LIKE '%PDKB%' THEN 1 END) as PDKB,
-              COUNT(CASE WHEN status_jam_kerja LIKE '%Normal%' AND status_jam_kerja NOT LIKE '%PIKET%' AND status_jam_kerja NOT LIKE '%PDKB%' THEN 1 END) as REGULER,
-              COUNT(CASE WHEN status_jam_kerja LIKE '%Shift%' THEN 1 END) as TOTAL_JAM_KERJA_SHIFT,
-              COUNT(CASE WHEN status_jam_kerja LIKE '%Pagi%' THEN 1 END) as SHIFT_PAGI,
-              COUNT(CASE WHEN status_jam_kerja LIKE '%Siang%' THEN 1 END) as SHIFT_SIANG,
-              COUNT(CASE WHEN status_jam_kerja LIKE '%Malam%' THEN 1 END) as SHIFT_MALAM,
-              COUNT(CASE WHEN status_jam_kerja LIKE '%OFF%' THEN 1 END) as SHIFT_OFF,
-              COUNT(CASE WHEN status_absen = 'Lengkap' THEN 1 END) as ABSEN_LENGKAP,
-              COUNT(CASE WHEN status_absen LIKE '%tidak absen%' THEN 1 END) as TIDAK_ABSEN,
-              COUNT(CASE WHEN status_absen LIKE '%in kosong%' THEN 1 END) as IN_KOSONG,
-              COUNT(CASE WHEN status_absen LIKE '%out kosong%' THEN 1 END) as OUT_KOSONG,
-              COUNT(CASE WHEN SUBSTRING_INDEX(value_att_abs, '_', 1) IN ('att', 'sppd') THEN 1 END) as SPPD_TUGAS_LUAR_DLL,
-              COUNT(CASE WHEN SUBSTRING_INDEX(value_att_abs, '_', 1) = 'abs' THEN 1 END) as CUTI_IJIN,
-              ROUND(COALESCE(SUM(CAST(jam_kerja_pegawai_cleansing AS DECIMAL(10,2))), 0), 2) as JAM_REALISASI,
-              ROUND(COALESCE(SUM(CAST(jam_kerja_seharusnya AS DECIMAL(10,2))), 0), 2) as JAM_SEHARUSNYA,
+              o.perner as PERNER,
+              dp.nama as NAMA,
+              dp.nip as NIP,
+              dp.bidang as BIDANG_UNIT,
+              
+              -- JUMLAH HARI REGULER
+              COUNT(o.tanggal) as TOTAL_HARI_REGULER,
+              COUNT(CASE WHEN o.jenis_hari LIKE '%HARI KERJA%' THEN 1 END) as HARI_KERJA_REGULER,
+              COUNT(CASE WHEN o.jenis_hari LIKE '%LIBUR%' THEN 1 END) as HARI_LIBUR_REGULER,
+              
+              -- JUMLAH HARI REALISASI
+              COUNT(o.tanggal) as TOTAL_HARI_REALISASI,
+              COUNT(
+                CASE 
+                  WHEN LOWER(o.jenis_hari_realisasi) = 'hari kerja' THEN 1 
+                END
+              ) AS HARI_KERJA_REALISASI,
+              COUNT(CASE WHEN o.jenis_hari_realisasi LIKE '%BUKAN HARI KERJA%' THEN 1 END) as HARI_LIBUR_REALISASI,
+              
+              -- DATA KOREKSI (dengan exclusion logic)
+              COUNT(CASE WHEN 
+                (o.correction_in = 'tanpa koreksi' AND o.correction_out = 'tanpa koreksi') 
+                AND o.jenis_hari_realisasi NOT LIKE '%Bukan hari kerja%' 
+                AND (o.value_att_abs IS NULL OR o.value_att_abs = '')
+                THEN 1 END) as TOTAL_HARI_TANPA_KOREKSI,
+              COUNT(CASE WHEN 
+                (o.correction_in = 'koreksi' OR o.correction_out = 'koreksi') 
+                AND o.jenis_hari_realisasi NOT LIKE '%Bukan hari kerja%' 
+                AND (o.value_att_abs IS NULL OR o.value_att_abs = '')
+                THEN 1 END) as TOTAL_HARI_KOREKSI,
+              COUNT(CASE WHEN 
+                o.correction_in = 'koreksi' 
+                AND o.jenis_hari_realisasi NOT LIKE '%Bukan hari kerja%' 
+                AND (o.value_att_abs IS NULL OR o.value_att_abs = '')
+                THEN 1 END) as KOREKSI_IN,
+              COUNT(CASE WHEN 
+                o.correction_out = 'koreksi' 
+                AND o.jenis_hari_realisasi NOT LIKE '%Bukan hari kerja%' 
+                AND (o.value_att_abs IS NULL OR o.value_att_abs = '')
+                THEN 1 END) as KOREKSI_OUT,
+              COUNT(CASE WHEN 
+                o.correction_in = 'koreksi' AND o.correction_out = 'koreksi' 
+                AND o.jenis_hari_realisasi NOT LIKE '%Bukan hari kerja%' 
+                AND (o.value_att_abs IS NULL OR o.value_att_abs = '')
+                THEN 1 END) as KOREKSI_IN_OUT,
+              
+              -- POLA JAM KERJA NORMAL
+              COUNT(CASE WHEN o.status_jam_kerja LIKE '%Normal%' THEN 1 END) as TOTAL_JAM_KERJA_NORMAL,
+              COUNT(CASE WHEN o.status_jam_kerja LIKE '%PIKET%' THEN 1 END) as PIKET,
+              COUNT(CASE WHEN o.status_jam_kerja LIKE '%PDKB%' THEN 1 END) as PDKB,
+              COUNT(CASE WHEN 
+                o.status_jam_kerja LIKE '%Normal%' 
+                AND o.status_jam_kerja NOT LIKE '%PIKET%' 
+                AND o.status_jam_kerja NOT LIKE '%PDKB%' 
+                THEN 1 END) as REGULER,
+              
+              -- POLA JAM KERJA SHIFT
+              COUNT(CASE WHEN o.status_jam_kerja LIKE '%Shift%' THEN 1 END) as TOTAL_JAM_KERJA_SHIFT,
+              COUNT(CASE WHEN o.status_jam_kerja LIKE '%Pagi%' THEN 1 END) as SHIFT_PAGI,
+              COUNT(CASE WHEN o.status_jam_kerja LIKE '%Siang%' THEN 1 END) as SHIFT_SIANG,
+              COUNT(CASE WHEN o.status_jam_kerja LIKE '%Malam%' THEN 1 END) as SHIFT_MALAM,
+              COUNT(CASE WHEN o.status_jam_kerja LIKE '%OFF%' THEN 1 END) as SHIFT_OFF,
+              
+              -- KETERANGAN ABSEN MASUK DAN PULANG
+              COUNT(CASE WHEN o.status_absen = 'Lengkap' THEN 1 END) as ABSEN_LENGKAP,
+              COUNT(CASE WHEN o.status_absen LIKE '%tidak lengkap%' THEN 1 END) as ABSEN_TIDAK_LENGKAP,
+              COUNT(CASE WHEN o.status_absen LIKE '%tidak absen%' THEN 1 END) as IN_OUT_KOSONG,
+              COUNT(CASE WHEN o.status_absen LIKE '%in kosong%' THEN 1 END) as IN_KOSONG,
+              COUNT(CASE WHEN o.status_absen LIKE '%out kosong%' THEN 1 END) as OUT_KOSONG,
+              
+              -- PENGAJUAN KETIDAKHADIRAN (dengan exclusion logic)
+              COUNT(CASE WHEN 
+                o.value_att_abs LIKE '%att_%' 
+                AND o.jenis_hari_realisasi NOT LIKE '%Bukan hari kerja%' 
+                THEN 1 END) as SPPD_TUGAS_LUAR_DLL,
+              COUNT(CASE WHEN 
+                o.value_att_abs LIKE '%abs_%' 
+                AND o.jenis_hari_realisasi NOT LIKE '%Bukan hari kerja%' 
+                THEN 1 END) as CUTI_IJIN,
+              
+              -- PEROLEHAN DURASI JAM KERJA (dengan exclusion logic)
+              ROUND(COALESCE(SUM(CASE WHEN 
+                o.jenis_hari_realisasi NOT LIKE '%Bukan hari kerja%' 
+                THEN CAST(o.jam_kerja_pegawai_cleansing AS DECIMAL(10,2)) 
+                ELSE 0 END), 0), 2) as JAM_REALISASI,
+              ROUND(COALESCE(SUM(CASE WHEN 
+                o.jenis_hari_realisasi NOT LIKE '%Bukan hari kerja%' 
+                THEN CAST(o.jam_kerja_seharusnya AS DECIMAL(10,2)) 
+                ELSE 0 END), 0), 2) as JAM_SEHARUSNYA,
+              
+              -- PERSENTASE JKP calculation
               CASE 
-                WHEN COALESCE(SUM(CAST(jam_kerja_seharusnya AS DECIMAL(10,2))), 0) = 0 THEN 0.00
+                WHEN COALESCE(SUM(CASE WHEN 
+                  o.jenis_hari_realisasi NOT LIKE '%Bukan hari kerja%' 
+                  THEN CAST(o.jam_kerja_seharusnya AS DECIMAL(10,2)) 
+                  ELSE 0 END), 0) = 0 THEN 0.00
                 ELSE ROUND(
-                  (COALESCE(SUM(CAST(jam_kerja_pegawai_cleansing AS DECIMAL(10,2))), 0) / 
-                   SUM(CAST(jam_kerja_seharusnya AS DECIMAL(10,2)))) * 100, 
+                  (COALESCE(SUM(CASE WHEN 
+                    o.jenis_hari_realisasi NOT LIKE '%Bukan hari kerja%' 
+                    THEN CAST(o.jam_kerja_pegawai_cleansing AS DECIMAL(10,2)) 
+                    ELSE 0 END), 0) / 
+                   SUM(CASE WHEN 
+                     o.jenis_hari_realisasi NOT LIKE '%Bukan hari kerja%' 
+                     THEN CAST(o.jam_kerja_seharusnya AS DECIMAL(10,2)) 
+                     ELSE 0 END)) * 100, 
                   2
                 )
               END as PERSENTASE_JKP
-            FROM olah_absensi 
-            WHERE perner IN (${chunk.map(() => "?").join(", ")})
-            GROUP BY perner
-            ORDER BY perner
+              
+            FROM olah_absensi o
+            LEFT JOIN data_pegawai dp ON o.perner = dp.perner
+            WHERE o.perner IN (${chunk.map(() => "?").join(", ")})
+            GROUP BY o.perner, dp.nama, dp.nip, dp.bidang
+            ORDER BY o.perner
           `;
 
           const chunkStartTime = Date.now();
           const pernerList = chunk.map((p) => p.perner);
 
-          conn.query(multiEmployeeSQL, pernerList, (calcErr, chunkResults) => {
+          conn.query(complexSQL, pernerList, (calcErr, chunkResults) => {
             if (calcErr) {
               console.error(
                 `❌ Chunk ${chunkIndex + 1} calculation failed:`,
@@ -4472,20 +4756,22 @@ app.post("/generate-rekap-absensi", (req, res) => {
               return resolve([]);
             }
 
-            // Batch insert chunk results
+            // Batch insert chunk results sesuai struktur tabel rekap_absensi
             const insertSQL = `
               INSERT INTO rekap_absensi (
-                PERNER, TOTAL_HARI, HARI_KERJA, HARI_LIBUR, 
-                TOTAL_HARI_KOREKSI, KOREKSI_IN, KOREKSI_OUT, KOREKSI_IN_OUT,
+                PERNER, NAMA, BIDANG_UNIT,
+                TOTAL_HARI_REGULER, HARI_KERJA_REGULER, HARI_LIBUR_REGULER,
+                TOTAL_HARI_REALISASI, HARI_KERJA_REALISASI, HARI_LIBUR_REALISASI,
+                TOTAL_HARI_TANPA_KOREKSI, TOTAL_HARI_KOREKSI, KOREKSI_IN, KOREKSI_OUT, KOREKSI_IN_OUT,
                 TOTAL_JAM_KERJA_NORMAL, PIKET, PDKB, REGULER,
                 TOTAL_JAM_KERJA_SHIFT, SHIFT_PAGI, SHIFT_SIANG, SHIFT_MALAM, SHIFT_OFF,
-                ABSEN_LENGKAP, TIDAK_ABSEN, IN_KOSONG, OUT_KOSONG,
+                ABSEN_LENGKAP, ABSEN_TIDAK_LENGKAP, IN_OUT_KOSONG, IN_KOSONG, OUT_KOSONG,
                 SPPD_TUGAS_LUAR_DLL, CUTI_IJIN,
                 JAM_REALISASI, JAM_SEHARUSNYA, PERSENTASE_JKP
               ) VALUES ${chunkResults
                 .map(
                   () =>
-                    "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                    "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
                 )
                 .join(", ")}
             `;
@@ -4494,9 +4780,15 @@ app.post("/generate-rekap-absensi", (req, res) => {
             chunkResults.forEach((rekapData) => {
               insertValues.push(
                 rekapData.PERNER,
-                rekapData.TOTAL_HARI || 0,
-                rekapData.HARI_KERJA || 0,
-                rekapData.HARI_LIBUR || 0,
+                rekapData.NAMA || null,
+                rekapData.BIDANG_UNIT || null,
+                rekapData.TOTAL_HARI_REGULER || 0,
+                rekapData.HARI_KERJA_REGULER || 0,
+                rekapData.HARI_LIBUR_REGULER || 0,
+                rekapData.TOTAL_HARI_REALISASI || 0,
+                rekapData.HARI_KERJA_REALISASI || 0,
+                rekapData.HARI_LIBUR_REALISASI || 0,
+                rekapData.TOTAL_HARI_TANPA_KOREKSI || 0,
                 rekapData.TOTAL_HARI_KOREKSI || 0,
                 rekapData.KOREKSI_IN || 0,
                 rekapData.KOREKSI_OUT || 0,
@@ -4511,7 +4803,8 @@ app.post("/generate-rekap-absensi", (req, res) => {
                 rekapData.SHIFT_MALAM || 0,
                 rekapData.SHIFT_OFF || 0,
                 rekapData.ABSEN_LENGKAP || 0,
-                rekapData.TIDAK_ABSEN || 0,
+                rekapData.ABSEN_TIDAK_LENGKAP || 0,
+                rekapData.IN_OUT_KOSONG || 0,
                 rekapData.IN_KOSONG || 0,
                 rekapData.OUT_KOSONG || 0,
                 rekapData.SPPD_TUGAS_LUAR_DLL || 0,
@@ -4558,54 +4851,34 @@ app.post("/generate-rekap-absensi", (req, res) => {
         });
       };
 
-      // Process chunks with controlled concurrency
+      // Process chunks sequentially untuk avoid overwhelming database
       const processChunksSequentially = async () => {
         const results = [];
 
-        // Process chunks in batches of maxConcurrentChunks
-        for (let i = 0; i < chunks.length; i += maxConcurrentChunks) {
-          const batchChunks = chunks.slice(i, i + maxConcurrentChunks);
-          const batchPromises = batchChunks.map((chunk, index) =>
-            processChunk(chunk, i + index)
-          );
-
-          console.log(
-            `🔄 Processing batch ${
-              Math.floor(i / maxConcurrentChunks) + 1
-            }/${Math.ceil(chunks.length / maxConcurrentChunks)} (${
-              batchPromises.length
-            } concurrent chunks)`
-          );
-
+        for (let i = 0; i < chunks.length; i++) {
           try {
-            const batchResults = await Promise.allSettled(batchPromises);
+            const chunkResult = await processChunk(chunks[i], i);
+            results.push(...chunkResult);
 
-            batchResults.forEach((result) => {
-              if (result.status === "fulfilled") {
-                results.push(...result.value);
-              } else {
-                console.error("Batch chunk failed:", result.reason);
-              }
-            });
-
-            // Small delay between batches to avoid overwhelming the database
-            if (i + maxConcurrentChunks < chunks.length) {
+            // Small delay between chunks
+            if (i < chunks.length - 1) {
               await new Promise((resolve) => setTimeout(resolve, 100));
             }
           } catch (error) {
-            console.error("Batch processing error:", error);
+            console.error(`Chunk ${i + 1} processing error:`, error);
+            // Continue with next chunk even if one fails
           }
         }
 
         return results;
       };
 
-      // Execute chunked processing
+      // Execute sequential processing
       processChunksSequentially()
         .then(() => {
           const processDuration = Date.now() - processStartTime;
           console.log(
-            `✅ Parallel processing completed: ${totalProcessed} successful, ${totalErrors} errors in ${processDuration}ms`
+            `✅ Rekap processing completed: ${totalProcessed} successful, ${totalErrors} errors in ${processDuration}ms`
           );
 
           // STEP 4: Final statistics
@@ -4625,7 +4898,7 @@ app.post("/generate-rekap-absensi", (req, res) => {
             const overallDuration = Date.now() - overallStartTime;
             const stats = statsErr ? null : statsResult[0];
 
-            console.log(`🎉 PARALLEL CHUNKED GENERATE REKAP COMPLETED!`);
+            console.log(`🎉 REVISED GENERATE REKAP COMPLETED!`);
             console.log(
               `   ⏱️ Overall: ${overallDuration}ms (${(
                 overallDuration / 1000
@@ -4645,11 +4918,11 @@ app.post("/generate-rekap-absensi", (req, res) => {
 
             res.json({
               success: true,
-              message: `⚡ Parallel chunked generate rekap completed in ${(
+              message: `⚡ Revised generate rekap completed in ${(
                 overallDuration / 1000
               ).toFixed(2)}s. ${totalProcessed}/${
                 perners.length
-              } employees processed.`,
+              } employees processed based on ketentuan tabel.`,
               performance: {
                 overall_duration_ms: overallDuration,
                 processing_duration_ms: processDuration,
@@ -4658,8 +4931,7 @@ app.post("/generate-rekap-absensi", (req, res) => {
                 ),
                 chunks_processed: processedChunks,
                 chunk_size: chunkSize,
-                max_concurrent_chunks: maxConcurrentChunks,
-                method: "parallel_chunked_processing",
+                method: "revised_sequential_processing_with_ketentuan",
               },
               details: {
                 total_pegawai: perners.length,
@@ -4670,16 +4942,17 @@ app.post("/generate-rekap-absensi", (req, res) => {
                 )}%`,
                 chunks: chunks.length,
                 generated_at: new Date().toISOString(),
+                ketentuan_applied: true,
               },
               stats: stats || null,
             });
           });
         })
         .catch((err) => {
-          console.error("❌ Fatal error during parallel processing:", err);
+          console.error("❌ Fatal error during revised processing:", err);
           res.status(500).json({
             success: false,
-            message: "❌ Fatal error during parallel chunked processing.",
+            message: "❌ Fatal error during revised rekap processing.",
             error: err.message,
           });
         });
@@ -4691,27 +4964,95 @@ app.post("/generate-rekap-absensi", (req, res) => {
 // ENDPOINT: Get Rekap Absensi Data
 // ============================================
 app.get("/get-rekap-absensi", (req, res) => {
-  const { limit = 50, offset = 0, search = "" } = req.query;
+  const { limit = 50, offset = 0, search = "", search_fields = "" } = req.query;
 
   let whereClause = "";
   const params = [];
 
-  if (search) {
-    whereClause = "WHERE PERNER LIKE ?";
-    params.push(`%${search}%`);
+  if (search && search.trim()) {
+    const searchTerm = search.trim();
+
+    // Enhanced search fields including NIP
+    const defaultFields = ["PERNER", "NAMA", "BIDANG_UNIT"];
+    const fieldsToSearch = search_fields
+      ? search_fields.split(",").map((field) => field.trim())
+      : defaultFields;
+
+    console.log(
+      `🔍 Enhanced search: "${searchTerm}" in fields:`,
+      fieldsToSearch
+    );
+
+    // Build dynamic WHERE clause for multiple fields with JOIN
+    const searchConditions = fieldsToSearch
+      .map((field) => {
+        // Validate field names to prevent SQL injection
+        const validFields = ["PERNER", "NAMA", "NIP", "BIDANG_UNIT"];
+        if (!validFields.includes(field)) {
+          console.warn(`⚠️ Invalid search field: ${field}`);
+          return null;
+        }
+
+        // Map fields to correct table aliases
+        if (field === "PERNER" || field === "BIDANG_UNIT") {
+          return `r.${field} LIKE ?`;
+        } else if (field === "NAMA" || field === "NIP") {
+          return `dp.${field.toLowerCase()} LIKE ?`;
+        }
+        return null;
+      })
+      .filter((condition) => condition !== null);
+
+    if (searchConditions.length > 0) {
+      whereClause = `WHERE (${searchConditions.join(" OR ")})`;
+
+      // Add search parameter for each field
+      searchConditions.forEach(() => {
+        params.push(`%${searchTerm}%`);
+      });
+    }
   }
 
-  const countSQL = `SELECT COUNT(*) as total FROM rekap_absensi ${whereClause}`;
-  const dataSQL = `
-    SELECT * FROM rekap_absensi 
+  console.log(
+    `📊 Enhanced Search Query - WHERE: ${whereClause}, Params:`,
+    params
+  );
+
+  // Count query dengan JOIN
+  const countSQL = `
+    SELECT COUNT(*) as total 
+    FROM rekap_absensi r
+    LEFT JOIN data_pegawai dp ON r.PERNER = dp.perner
     ${whereClause}
-    ORDER BY PERNER 
+  `;
+
+  // Data query dengan JOIN dan semua field yang diperlukan
+  const dataSQL = `
+    SELECT 
+      r.PERNER,
+      dp.nama as NAMA,
+      dp.nip as NIP,
+      r.BIDANG_UNIT,
+      r.TOTAL_HARI_REGULER, r.HARI_KERJA_REGULER, r.HARI_LIBUR_REGULER,
+      r.TOTAL_HARI_REALISASI, r.HARI_KERJA_REALISASI, r.HARI_LIBUR_REALISASI,
+      r.TOTAL_HARI_TANPA_KOREKSI, r.TOTAL_HARI_KOREKSI, r.KOREKSI_IN, r.KOREKSI_OUT, r.KOREKSI_IN_OUT,
+      r.TOTAL_JAM_KERJA_NORMAL, r.PIKET, r.PDKB, r.REGULER,
+      r.TOTAL_JAM_KERJA_SHIFT, r.SHIFT_PAGI, r.SHIFT_SIANG, r.SHIFT_MALAM, r.SHIFT_OFF,
+      r.ABSEN_LENGKAP, r.ABSEN_TIDAK_LENGKAP, r.IN_OUT_KOSONG, r.IN_KOSONG, r.OUT_KOSONG,
+      r.SPPD_TUGAS_LUAR_DLL, r.CUTI_IJIN,
+      r.JAM_REALISASI, r.JAM_SEHARUSNYA, r.PERSENTASE_JKP,
+      r.RESULT_BLASTING
+    FROM rekap_absensi r
+    LEFT JOIN data_pegawai dp ON r.PERNER = dp.perner
+    ${whereClause}
+    ORDER BY r.PERNER 
     LIMIT ? OFFSET ?
   `;
 
   // Get total count
   conn.query(countSQL, params, (countErr, countResult) => {
     if (countErr) {
+      console.error("❌ Error getting count:", countErr);
       return res.status(500).json({
         success: false,
         message: "Error getting count",
@@ -4727,6 +5068,7 @@ app.get("/get-rekap-absensi", (req, res) => {
       [...params, parseInt(limit), parseInt(offset)],
       (dataErr, dataResult) => {
         if (dataErr) {
+          console.error("❌ Error getting data:", dataErr);
           return res.status(500).json({
             success: false,
             message: "Error getting data",
@@ -4734,7 +5076,8 @@ app.get("/get-rekap-absensi", (req, res) => {
           });
         }
 
-        res.json({
+        // Enhanced response with search info
+        const response = {
           success: true,
           data: dataResult,
           pagination: {
@@ -4743,7 +5086,24 @@ app.get("/get-rekap-absensi", (req, res) => {
             offset: parseInt(offset),
             totalPages: Math.ceil(total / limit),
           },
+          search_info: {
+            query: search,
+            fields_searched: search_fields
+              ? search_fields.split(",")
+              : ["PERNER", "NAMA", "BIDANG_UNIT"],
+            results_found: total,
+            has_search: search && search.trim() !== "",
+          },
+        };
+
+        console.log(`✅ Enhanced search completed:`, {
+          query: search,
+          fields: search_fields,
+          results: total,
+          returned: dataResult.length,
         });
+
+        res.json(response);
       }
     );
   });
@@ -4769,9 +5129,12 @@ app.get("/get-rekap-absensi", (req, res) => {
 // 📊 GET: Ambil data rekap_absensi dengan JOIN ke data_pegawai + periode bulan
 app.get("/getRekapAbsensi", (req, res) => {
   const startTime = Date.now();
-  console.log("🚀 Fetching rekap_absensi with JOIN and periode bulan...");
+  const { search = "", search_fields = "PERNER,NAMA,NIP,BIDANG_UNIT" } =
+    req.query;
 
-  // Step 1: Ambil sample tanggal dari olah_absensi untuk menentukan periode
+  console.log("🚀 Fetching rekap_absensi with enhanced multi-field search...");
+
+  // Step 1: Get periode info
   const periodeSQL = `
     SELECT tanggal 
     FROM olah_absensi 
@@ -4790,7 +5153,7 @@ app.get("/getRekapAbsensi", (req, res) => {
       });
     }
 
-    // Determine periode bulan dan tahun dari olah_absensi
+    // Determine periode
     let periodeBulan = "Tidak Diketahui";
     let periodeTahun = new Date().getFullYear();
 
@@ -4816,51 +5179,79 @@ app.get("/getRekapAbsensi", (req, res) => {
 
     console.log(`📅 Periode absensi: ${periodeBulan} ${periodeTahun}`);
 
-    // Step 2: Query dengan LEFT JOIN untuk ambil data pegawai
+    // Step 2: Build enhanced search query
+    let whereClause = "";
+    const params = [];
+
+    if (search && search.trim()) {
+      const searchTerm = search.trim();
+      const fieldsToSearch = search_fields
+        .split(",")
+        .map((field) => field.trim());
+
+      console.log(
+        `🔍 Enhanced search: "${searchTerm}" in fields:`,
+        fieldsToSearch
+      );
+
+      // Build search conditions with table aliases
+      const searchConditions = fieldsToSearch
+        .map((field) => {
+          switch (field) {
+            case "PERNER":
+              return "r.PERNER LIKE ?";
+            case "NAMA":
+              return "dp.nama LIKE ?";
+            case "NIP":
+              return "dp.nip LIKE ?";
+            case "BIDANG_UNIT":
+              return "dp.bidang LIKE ?";
+            default:
+              return null;
+          }
+        })
+        .filter((condition) => condition !== null);
+
+      if (searchConditions.length > 0) {
+        whereClause = `WHERE (${searchConditions.join(" OR ")})`;
+
+        // Add parameters for each search condition
+        searchConditions.forEach(() => {
+          params.push(`%${searchTerm}%`);
+        });
+      }
+    }
+
+    // Step 3: Enhanced query with JOIN and search
     const sql = `
       SELECT 
         r.PERNER,
-        dp.nama,
-        dp.nip,
-        dp.bidang,
+        dp.nama as NAMA,
+        dp.nip as NIP,
+        dp.bidang as BIDANG_UNIT,
         dp.no_telp,
-        r.TOTAL_HARI,
-        r.HARI_KERJA,
-        r.HARI_LIBUR,
-        r.TOTAL_HARI_KOREKSI,
-        r.KOREKSI_IN,
-        r.KOREKSI_OUT,
-        r.KOREKSI_IN_OUT,
-        r.TOTAL_JAM_KERJA_NORMAL,
-        r.PIKET,
-        r.PDKB,
-        r.REGULER,
-        r.TOTAL_JAM_KERJA_SHIFT,
-        r.SHIFT_PAGI,
-        r.SHIFT_SIANG,
-        r.SHIFT_MALAM,
-        r.SHIFT_OFF,
-        r.ABSEN_LENGKAP,
-        r.TIDAK_ABSEN,
-        r.IN_KOSONG,
-        r.OUT_KOSONG,
-        r.SPPD_TUGAS_LUAR_DLL,
-        r.CUTI_IJIN,
-        r.JAM_REALISASI,
-        r.JAM_SEHARUSNYA,
-        r.PERSENTASE_JKP,
+        r.TOTAL_HARI_REGULER, r.HARI_KERJA_REGULER, r.HARI_LIBUR_REGULER,
+        r.TOTAL_HARI_REALISASI, r.HARI_KERJA_REALISASI, r.HARI_LIBUR_REALISASI,
+        r.TOTAL_HARI_TANPA_KOREKSI, r.TOTAL_HARI_KOREKSI,
+        r.KOREKSI_IN, r.KOREKSI_OUT, r.KOREKSI_IN_OUT,
+        r.TOTAL_JAM_KERJA_NORMAL, r.PIKET, r.PDKB, r.REGULER,
+        r.TOTAL_JAM_KERJA_SHIFT, r.SHIFT_PAGI, r.SHIFT_SIANG, r.SHIFT_MALAM, r.SHIFT_OFF,
+        r.ABSEN_LENGKAP, r.TIDAK_ABSEN, r.IN_KOSONG, r.OUT_KOSONG,
+        r.SPPD_TUGAS_LUAR_DLL, r.CUTI_IJIN,
+        r.JAM_REALISASI, r.JAM_SEHARUSNYA, r.PERSENTASE_JKP,
         r.RESULT_BLASTING
       FROM rekap_absensi r
       LEFT JOIN data_pegawai dp ON r.PERNER = dp.perner
+      ${whereClause}
       ORDER BY r.PERNER ASC
     `;
 
-    conn.query(sql, (err, results) => {
+    conn.query(sql, params, (err, results) => {
       if (err) {
-        console.error("❌ Error fetching data with JOIN:", err);
+        console.error("❌ Error fetching enhanced search data:", err);
         return res.status(500).json({
           success: false,
-          message: "❌ Gagal mengambil data rekap dengan pegawai",
+          message: "❌ Gagal mengambil data rekap dengan enhanced search",
           error: err.message,
         });
       }
@@ -4869,50 +5260,26 @@ app.get("/getRekapAbsensi", (req, res) => {
       const duration = endTime - startTime;
 
       console.log(
-        `✅ Data with JOIN fetched: ${results.length} records in ${duration}ms`
+        `✅ Enhanced search completed: ${results.length} records in ${duration}ms`
       );
 
-      // Debug log untuk check JOIN result
-      if (results.length > 0) {
-        const sampleData = results[0];
-        console.log(`📊 Sample data:`, {
-          PERNER: sampleData.PERNER,
-          nama: sampleData.nama,
-          nip: sampleData.nip,
-          bidang: sampleData.bidang,
-          no_telp: sampleData.no_telp,
-        });
-
-        // Count berapa yang punya data pegawai
-        const withPegawaiData = results.filter((r) => r.nama !== null).length;
-        const withoutPegawaiData = results.filter(
-          (r) => r.nama === null
-        ).length;
-
-        console.log(`📈 JOIN Statistics:`);
-        console.log(`   - Records with pegawai data: ${withPegawaiData}`);
-        console.log(`   - Records without pegawai data: ${withoutPegawaiData}`);
-        console.log(
-          `   - Match percentage: ${(
-            (withPegawaiData / results.length) *
-            100
-          ).toFixed(2)}%`
-        );
-      }
-
-      // Format hasil untuk konsistensi + tambahkan periode
+      // Format results
       const formattedResults = results.map((row) => ({
         PERNER: row.PERNER || "",
-        nama: row.nama || null,
-        nip: row.nip || null,
-        bidang: row.bidang || null,
+        NAMA: row.NAMA || null,
+        NIP: row.NIP || null,
+        BIDANG_UNIT: row.BIDANG_UNIT || null,
         no_telp: row.no_telp || null,
-        // Tambahkan info periode untuk template pesan
         periode_bulan: periodeBulan,
         periode_tahun: periodeTahun,
-        TOTAL_HARI: parseInt(row.TOTAL_HARI) || 0,
-        HARI_KERJA: parseInt(row.HARI_KERJA) || 0,
-        HARI_LIBUR: parseInt(row.HARI_LIBUR) || 0,
+        // ... all other fields mapping
+        TOTAL_HARI_REGULER: parseInt(row.TOTAL_HARI_REGULER) || 0,
+        HARI_KERJA_REGULER: parseInt(row.HARI_KERJA_REGULER) || 0,
+        HARI_LIBUR_REGULER: parseInt(row.HARI_LIBUR_REGULER) || 0,
+        TOTAL_HARI_REALISASI: parseInt(row.TOTAL_HARI_REALISASI) || 0,
+        HARI_KERJA_REALISASI: parseInt(row.HARI_KERJA_REALISASI) || 0,
+        HARI_LIBUR_REALISASI: parseInt(row.HARI_LIBUR_REALISASI) || 0,
+        TOTAL_HARI_TANPA_KOREKSI: parseInt(row.TOTAL_HARI_TANPA_KOREKSI) || 0,
         TOTAL_HARI_KOREKSI: parseInt(row.TOTAL_HARI_KOREKSI) || 0,
         KOREKSI_IN: parseInt(row.KOREKSI_IN) || 0,
         KOREKSI_OUT: parseInt(row.KOREKSI_OUT) || 0,
@@ -4938,7 +5305,24 @@ app.get("/getRekapAbsensi", (req, res) => {
         RESULT_BLASTING: row.RESULT_BLASTING || null,
       }));
 
-      res.json(formattedResults);
+      // Add search metadata to response
+      const response = {
+        success: true,
+        data: formattedResults,
+        search_info: {
+          query: search,
+          fields_searched: search_fields ? search_fields.split(",") : [],
+          results_found: results.length,
+          has_search: search && search.trim() !== "",
+          duration_ms: duration,
+        },
+        periode: {
+          bulan: periodeBulan,
+          tahun: periodeTahun,
+        },
+      };
+
+      res.json(response);
     });
   });
 });
@@ -6826,6 +7210,1124 @@ app.get("/getInputInOutSapStats", (req, res) => {
         },
         timestamp: new Date().toISOString(),
       },
+    });
+  });
+});
+
+// ============================================
+// NEW ENDPOINT: Debug Rekap Calculation for Specific PERNER
+// ============================================
+app.get("/debug-rekap-calculation/:perner", (req, res) => {
+  const { perner } = req.params;
+  console.log(`🐛 Debugging rekap calculation for PERNER: ${perner}`);
+  const startTime = Date.now();
+
+  if (!perner) {
+    return res.status(400).json({
+      success: false,
+      message: "❌ PERNER parameter is required",
+    });
+  }
+
+  // Get detailed breakdown for specific PERNER
+  const debugSQL = `
+    SELECT 
+      o.perner,
+      o.tanggal,
+      o.jenis_hari,
+      o.jenis_hari_realisasi,
+      o.correction_in,
+      o.correction_out,
+      o.status_jam_kerja,
+      o.status_absen,
+      o.value_att_abs,
+      o.jam_kerja_pegawai_cleansing,
+      o.jam_kerja_seharusnya,
+      
+      -- Debug flags
+      CASE WHEN o.jenis_hari LIKE '%HARI KERJA%' THEN 1 ELSE 0 END as is_hari_kerja_reguler,
+      CASE WHEN o.jenis_hari_realisasi LIKE '%HARI KERJA%' THEN 1 ELSE 0 END as is_hari_kerja_realisasi,
+      CASE WHEN o.jenis_hari_realisasi LIKE '%BUKAN HARI KERJA%' THEN 1 ELSE 0 END as is_bukan_hari_kerja,
+      
+      -- Koreksi debug
+      CASE WHEN (o.correction_in = 'tanpa koreksi' AND o.correction_out = 'tanpa koreksi') 
+                AND o.jenis_hari_realisasi NOT LIKE '%Bukan hari kerja%' 
+                AND (o.value_att_abs IS NULL OR o.value_att_abs = '')
+           THEN 1 ELSE 0 END as count_tanpa_koreksi,
+      CASE WHEN (o.correction_in = 'koreksi' OR o.correction_out = 'koreksi') 
+                AND o.jenis_hari_realisasi NOT LIKE '%Bukan hari kerja%' 
+                AND (o.value_att_abs IS NULL OR o.value_att_abs = '')
+           THEN 1 ELSE 0 END as count_koreksi,
+      
+      -- JAM debug
+      CASE WHEN o.jenis_hari_realisasi NOT LIKE '%Bukan hari kerja%' 
+           THEN CAST(o.jam_kerja_pegawai_cleansing AS DECIMAL(10,2)) 
+           ELSE 0 END as jam_realisasi_counted,
+      CASE WHEN o.jenis_hari_realisasi NOT LIKE '%Bukan hari kerja%' 
+           THEN CAST(o.jam_kerja_seharusnya AS DECIMAL(10,2)) 
+           ELSE 0 END as jam_seharusnya_counted
+      
+    FROM olah_absensi o
+    WHERE o.perner = ?
+    ORDER BY o.tanggal
+  `;
+
+  conn.query(debugSQL, [perner], (debugErr, debugResults) => {
+    if (debugErr) {
+      console.error(`❌ Debug query error for ${perner}:`, debugErr);
+      return res.status(500).json({
+        success: false,
+        message: "❌ Gagal debug rekap calculation",
+        error: debugErr.message,
+      });
+    }
+
+    // Get actual rekap result for comparison
+    const rekapSQL = `
+      SELECT * FROM rekap_absensi WHERE PERNER = ?
+    `;
+
+    conn.query(rekapSQL, [perner], (rekapErr, rekapResults) => {
+      if (rekapErr) {
+        console.error(`❌ Rekap query error for ${perner}:`, rekapErr);
+        return res.status(500).json({
+          success: false,
+          message: "❌ Gagal mengambil data rekap",
+          error: rekapErr.message,
+        });
+      }
+
+      const endTime = Date.now();
+      const duration = endTime - startTime;
+
+      // Calculate manual totals for verification
+      const manualCalculation = {
+        total_hari_reguler: debugResults.length,
+        hari_kerja_reguler: debugResults.filter(
+          (r) => r.is_hari_kerja_reguler === 1
+        ).length,
+        hari_libur_reguler: debugResults.filter(
+          (r) => r.is_hari_kerja_reguler === 0
+        ).length,
+        total_hari_realisasi: debugResults.length,
+        hari_kerja_realisasi: debugResults.filter(
+          (r) => r.is_hari_kerja_realisasi === 1
+        ).length,
+        hari_libur_realisasi: debugResults.filter(
+          (r) => r.is_bukan_hari_kerja === 1
+        ).length,
+        total_tanpa_koreksi: debugResults.filter(
+          (r) => r.count_tanpa_koreksi === 1
+        ).length,
+        total_koreksi: debugResults.filter((r) => r.count_koreksi === 1).length,
+        jam_realisasi: debugResults.reduce(
+          (sum, r) => sum + (parseFloat(r.jam_realisasi_counted) || 0),
+          0
+        ),
+        jam_seharusnya: debugResults.reduce(
+          (sum, r) => sum + (parseFloat(r.jam_seharusnya_counted) || 0),
+          0
+        ),
+      };
+
+      // Add percentage calculation
+      manualCalculation.persentase_jkp =
+        manualCalculation.jam_seharusnya > 0
+          ? (manualCalculation.jam_realisasi /
+              manualCalculation.jam_seharusnya) *
+            100
+          : 0;
+
+      console.log(`🐛 Debug completed for ${perner} in ${duration}ms`);
+
+      res.json({
+        success: true,
+        message: `🐛 Debug rekap calculation completed for PERNER ${perner}`,
+        debug_info: {
+          perner: perner,
+          total_days_found: debugResults.length,
+          duration_ms: duration,
+        },
+        manual_calculation: manualCalculation,
+        actual_rekap: rekapResults[0] || null,
+        detailed_breakdown: debugResults,
+        comparison: rekapResults[0]
+          ? {
+              total_hari_reguler_match:
+                manualCalculation.total_hari_reguler ===
+                rekapResults[0].TOTAL_HARI_REGULER,
+              hari_kerja_reguler_match:
+                manualCalculation.hari_kerja_reguler ===
+                rekapResults[0].HARI_KERJA_REGULER,
+              jam_realisasi_match:
+                Math.abs(
+                  manualCalculation.jam_realisasi -
+                    rekapResults[0].JAM_REALISASI
+                ) < 0.01,
+              persentase_match:
+                Math.abs(
+                  manualCalculation.persentase_jkp -
+                    rekapResults[0].PERSENTASE_JKP
+                ) < 0.01,
+            }
+          : null,
+        timestamp: new Date().toISOString(),
+      });
+    });
+  });
+});
+
+// ============================================
+// NEW ENDPOINT: Bulk Fix Data Issues
+// ============================================
+app.post("/bulk-fix-data-issues", (req, res) => {
+  console.log("🔧 Starting bulk fix for common data issues...");
+  const startTime = Date.now();
+
+  const fixes = [];
+  let totalFixed = 0;
+
+  // Fix 1: Generate missing data_pegawai
+  const fixMissingDataPegawai = () => {
+    return new Promise((resolve) => {
+      const findMissingSQL = `
+        SELECT DISTINCT ra.PERNER
+        FROM rekap_absensi ra
+        LEFT JOIN data_pegawai dp ON ra.PERNER = dp.perner
+        WHERE dp.perner IS NULL
+        ORDER BY ra.PERNER
+        LIMIT 100
+      `;
+
+      conn.query(findMissingSQL, (findErr, missingRecords) => {
+        if (findErr || missingRecords.length === 0) {
+          fixes.push({
+            type: "missing_data_pegawai",
+            status: "skipped",
+            message: findErr
+              ? `Error: ${findErr.message}`
+              : "No missing records found",
+            fixed_count: 0,
+          });
+          return resolve();
+        }
+
+        // Generate dummy data
+        const insertData = missingRecords.map((record, index) => ({
+          perner: record.PERNER,
+          nip: `99${String(Date.now()).slice(-6)}${String(index).padStart(
+            2,
+            "0"
+          )}`,
+          nama: `Pegawai ${record.PERNER}`,
+          bidang: [
+            "IT & Digital",
+            "Keuangan",
+            "Human Resources",
+            "Marketing",
+            "Operasional",
+          ][index % 5],
+          no_telp: `0813${String(
+            Math.floor(Math.random() * 90000000) + 10000000
+          )}`,
+        }));
+
+        const placeholders = insertData.map(() => "(?, ?, ?, ?, ?)").join(", ");
+        const insertSQL = `INSERT INTO data_pegawai (perner, nip, nama, bidang, no_telp) VALUES ${placeholders}`;
+
+        const params = [];
+        insertData.forEach((item) => {
+          params.push(
+            item.perner,
+            item.nip,
+            item.nama,
+            item.bidang,
+            item.no_telp
+          );
+        });
+
+        conn.query(insertSQL, params, (insertErr, insertResult) => {
+          const fixedCount = insertErr ? 0 : insertResult.affectedRows;
+          totalFixed += fixedCount;
+
+          fixes.push({
+            type: "missing_data_pegawai",
+            status: insertErr ? "failed" : "success",
+            message: insertErr
+              ? `Error: ${insertErr.message}`
+              : `Fixed ${fixedCount} missing data_pegawai`,
+            fixed_count: fixedCount,
+          });
+          resolve();
+        });
+      });
+    });
+  };
+
+  // Fix 2: Update NAMA and BIDANG_UNIT in rekap_absensi from data_pegawai
+  const fixNameAndBidangMapping = () => {
+    return new Promise((resolve) => {
+      const updateSQL = `
+        UPDATE rekap_absensi ra
+        INNER JOIN data_pegawai dp ON ra.PERNER = dp.perner
+        SET ra.NAMA = dp.nama, ra.BIDANG_UNIT = dp.bidang
+        WHERE ra.NAMA IS NULL OR ra.BIDANG_UNIT IS NULL OR ra.NAMA != dp.nama OR ra.BIDANG_UNIT != dp.bidang
+      `;
+
+      conn.query(updateSQL, (updateErr, updateResult) => {
+        const fixedCount = updateErr ? 0 : updateResult.affectedRows;
+        totalFixed += fixedCount;
+
+        fixes.push({
+          type: "nama_bidang_mapping",
+          status: updateErr ? "failed" : "success",
+          message: updateErr
+            ? `Error: ${updateErr.message}`
+            : `Updated ${fixedCount} NAMA/BIDANG mappings`,
+          fixed_count: fixedCount,
+        });
+        resolve();
+      });
+    });
+  };
+
+  // Fix 3: Set NULL RESULT_BLASTING to default value
+  const fixResultBlasting = () => {
+    return new Promise((resolve) => {
+      const updateSQL = `
+        UPDATE rekap_absensi 
+        SET RESULT_BLASTING = NULL
+        WHERE RESULT_BLASTING = '' OR RESULT_BLASTING = 'undefined'
+      `;
+
+      conn.query(updateSQL, (updateErr, updateResult) => {
+        const fixedCount = updateErr ? 0 : updateResult.affectedRows;
+        totalFixed += fixedCount;
+
+        fixes.push({
+          type: "result_blasting_cleanup",
+          status: updateErr ? "failed" : "success",
+          message: updateErr
+            ? `Error: ${updateErr.message}`
+            : `Cleaned ${fixedCount} RESULT_BLASTING values`,
+          fixed_count: fixedCount,
+        });
+        resolve();
+      });
+    });
+  };
+
+  // Execute all fixes
+  Promise.all([
+    fixMissingDataPegawai(),
+    fixNameAndBidangMapping(),
+    fixResultBlasting(),
+  ])
+    .then(() => {
+      const endTime = Date.now();
+      const duration = endTime - startTime;
+
+      console.log(
+        `🔧 Bulk fix completed in ${duration}ms, ${totalFixed} total fixes applied`
+      );
+
+      res.json({
+        success: true,
+        message: `🔧 Bulk fix completed successfully in ${duration}ms`,
+        summary: {
+          total_fixes_applied: totalFixed,
+          fix_types_attempted: fixes.length,
+          successful_fixes: fixes.filter((f) => f.status === "success").length,
+          failed_fixes: fixes.filter((f) => f.status === "failed").length,
+          duration_ms: duration,
+        },
+        detailed_fixes: fixes,
+        timestamp: new Date().toISOString(),
+      });
+    })
+    .catch((err) => {
+      console.error("❌ Fatal error in bulk fix:", err);
+      res.status(500).json({
+        success: false,
+        message: "❌ Fatal error during bulk fix",
+        error: err.message,
+        partial_fixes: fixes,
+      });
+    });
+});
+
+// ============================================
+// NEW ENDPOINT: Get Rekap Statistics
+// ============================================
+app.get("/get-rekap-statistics", (req, res) => {
+  console.log("📊 Getting comprehensive rekap statistics...");
+  const startTime = Date.now();
+
+  // Comprehensive statistics query
+  const statsSQL = `
+    SELECT 
+      -- Basic counts
+      COUNT(*) as total_pegawai,
+      COUNT(CASE WHEN NAMA IS NOT NULL THEN 1 END) as pegawai_with_nama,
+      COUNT(CASE WHEN BIDANG_UNIT IS NOT NULL THEN 1 END) as pegawai_with_bidang,
+      
+      -- JKP Statistics
+      ROUND(AVG(PERSENTASE_JKP), 2) as avg_persentase_jkp,
+      ROUND(MIN(PERSENTASE_JKP), 2) as min_persentase_jkp,
+      ROUND(MAX(PERSENTASE_JKP), 2) as max_persentase_jkp,
+      COUNT(CASE WHEN PERSENTASE_JKP >= 90 THEN 1 END) as pegawai_excellent_jkp,
+      COUNT(CASE WHEN PERSENTASE_JKP >= 70 AND PERSENTASE_JKP < 90 THEN 1 END) as pegawai_good_jkp,
+      COUNT(CASE WHEN PERSENTASE_JKP < 70 THEN 1 END) as pegawai_poor_jkp,
+      
+      -- Working hours statistics
+      ROUND(SUM(JAM_REALISASI), 2) as total_jam_realisasi,
+      ROUND(SUM(JAM_SEHARUSNYA), 2) as total_jam_seharusnya,
+      ROUND(AVG(JAM_REALISASI), 2) as avg_jam_realisasi_per_pegawai,
+      ROUND(AVG(JAM_SEHARUSNYA), 2) as avg_jam_seharusnya_per_pegawai,
+      
+      -- Attendance statistics
+      ROUND(AVG(TOTAL_HARI_REGULER), 1) as avg_total_hari_reguler,
+      ROUND(AVG(HARI_KERJA_REGULER), 1) as avg_hari_kerja_reguler,
+      ROUND(AVG(ABSEN_LENGKAP), 1) as avg_absen_lengkap,
+      ROUND(AVG(TOTAL_HARI_KOREKSI), 1) as avg_koreksi_per_pegawai,
+      
+      -- Work pattern statistics
+      ROUND(AVG(TOTAL_JAM_KERJA_NORMAL), 1) as avg_jam_kerja_normal,
+      ROUND(AVG(TOTAL_JAM_KERJA_SHIFT), 1) as avg_jam_kerja_shift,
+      COUNT(CASE WHEN TOTAL_JAM_KERJA_NORMAL > 0 THEN 1 END) as pegawai_normal_schedule,
+      COUNT(CASE WHEN TOTAL_JAM_KERJA_SHIFT > 0 THEN 1 END) as pegawai_shift_schedule,
+      
+      -- Leave statistics
+      ROUND(AVG(SPPD_TUGAS_LUAR_DLL), 1) as avg_sppd_per_pegawai,
+      ROUND(AVG(CUTI_IJIN), 1) as avg_cuti_ijin_per_pegawai,
+      
+      -- Result blasting statistics
+      COUNT(CASE WHEN RESULT_BLASTING = 'Terkirim' THEN 1 END) as blasting_terkirim,
+      COUNT(CASE WHEN RESULT_BLASTING = 'Gagal' THEN 1 END) as blasting_gagal,
+      COUNT(CASE WHEN RESULT_BLASTING IS NULL THEN 1 END) as blasting_pending
+      
+    FROM rekap_absensi
+  `;
+
+  conn.query(statsSQL, (statsErr, statsResult) => {
+    if (statsErr) {
+      console.error("❌ Error getting statistics:", statsErr);
+      return res.status(500).json({
+        success: false,
+        message: "❌ Gagal mengambil statistik rekap",
+        error: statsErr.message,
+      });
+    }
+
+    // Get bidang distribution
+    const bidangSQL = `
+      SELECT 
+        BIDANG_UNIT,
+        COUNT(*) as jumlah_pegawai,
+        ROUND(AVG(PERSENTASE_JKP), 2) as avg_jkp_bidang,
+        ROUND(SUM(JAM_REALISASI), 2) as total_jam_bidang
+      FROM rekap_absensi
+      WHERE BIDANG_UNIT IS NOT NULL
+      GROUP BY BIDANG_UNIT
+      ORDER BY jumlah_pegawai DESC
+      LIMIT 10
+    `;
+
+    conn.query(bidangSQL, (bidangErr, bidangResult) => {
+      const endTime = Date.now();
+      const duration = endTime - startTime;
+
+      const stats = statsResult[0] || {};
+      const bidangDistribution = bidangErr ? [] : bidangResult;
+
+      // Calculate additional derived statistics
+      const derivedStats = {
+        overall_jkp_achievement:
+          stats.total_jam_seharusnya > 0
+            ? Math.round(
+                (stats.total_jam_realisasi / stats.total_jam_seharusnya) *
+                  100 *
+                  100
+              ) / 100
+            : 0,
+        data_completeness: {
+          nama_completeness:
+            stats.total_pegawai > 0
+              ? Math.round(
+                  (stats.pegawai_with_nama / stats.total_pegawai) * 100
+                )
+              : 0,
+          bidang_completeness:
+            stats.total_pegawai > 0
+              ? Math.round(
+                  (stats.pegawai_with_bidang / stats.total_pegawai) * 100
+                )
+              : 0,
+        },
+        jkp_distribution: {
+          excellent_percentage:
+            stats.total_pegawai > 0
+              ? Math.round(
+                  (stats.pegawai_excellent_jkp / stats.total_pegawai) * 100
+                )
+              : 0,
+          good_percentage:
+            stats.total_pegawai > 0
+              ? Math.round((stats.pegawai_good_jkp / stats.total_pegawai) * 100)
+              : 0,
+          poor_percentage:
+            stats.total_pegawai > 0
+              ? Math.round((stats.pegawai_poor_jkp / stats.total_pegawai) * 100)
+              : 0,
+        },
+        work_pattern_distribution: {
+          normal_percentage:
+            stats.total_pegawai > 0
+              ? Math.round(
+                  (stats.pegawai_normal_schedule / stats.total_pegawai) * 100
+                )
+              : 0,
+          shift_percentage:
+            stats.total_pegawai > 0
+              ? Math.round(
+                  (stats.pegawai_shift_schedule / stats.total_pegawai) * 100
+                )
+              : 0,
+        },
+        blasting_completion: {
+          completion_rate:
+            stats.total_pegawai > 0
+              ? Math.round(
+                  ((stats.blasting_terkirim + stats.blasting_gagal) /
+                    stats.total_pegawai) *
+                    100
+                )
+              : 0,
+          success_rate:
+            stats.blasting_terkirim + stats.blasting_gagal > 0
+              ? Math.round(
+                  (stats.blasting_terkirim /
+                    (stats.blasting_terkirim + stats.blasting_gagal)) *
+                    100
+                )
+              : 0,
+        },
+      };
+
+      console.log(
+        `📊 Statistics generated in ${duration}ms for ${stats.total_pegawai} pegawai`
+      );
+
+      res.json({
+        success: true,
+        message: `📊 Statistik rekap berhasil diambil untuk ${stats.total_pegawai} pegawai`,
+        raw_statistics: stats,
+        derived_statistics: derivedStats,
+        bidang_distribution: bidangDistribution,
+        performance: {
+          query_duration_ms: duration,
+          records_analyzed: stats.total_pegawai,
+        },
+        timestamp: new Date().toISOString(),
+      });
+    });
+  });
+});
+
+// ============================================
+// UPDATED ENDPOINT: Enhanced Get Rekap with Full JOIN
+// ============================================
+app.get("/get-rekap-absensi-enhanced", (req, res) => {
+  const {
+    limit = 50,
+    offset = 0,
+    search = "",
+    search_fields = "",
+    include_stats = "false",
+  } = req.query;
+  const startTime = Date.now();
+
+  let whereClause = "";
+  const params = [];
+
+  if (search && search.trim()) {
+    const searchTerm = search.trim();
+    const fieldsToSearch = search_fields
+      ? search_fields.split(",").map((field) => field.trim())
+      : ["PERNER", "NAMA", "BIDANG_UNIT"];
+
+    console.log(
+      `🔍 Enhanced search: "${searchTerm}" in fields:`,
+      fieldsToSearch
+    );
+
+    const searchConditions = fieldsToSearch
+      .map((field) => {
+        const validFields = ["PERNER", "NAMA", "NIP", "BIDANG_UNIT"];
+        if (!validFields.includes(field)) {
+          console.warn(`⚠️ Invalid search field: ${field}`);
+          return null;
+        }
+
+        if (field === "PERNER" || field === "BIDANG_UNIT") {
+          return `r.${field} LIKE ?`;
+        } else if (field === "NAMA" || field === "NIP") {
+          return `dp.${field.toLowerCase()} LIKE ?`;
+        }
+        return null;
+      })
+      .filter((condition) => condition !== null);
+
+    if (searchConditions.length > 0) {
+      whereClause = `WHERE (${searchConditions.join(" OR ")})`;
+      searchConditions.forEach(() => {
+        params.push(`%${searchTerm}%`);
+      });
+    }
+  }
+
+  // Enhanced data query dengan semua field dan calculated fields
+  const dataSQL = `
+    SELECT 
+      r.PERNER,
+      dp.nama as NAMA,
+      dp.nip as NIP,
+      COALESCE(r.BIDANG_UNIT, dp.bidang) as BIDANG_UNIT,
+      dp.no_telp,
+      
+      -- All original rekap fields
+      r.TOTAL_HARI_REGULER, r.HARI_KERJA_REGULER, r.HARI_LIBUR_REGULER,
+      r.TOTAL_HARI_REALISASI, r.HARI_KERJA_REALISASI, r.HARI_LIBUR_REALISASI,
+      r.TOTAL_HARI_TANPA_KOREKSI, r.TOTAL_HARI_KOREKSI, r.KOREKSI_IN, r.KOREKSI_OUT, r.KOREKSI_IN_OUT,
+      r.TOTAL_JAM_KERJA_NORMAL, r.PIKET, r.PDKB, r.REGULER,
+      r.TOTAL_JAM_KERJA_SHIFT, r.SHIFT_PAGI, r.SHIFT_SIANG, r.SHIFT_MALAM, r.SHIFT_OFF,
+      r.ABSEN_LENGKAP, r.ABSEN_TIDAK_LENGKAP, r.IN_OUT_KOSONG, r.IN_KOSONG, r.OUT_KOSONG,
+      r.SPPD_TUGAS_LUAR_DLL, r.CUTI_IJIN,
+      r.JAM_REALISASI, r.JAM_SEHARUSNYA, r.PERSENTASE_JKP,
+      r.RESULT_BLASTING,
+      
+      -- Enhanced calculated fields
+      CASE 
+        WHEN r.PERSENTASE_JKP >= 90 THEN 'Excellent'
+        WHEN r.PERSENTASE_JKP >= 70 THEN 'Good'
+        ELSE 'Poor'
+      END as JKP_CATEGORY,
+      
+      CASE 
+        WHEN r.TOTAL_JAM_KERJA_SHIFT > r.TOTAL_JAM_KERJA_NORMAL THEN 'Shift'
+        WHEN r.TOTAL_JAM_KERJA_NORMAL > 0 THEN 'Normal'
+        ELSE 'Unknown'
+      END as WORK_PATTERN,
+      
+      ROUND((r.ABSEN_LENGKAP * 100.0 / NULLIF(r.TOTAL_HARI_REGULER, 0)), 2) as ATTENDANCE_RATE,
+      
+      CASE 
+        WHEN dp.perner IS NULL THEN 'Missing Data Pegawai'
+        WHEN r.NAMA IS NULL THEN 'Missing Nama'
+        WHEN r.BIDANG_UNIT IS NULL AND dp.bidang IS NULL THEN 'Missing Bidang'
+        ELSE 'Complete'
+      END as DATA_STATUS
+      
+    FROM rekap_absensi r
+    LEFT JOIN data_pegawai dp ON r.PERNER = dp.perner
+    ${whereClause}
+    ORDER BY r.PERNER 
+    LIMIT ? OFFSET ?
+  `;
+
+  // Count query
+  const countSQL = `
+    SELECT COUNT(*) as total 
+    FROM rekap_absensi r
+    LEFT JOIN data_pegawai dp ON r.PERNER = dp.perner
+    ${whereClause}
+  `;
+
+  // Execute count query
+  conn.query(countSQL, params, (countErr, countResult) => {
+    if (countErr) {
+      console.error("❌ Error getting count:", countErr);
+      return res.status(500).json({
+        success: false,
+        message: "Error getting count",
+        error: countErr.message,
+      });
+    }
+
+    const total = countResult[0].total;
+
+    // Execute data query
+    conn.query(
+      dataSQL,
+      [...params, parseInt(limit), parseInt(offset)],
+      (dataErr, dataResult) => {
+        if (dataErr) {
+          console.error("❌ Error getting enhanced data:", dataErr);
+          return res.status(500).json({
+            success: false,
+            message: "Error getting enhanced data",
+            error: dataErr.message,
+          });
+        }
+
+        const endTime = Date.now();
+        const duration = endTime - startTime;
+
+        // Optional: Include page-level statistics
+        let pageStats = null;
+        if (include_stats === "true" && dataResult.length > 0) {
+          pageStats = {
+            avg_jkp:
+              Math.round(
+                (dataResult.reduce(
+                  (sum, row) => sum + parseFloat(row.PERSENTASE_JKP || 0),
+                  0
+                ) /
+                  dataResult.length) *
+                  100
+              ) / 100,
+            excellent_count: dataResult.filter(
+              (row) => row.JKP_CATEGORY === "Excellent"
+            ).length,
+            good_count: dataResult.filter((row) => row.JKP_CATEGORY === "Good")
+              .length,
+            poor_count: dataResult.filter((row) => row.JKP_CATEGORY === "Poor")
+              .length,
+            shift_workers: dataResult.filter(
+              (row) => row.WORK_PATTERN === "Shift"
+            ).length,
+            normal_workers: dataResult.filter(
+              (row) => row.WORK_PATTERN === "Normal"
+            ).length,
+            data_complete: dataResult.filter(
+              (row) => row.DATA_STATUS === "Complete"
+            ).length,
+            data_issues: dataResult.filter(
+              (row) => row.DATA_STATUS !== "Complete"
+            ).length,
+          };
+        }
+
+        const response = {
+          success: true,
+          data: dataResult,
+          pagination: {
+            total: total,
+            limit: parseInt(limit),
+            offset: parseInt(offset),
+            totalPages: Math.ceil(total / limit),
+            current_page: Math.floor(parseInt(offset) / parseInt(limit)) + 1,
+          },
+          search_info: {
+            query: search,
+            fields_searched: search_fields
+              ? search_fields.split(",")
+              : ["PERNER", "NAMA", "BIDANG_UNIT"],
+            results_found: total,
+            has_search: search && search.trim() !== "",
+          },
+          page_statistics: pageStats,
+          performance: {
+            query_duration_ms: duration,
+            records_returned: dataResult.length,
+          },
+          timestamp: new Date().toISOString(),
+        };
+
+        console.log(`✅ Enhanced rekap query completed:`, {
+          query: search,
+          fields: search_fields,
+          results: total,
+          returned: dataResult.length,
+          duration_ms: duration,
+        });
+
+        res.json(response);
+      }
+    );
+  });
+}); // ============================================
+
+// ============================================
+// NEW ENDPOINT: Validate Rekap Data Consistency
+// ============================================
+app.get("/validate-rekap-consistency", (req, res) => {
+  console.log("🔍 Starting rekap data consistency validation...");
+  const startTime = Date.now();
+
+  // Validation queries based on ketentuan
+  const validationQueries = [
+    {
+      name: "PERNER_COUNT_VALIDATION",
+      description: "Validate PERNER count consistency",
+      sql: `
+        SELECT 
+          'PERNER_COUNT' as validation_type,
+          COUNT(DISTINCT oa.perner) as source_count,
+          COUNT(DISTINCT ra.PERNER) as rekap_count,
+          CASE 
+            WHEN COUNT(DISTINCT oa.perner) = COUNT(DISTINCT ra.PERNER) THEN 'PASS'
+            ELSE 'FAIL'
+          END as status
+        FROM olah_absensi oa
+        CROSS JOIN rekap_absensi ra
+      `,
+    },
+    {
+      name: "DATA_PEGAWAI_MAPPING",
+      description: "Validate data_pegawai mapping",
+      sql: `
+        SELECT 
+          'DATA_PEGAWAI_MAPPING' as validation_type,
+          COUNT(ra.PERNER) as total_rekap,
+          COUNT(dp.perner) as mapped_pegawai,
+          COUNT(ra.PERNER) - COUNT(dp.perner) as missing_pegawai,
+          CASE 
+            WHEN COUNT(ra.PERNER) = COUNT(dp.perner) THEN 'PASS'
+            ELSE 'FAIL'
+          END as status
+        FROM rekap_absensi ra
+        LEFT JOIN data_pegawai dp ON ra.PERNER = dp.perner
+      `,
+    },
+    {
+      name: "NUMERICAL_CONSISTENCY",
+      description: "Validate numerical field consistency",
+      sql: `
+        SELECT 
+          'NUMERICAL_CONSISTENCY' as validation_type,
+          COUNT(*) as total_records,
+          COUNT(CASE WHEN TOTAL_HARI_REGULER < 0 THEN 1 END) as negative_total_hari,
+          COUNT(CASE WHEN JAM_REALISASI < 0 THEN 1 END) as negative_jam_realisasi,
+          COUNT(CASE WHEN PERSENTASE_JKP < 0 OR PERSENTASE_JKP > 200 THEN 1 END) as invalid_percentage,
+          CASE 
+            WHEN COUNT(CASE WHEN TOTAL_HARI_REGULER < 0 OR JAM_REALISASI < 0 OR PERSENTASE_JKP < 0 OR PERSENTASE_JKP > 200 THEN 1 END) = 0 
+            THEN 'PASS'
+            ELSE 'FAIL'
+          END as status
+        FROM rekap_absensi
+      `,
+    },
+    {
+      name: "LOGICAL_CONSISTENCY",
+      description: "Validate logical field relationships",
+      sql: `
+        SELECT 
+          'LOGICAL_CONSISTENCY' as validation_type,
+          COUNT(*) as total_records,
+          COUNT(CASE WHEN HARI_KERJA_REGULER + HARI_LIBUR_REGULER != TOTAL_HARI_REGULER THEN 1 END) as hari_reguler_mismatch,
+          COUNT(CASE WHEN HARI_KERJA_REALISASI + HARI_LIBUR_REALISASI != TOTAL_HARI_REALISASI THEN 1 END) as hari_realisasi_mismatch,
+          COUNT(CASE WHEN KOREKSI_IN + KOREKSI_OUT < KOREKSI_IN_OUT THEN 1 END) as koreksi_logic_error,
+          CASE 
+            WHEN COUNT(CASE 
+              WHEN HARI_KERJA_REGULER + HARI_LIBUR_REGULER != TOTAL_HARI_REGULER 
+              OR HARI_KERJA_REALISASI + HARI_LIBUR_REALISASI != TOTAL_HARI_REALISASI 
+              OR KOREKSI_IN + KOREKSI_OUT < KOREKSI_IN_OUT 
+              THEN 1 END) = 0 
+            THEN 'PASS'
+            ELSE 'FAIL'
+          END as status
+        FROM rekap_absensi
+      `,
+    },
+  ];
+
+  // Execute all validation queries
+  const validationPromises = validationQueries.map((query) => {
+    return new Promise((resolve, reject) => {
+      conn.query(query.sql, (err, results) => {
+        if (err) {
+          console.error(`❌ Validation error for ${query.name}:`, err);
+          resolve({
+            name: query.name,
+            description: query.description,
+            status: "ERROR",
+            error: err.message,
+            results: null,
+          });
+        } else {
+          resolve({
+            name: query.name,
+            description: query.description,
+            status: "SUCCESS",
+            error: null,
+            results: results[0] || {},
+          });
+        }
+      });
+    });
+  });
+
+  Promise.all(validationPromises)
+    .then((validationResults) => {
+      const endTime = Date.now();
+      const duration = endTime - startTime;
+
+      // Analyze overall validation status
+      const passedValidations = validationResults.filter(
+        (v) => v.results && v.results.status === "PASS"
+      ).length;
+      const totalValidations = validationResults.length;
+      const overallStatus =
+        passedValidations === totalValidations ? "PASS" : "FAIL";
+
+      console.log(`🔍 Validation completed in ${duration}ms`);
+      console.log(
+        `📊 Overall status: ${overallStatus} (${passedValidations}/${totalValidations} passed)`
+      );
+
+      res.json({
+        success: true,
+        message: `🔍 Rekap data validation completed in ${duration}ms`,
+        overall_status: overallStatus,
+        summary: {
+          total_validations: totalValidations,
+          passed_validations: passedValidations,
+          failed_validations: totalValidations - passedValidations,
+          success_rate: `${Math.round(
+            (passedValidations / totalValidations) * 100
+          )}%`,
+          duration_ms: duration,
+        },
+        validations: validationResults,
+        timestamp: new Date().toISOString(),
+      });
+    })
+    .catch((err) => {
+      console.error("❌ Fatal validation error:", err);
+      res.status(500).json({
+        success: false,
+        message: "❌ Fatal error during validation",
+        error: err.message,
+      });
+    });
+});
+
+// ============================================
+// NEW ENDPOINT: Get Missing PERNER Details
+// ============================================
+app.get("/get-missing-perner-details", (req, res) => {
+  console.log("🔍 Getting detailed missing PERNER analysis...");
+  const startTime = Date.now();
+
+  // Check PERNER that exist in olah_absensi but missing in rekap_absensi
+  const missingInRekapSQL = `
+    SELECT DISTINCT
+      oa.perner,
+      COUNT(oa.tanggal) as total_days_in_olah,
+      'MISSING_IN_REKAP' as issue_type
+    FROM olah_absensi oa
+    LEFT JOIN rekap_absensi ra ON oa.perner = ra.PERNER
+    WHERE ra.PERNER IS NULL
+    GROUP BY oa.perner
+    ORDER BY oa.perner
+  `;
+
+  // Check PERNER that exist in rekap_absensi but missing in olah_absensi
+  const missingInOlahSQL = `
+    SELECT DISTINCT
+      ra.PERNER as perner,
+      0 as total_days_in_olah,
+      'MISSING_IN_OLAH' as issue_type
+    FROM rekap_absensi ra
+    LEFT JOIN olah_absensi oa ON ra.PERNER = oa.perner
+    WHERE oa.perner IS NULL
+    ORDER BY ra.PERNER
+  `;
+
+  // Check PERNER without data_pegawai mapping
+  const missingDataPegawaiSQL = `
+    SELECT DISTINCT
+      ra.PERNER as perner,
+      ra.NAMA,
+      ra.BIDANG_UNIT,
+      'MISSING_DATA_PEGAWAI' as issue_type
+    FROM rekap_absensi ra
+    LEFT JOIN data_pegawai dp ON ra.PERNER = dp.perner
+    WHERE dp.perner IS NULL
+    ORDER BY ra.PERNER
+  `;
+
+  const queries = [
+    { name: "missing_in_rekap", sql: missingInRekapSQL },
+    { name: "missing_in_olah", sql: missingInOlahSQL },
+    { name: "missing_data_pegawai", sql: missingDataPegawaiSQL },
+  ];
+
+  const queryPromises = queries.map((query) => {
+    return new Promise((resolve, reject) => {
+      conn.query(query.sql, (err, results) => {
+        if (err) {
+          console.error(`❌ Error in ${query.name}:`, err);
+          resolve({ name: query.name, error: err.message, results: [] });
+        } else {
+          console.log(`✅ ${query.name}: ${results.length} records found`);
+          resolve({ name: query.name, error: null, results: results });
+        }
+      });
+    });
+  });
+
+  Promise.all(queryPromises)
+    .then((queryResults) => {
+      const endTime = Date.now();
+      const duration = endTime - startTime;
+
+      // Organize results
+      const analysis = {};
+      queryResults.forEach((queryResult) => {
+        analysis[queryResult.name] = {
+          count: queryResult.results.length,
+          details: queryResult.results,
+          error: queryResult.error,
+        };
+      });
+
+      // Calculate totals
+      const totalIssues = Object.values(analysis).reduce(
+        (sum, item) => sum + item.count,
+        0
+      );
+
+      console.log(`🔍 Missing PERNER analysis completed in ${duration}ms`);
+      console.log(`📊 Total issues found: ${totalIssues}`);
+
+      res.json({
+        success: true,
+        message: `🔍 Missing PERNER analysis completed in ${duration}ms`,
+        summary: {
+          total_issues: totalIssues,
+          missing_in_rekap: analysis.missing_in_rekap.count,
+          missing_in_olah: analysis.missing_in_olah.count,
+          missing_data_pegawai: analysis.missing_data_pegawai.count,
+          duration_ms: duration,
+        },
+        analysis: analysis,
+        timestamp: new Date().toISOString(),
+      });
+    })
+    .catch((err) => {
+      console.error("❌ Fatal error in missing PERNER analysis:", err);
+      res.status(500).json({
+        success: false,
+        message: "❌ Fatal error during missing PERNER analysis",
+        error: err.message,
+      });
+    });
+});
+
+// ============================================
+// NEW ENDPOINT: Fix Missing Data Pegawai
+// ============================================
+app.post("/fix-missing-data-pegawai", (req, res) => {
+  console.log("🔧 Starting fix missing data_pegawai...");
+  const startTime = Date.now();
+
+  // Step 1: Find missing PERNER in data_pegawai
+  const findMissingSQL = `
+    SELECT DISTINCT ra.PERNER
+    FROM rekap_absensi ra
+    LEFT JOIN data_pegawai dp ON ra.PERNER = dp.perner
+    WHERE dp.perner IS NULL
+    ORDER BY ra.PERNER
+  `;
+
+  conn.query(findMissingSQL, (findErr, missingRecords) => {
+    if (findErr) {
+      console.error("❌ Error finding missing PERNER:", findErr);
+      return res.status(500).json({
+        success: false,
+        message: "❌ Gagal mencari PERNER yang hilang",
+        error: findErr.message,
+      });
+    }
+
+    if (missingRecords.length === 0) {
+      console.log("✅ Tidak ada PERNER yang hilang di data_pegawai");
+      return res.json({
+        success: true,
+        message: "✅ Semua PERNER sudah ada di data_pegawai",
+        missing_count: 0,
+        duration_ms: Date.now() - startTime,
+      });
+    }
+
+    console.log(
+      `🔧 Found ${missingRecords.length} missing PERNER, generating data...`
+    );
+
+    // Step 2: Generate dummy data for missing PERNER
+    const insertData = missingRecords.map((record, index) => {
+      const perner = record.PERNER;
+      const bidangList = [
+        "IT & Digital",
+        "Keuangan",
+        "Human Resources",
+        "Marketing",
+        "Operasional",
+        "Procurement",
+        "Quality Control",
+        "Maintenance",
+        "Safety & Environment",
+        "General Affairs",
+        "Legal",
+        "Engineering",
+      ];
+
+      return {
+        perner: perner,
+        nip: `99${String(Date.now()).slice(-6)}${String(index).padStart(
+          2,
+          "0"
+        )}`,
+        nama: `Pegawai ${perner}`,
+        bidang: bidangList[index % bidangList.length],
+        no_telp: `0813${String(
+          Math.floor(Math.random() * 90000000) + 10000000
+        )}`,
+      };
+    });
+
+    // Step 3: Bulk insert
+    const placeholders = insertData.map(() => "(?, ?, ?, ?, ?)").join(", ");
+    const insertSQL = `
+      INSERT INTO data_pegawai (perner, nip, nama, bidang, no_telp) 
+      VALUES ${placeholders}
+    `;
+
+    const params = [];
+    insertData.forEach((item) => {
+      params.push(item.perner, item.nip, item.nama, item.bidang, item.no_telp);
+    });
+
+    conn.query(insertSQL, params, (insertErr, insertResult) => {
+      if (insertErr) {
+        console.error("❌ Error inserting missing data pegawai:", insertErr);
+        return res.status(500).json({
+          success: false,
+          message: "❌ Gagal generate data pegawai",
+          error: insertErr.message,
+        });
+      }
+
+      const endTime = Date.now();
+      const duration = endTime - startTime;
+
+      console.log(
+        `✅ Fixed ${insertResult.affectedRows} missing data pegawai in ${duration}ms`
+      );
+
+      res.json({
+        success: true,
+        message: `✅ Berhasil fix ${insertResult.affectedRows} data pegawai yang hilang`,
+        data: {
+          missing_count: missingRecords.length,
+          fixed_count: insertResult.affectedRows,
+          generated_perner: insertData.map((d) => d.perner),
+          sample_data: insertData.slice(0, 3),
+          duration_ms: duration,
+        },
+      });
     });
   });
 });

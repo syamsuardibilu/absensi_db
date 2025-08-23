@@ -1529,7 +1529,7 @@
               (column.includes("jam_kerja") || column.includes("durasi")) &&
               !isNaN(value)
             ) {
-              value = parseFloat(value).toFixed(3);
+              value = parseFloat(value).toFixed(0);
             }
 
             htmlContent += `<td>${value}</td>`;

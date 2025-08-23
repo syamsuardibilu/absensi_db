@@ -185,11 +185,10 @@
         overflow-y: auto;
         max-height: 600px;
         position: relative;
-        /* Custom scrollbar */
         scrollbar-width: thin;
         scrollbar-color: #667eea #f1f1f1;
 
-        /* --- Offset untuk sticky multi-row header (akan di-set via JS) --- */
+        /* Offset untuk sticky multi-row header */
         --header-row-1: 0px;
         --header-row-2: 40px;
       }
@@ -242,7 +241,7 @@
         width: 100%;
         border-collapse: collapse;
         font-size: 11px;
-        min-width: 1800px;
+        min-width: 2600px; /* Increased min-width untuk kolom NIP + ABSEN_TIDAK_LENGKAP */
       }
 
       th,
@@ -250,30 +249,29 @@
         border: 1px solid #e1e8ed;
         padding: 12px 8px;
         text-align: center;
-        white-space: nowrap;
+        /* white-space: nowrap; */
       }
 
-      /* --- Sticky header baru: hanya thead th yang sticky --- */
+      /* Sticky header */
       thead th {
         position: sticky;
-        z-index: 100; /* di atas body cells */
+        z-index: 100;
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: #fff;
         font-weight: 600;
         font-size: 10px;
       }
 
-      /* Baris header utama (judul grup) */
+      /* Main header row (grup utama) */
       thead tr.main-header th {
         top: var(--header-row-1);
-        z-index: 102; /* di atas subheader */
-        /* warna berbeda agar jelas */
+        z-index: 102;
         background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
         font-size: 9px;
         padding: 8px 4px;
       }
 
-      /* Baris subheader (judul kolom) */
+      /* Sub header row (detail kolom) */
       thead tr.sub-header th {
         top: calc(var(--header-row-1) + var(--header-row-2));
         z-index: 101;
@@ -290,13 +288,45 @@
         transition: all 0.2s ease;
       }
 
-      /* Kolom PERNER sticky kiri tanpa menutupi header */
-      .perner {
-        font-weight: 700;
-        background: rgba(102, 126, 234, 0.2);
+      /* PERNER, NIP, dan NAMA yang sticky kiri */
+      .sticky-left-1 {
         position: sticky;
         left: 0;
-        z-index: 90; /* lebih rendah dari header (101/102) */
+        z-index: 90;
+        background: rgba(102, 126, 234, 0.2);
+        font-weight: 700;
+        min-width: 100px;
+        max-width: 100px;
+      }
+
+      .sticky-left-2 {
+        position: sticky;
+        left: 100px; /* Tepat setelah PERNER (100px) */
+        z-index: 90;
+        background: rgba(102, 126, 234, 0.18);
+        font-weight: 600;
+        min-width: 100px;
+        max-width: 100px;
+      }
+
+      .sticky-left-3 {
+        position: sticky;
+        left: 200px; /* Tepat setelah PERNER + NIP (200px) */
+        z-index: 90;
+        background: rgba(102, 126, 234, 0.15);
+        font-weight: 600;
+        min-width: 180px;
+        max-width: 180px;
+        white-space: normal; /* TAMBAHKAN: Allow text wrapping */
+        word-wrap: break-word; /* TAMBAHKAN: Break long words */
+        line-height: 1.3; /* TAMBAHKAN: Increase line height */
+      }
+
+      /* BIDANG/UNIT tidak sticky - normal column */
+      .bidang-unit {
+        font-weight: 600;
+        background: rgba(102, 126, 234, 0.05);
+        min-width: 120px;
       }
 
       .percentage {
@@ -368,16 +398,55 @@
         border: 2px solid rgba(231, 76, 60, 0.2);
       }
 
+      .alert-info {
+        background: rgba(52, 152, 219, 0.1);
+        color: #3498db;
+        border: 2px solid rgba(52, 152, 219, 0.2);
+      }
+
       .pagination {
         display: flex;
-        justify-content: center;
+        justify-content: space-between;
         align-items: center;
-        gap: 10px;
+        gap: 20px;
         padding: 20px;
         background: rgba(255, 255, 255, 0.95);
         backdrop-filter: blur(10px);
         margin-top: 15px;
         border-radius: 12px;
+        flex-wrap: wrap;
+      }
+
+      .pagination-info {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        font-size: 13px;
+        color: #2c3e50;
+        min-width: 200px;
+      }
+
+      .pagination-info .primary-info {
+        font-weight: 600;
+        font-size: 14px;
+      }
+
+      .pagination-info .secondary-info {
+        font-size: 12px;
+        color: #7f8c8d;
+      }
+
+      .pagination-controls {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        flex-wrap: wrap;
+      }
+
+      .pagination-navigation {
+        display: flex;
+        align-items: center;
+        gap: 10px;
       }
 
       .pagination button {
@@ -388,6 +457,8 @@
         border-radius: 8px;
         cursor: pointer;
         transition: all 0.3s ease;
+        font-size: 13px;
+        min-width: 40px;
       }
 
       .pagination button:hover:not(:disabled) {
@@ -405,6 +476,53 @@
         background: #667eea;
         color: white;
         border-color: #667eea;
+      }
+
+      .page-input-group {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        color: #2c3e50;
+      }
+
+      .page-input {
+        width: 60px;
+        padding: 6px 8px;
+        border: 2px solid #e1e8ed;
+        border-radius: 6px;
+        text-align: center;
+        font-size: 13px;
+        background: white;
+      }
+
+      .page-input:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+      }
+
+      .items-per-page-group {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        color: #2c3e50;
+      }
+
+      .items-per-page-select {
+        padding: 6px 8px;
+        border: 2px solid #e1e8ed;
+        border-radius: 6px;
+        background: white;
+        font-size: 13px;
+        cursor: pointer;
+      }
+
+      .items-per-page-select:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
       }
 
       .no-data {
@@ -433,6 +551,27 @@
         .stats-grid {
           grid-template-columns: 1fr;
         }
+
+        .pagination {
+          flex-direction: column;
+          gap: 15px;
+        }
+
+        .pagination-controls {
+          flex-direction: column;
+          gap: 10px;
+          width: 100%;
+        }
+
+        .pagination-navigation {
+          justify-content: center;
+          flex-wrap: wrap;
+        }
+
+        .page-input-group,
+        .items-per-page-group {
+          justify-content: center;
+        }
       }
     </style>
   </head>
@@ -459,7 +598,7 @@
           <input
             type="text"
             id="searchInput"
-            placeholder="🔍 Cari berdasarkan PERNER..."
+            placeholder="🔍 Cari berdasarkan PERNER, NIP, Nama, atau Bidang..."
           />
         </div>
       </div>
@@ -512,21 +651,6 @@
         const p = path.startsWith("/") ? path : `/${path}`;
         return fetch(`${BASE_URL}${p}`, opts);
       };
-      // === END KONFIG ===
-
-      // Untuk backward compatibility
-      const API_BASE_URL = BASE_URL;
-
-      console.log("🔧 BASE_URL:", BASE_URL);
-      console.log("🔧 API Base URL:", API_BASE_URL);
-      console.log("🌐 Current hostname:", location.hostname);
-      console.log("🌐 Current page URL:", window.location.href);
-      console.log(
-        "🎯 Environment:",
-        location.hostname.includes("onrender.com")
-          ? "PRODUCTION"
-          : "DEVELOPMENT"
-      );
 
       // Global variables
       let currentPage = 1;
@@ -562,7 +686,7 @@
         try {
           if (!currentData || currentData.length === 0) {
             showAlert(
-              "❌ Tidak ada data untuk diunduh. Generate rekap terlebih dahulu.",
+              "⚠ Tidak ada data untuk diunduh. Generate rekap terlebih dahulu.",
               "error"
             );
             return;
@@ -572,10 +696,15 @@
           showAlert("📊 Mengunduh data dalam format Excel (.xlsx)...", "info");
 
           // Get all data (not just current page) for export
+          const searchParams = new URLSearchParams({
+            limit: 10000,
+            offset: 0,
+            search: searchQuery,
+            search_fields: "PERNER,NAMA,NIP,BIDANG_UNIT",
+          });
+
           const allDataResponse = await fetch(
-            `${API_BASE_URL}/get-rekap-absensi?limit=10000&offset=0&search=${encodeURIComponent(
-              searchQuery
-            )}`
+            `${BASE_URL}/get-rekap-absensi?${searchParams.toString()}`
           );
           const allDataResult = await allDataResponse.json();
 
@@ -594,49 +723,69 @@
 
           // Set worksheet range
           const totalRows = data.length + 2; // +2 for header rows
-          const totalCols = 26; // Total columns
+          const totalCols = 34; // Total columns (tambah kolom NIP + ABSEN_TIDAK_LENGKAP)
           ws["!ref"] = XLSX.utils.encode_range({
             s: { c: 0, r: 0 },
             e: { c: totalCols - 1, r: totalRows - 1 },
           });
 
-          // Row 1: Main headers (merged)
+          // Row 1: Main headers (merged) - UPDATE sesuai struktur baru
           const mainHeaders = [
             { value: "PERNER", col: 0 },
-            { value: "JUMLAH HARI", col: 1, span: 3 },
-            { value: "DATA KOREKSI", col: 4, span: 4 },
-            { value: "POLA JAM KERJA NORMAL", col: 8, span: 4 },
-            { value: "POLA JAM KERJA SHIFT", col: 12, span: 5 },
-            { value: "KETERANGAN ABSEN MASUK DAN PULANG", col: 17, span: 4 },
-            { value: "PENGAJUAN KETIDAKHADIRAN", col: 21, span: 2 },
-            { value: "PEROLEHAN DURASI JAM KERJA", col: 23, span: 3 },
+            { value: "NIP", col: 1 },
+            { value: "NAMA", col: 2 },
+            { value: "BIDANG/UNIT", col: 3 },
+            { value: "JUMLAH HARI REGULER", col: 4, span: 3 },
+            { value: "JUMLAH HARI REALISASI", col: 7, span: 3 },
+            { value: "DATA KOREKSI", col: 10, span: 5 },
+            { value: "POLA JAM KERJA NORMAL", col: 15, span: 4 },
+            { value: "POLA JAM KERJA SHIFT", col: 19, span: 5 },
+            { value: "KETERANGAN ABSEN MASUK DAN PULANG", col: 24, span: 5 }, // Update span menjadi 6
+            { value: "PENGAJUAN KETIDAKHADIRAN", col: 29, span: 2 }, // Update col menjadi 30
+            { value: "PEROLEHAN DURASI JAM KERJA", col: 31, span: 3 }, // Update col menjadi 32
           ];
 
-          // Row 2: Sub headers
+          // Row 2: Sub headers - UPDATE sesuai struktur baru
           const subHeaders = [
             "PERNER",
+            "NIP",
+            "NAMA",
+            "BIDANG/UNIT",
+            // JUMLAH HARI REGULER
             "TOTAL HARI",
             "HARI KERJA",
             "HARI LIBUR",
+            // JUMLAH HARI REALISASI
+            "TOTAL HARI",
+            "HARI KERJA",
+            "HARI LIBUR",
+            // DATA KOREKSI
+            "TOTAL TANPA KOREKSI",
             "TOTAL HARI KOREKSI",
             "KOREKSI IN",
             "KOREKSI OUT",
             "KOREKSI IN & OUT",
+            // POLA JAM KERJA NORMAL
             "TOTAL JAM KERJA NORMAL",
             "PIKET",
             "PDKB",
             "REGULER",
+            // POLA JAM KERJA SHIFT
             "TOTAL JAM KERJA SHIFT",
             "SHIFT PAGI",
             "SHIFT SIANG",
             "SHIFT MALAM",
             "SHIFT OFF",
-            "ABSEN LENGKAP",
-            "TIDAK ABSEN",
+            // KETERANGAN ABSEN MASUK DAN PULANG
+            "TOTAL ABSEN LENGKAP",
+            "TOTAL ABSEN TIDAK LENGKAP",
+            "IN & OUT KOSONG",
             "IN KOSONG",
             "OUT KOSONG",
+            // PENGAJUAN KETIDAKHADIRAN
             "SPPD/TUGAS LUAR DLL",
             "CUTI/IJIN",
+            // PEROLEHAN DURASI JAM KERJA
             "JAM REALISASI",
             "JAM SEHARUSNYA",
             "PERSENTASE JKP (%)",
@@ -682,35 +831,51 @@
             };
           });
 
-          // Add data rows (starting from row 2)
+          // Add data rows (starting from row 2) - UPDATE mapping sesuai struktur baru
           data.forEach((row, rowIndex) => {
             const dataRow = [
               row.PERNER,
-              parseInt(row.TOTAL_HARI),
-              parseInt(row.HARI_KERJA),
-              parseInt(row.HARI_LIBUR),
-              parseInt(row.TOTAL_HARI_KOREKSI),
-              parseInt(row.KOREKSI_IN),
-              parseInt(row.KOREKSI_OUT),
-              parseInt(row.KOREKSI_IN_OUT),
-              parseInt(row.TOTAL_JAM_KERJA_NORMAL),
-              parseInt(row.PIKET),
-              parseInt(row.PDKB),
-              parseInt(row.REGULER),
-              parseInt(row.TOTAL_JAM_KERJA_SHIFT),
-              parseInt(row.SHIFT_PAGI),
-              parseInt(row.SHIFT_SIANG),
-              parseInt(row.SHIFT_MALAM),
-              parseInt(row.SHIFT_OFF),
-              parseInt(row.ABSEN_LENGKAP),
-              parseInt(row.TIDAK_ABSEN),
-              parseInt(row.IN_KOSONG),
-              parseInt(row.OUT_KOSONG),
-              parseInt(row.SPPD_TUGAS_LUAR_DLL),
-              parseInt(row.CUTI_IJIN),
-              parseFloat(row.JAM_REALISASI),
-              parseFloat(row.JAM_SEHARUSNYA),
-              parseFloat(row.PERSENTASE_JKP),
+              row.NIP || "-",
+              row.NAMA || "-",
+              row.BIDANG_UNIT || "-",
+              // JUMLAH HARI REGULER
+              parseInt(row.TOTAL_HARI_REGULER || 0),
+              parseInt(row.HARI_KERJA_REGULER || 0),
+              parseInt(row.HARI_LIBUR_REGULER || 0),
+              // JUMLAH HARI REALISASI
+              parseInt(row.TOTAL_HARI_REALISASI || 0),
+              parseInt(row.HARI_KERJA_REALISASI || 0),
+              parseInt(row.HARI_LIBUR_REALISASI || 0),
+              // DATA KOREKSI
+              parseInt(row.TOTAL_HARI_TANPA_KOREKSI || 0),
+              parseInt(row.TOTAL_HARI_KOREKSI || 0),
+              parseInt(row.KOREKSI_IN || 0),
+              parseInt(row.KOREKSI_OUT || 0),
+              parseInt(row.KOREKSI_IN_OUT || 0),
+              // POLA JAM KERJA NORMAL
+              parseInt(row.TOTAL_JAM_KERJA_NORMAL || 0),
+              parseInt(row.PIKET || 0),
+              parseInt(row.PDKB || 0),
+              parseInt(row.REGULER || 0),
+              // POLA JAM KERJA SHIFT
+              parseInt(row.TOTAL_JAM_KERJA_SHIFT || 0),
+              parseInt(row.SHIFT_PAGI || 0),
+              parseInt(row.SHIFT_SIANG || 0),
+              parseInt(row.SHIFT_MALAM || 0),
+              parseInt(row.SHIFT_OFF || 0),
+              // KETERANGAN ABSEN MASUK DAN PULANG
+              parseInt(row.ABSEN_LENGKAP || 0),
+              parseInt(row.ABSEN_TIDAK_LENGKAP || 0),
+              parseInt(row.IN_OUT_KOSONG || 0),
+              parseInt(row.IN_KOSONG || 0),
+              parseInt(row.OUT_KOSONG || 0),
+              // PENGAJUAN KETIDAKHADIRAN
+              parseInt(row.SPPD_TUGAS_LUAR_DLL || 0),
+              parseInt(row.CUTI_IJIN || 0),
+              // PEROLEHAN DURASI JAM KERJA
+              parseFloat(row.JAM_REALISASI || 0),
+              parseFloat(row.JAM_SEHARUSNYA || 0),
+              parseFloat(row.PERSENTASE_JKP || 0),
             ];
 
             dataRow.forEach((cellValue, colIndex) => {
@@ -729,14 +894,18 @@
               };
 
               // Special formatting for specific columns
-              if (colIndex === 0) {
-                // PERNER column
+              if (colIndex === 0 || colIndex === 1 || colIndex === 2) {
+                // PERNER, NIP, NAMA columns (sticky)
                 cellStyle.font = { bold: true };
                 cellStyle.fill = { fgColor: { rgb: "E3F2FD" } };
-              } else if (colIndex >= 23 && colIndex <= 24) {
+              } else if (colIndex === 3) {
+                // BIDANG/UNIT column (non-sticky)
+                cellStyle.font = { bold: true };
+                cellStyle.fill = { fgColor: { rgb: "F5F5F5" } };
+              } else if (colIndex >= 32 && colIndex <= 33) {
                 // JAM REALISASI & JAM SEHARUSNYA
                 cellStyle.numFmt = "#,##0.00";
-              } else if (colIndex === 25) {
+              } else if (colIndex === 34) {
                 // PERSENTASE JKP
                 cellStyle.numFmt = "#,##0.00";
 
@@ -762,25 +931,36 @@
             });
           });
 
-          // Set merge ranges for main headers
+          // Set merge ranges for main headers - UPDATE sesuai struktur baru
           const merges = [
             { s: { r: 0, c: 0 }, e: { r: 1, c: 0 } }, // PERNER (span 2 rows)
-            { s: { r: 0, c: 1 }, e: { r: 0, c: 3 } }, // JUMLAH HARI
-            { s: { r: 0, c: 4 }, e: { r: 0, c: 7 } }, // DATA KOREKSI
-            { s: { r: 0, c: 8 }, e: { r: 0, c: 11 } }, // POLA JAM KERJA NORMAL
-            { s: { r: 0, c: 12 }, e: { r: 0, c: 16 } }, // POLA JAM KERJA SHIFT
-            { s: { r: 0, c: 17 }, e: { r: 0, c: 20 } }, // KETERANGAN ABSEN MASUK DAN PULANG
-            { s: { r: 0, c: 21 }, e: { r: 0, c: 22 } }, // PENGAJUAN KETIDAKHADIRAN
-            { s: { r: 0, c: 23 }, e: { r: 0, c: 25 } }, // PEROLEHAN DURASI JAM KERJA
+            { s: { r: 0, c: 1 }, e: { r: 1, c: 1 } }, // NIP (span 2 rows)
+            { s: { r: 0, c: 2 }, e: { r: 1, c: 2 } }, // NAMA (span 2 rows)
+            { s: { r: 0, c: 3 }, e: { r: 1, c: 3 } }, // BIDANG/UNIT (span 2 rows)
+            { s: { r: 0, c: 4 }, e: { r: 0, c: 6 } }, // JUMLAH HARI REGULER
+            { s: { r: 0, c: 7 }, e: { r: 0, c: 9 } }, // JUMLAH HARI REALISASI
+            { s: { r: 0, c: 10 }, e: { r: 0, c: 14 } }, // DATA KOREKSI
+            { s: { r: 0, c: 15 }, e: { r: 0, c: 18 } }, // POLA JAM KERJA NORMAL
+            { s: { r: 0, c: 19 }, e: { r: 0, c: 23 } }, // POLA JAM KERJA SHIFT
+            { s: { r: 0, c: 24 }, e: { r: 0, c: 28 } }, // KETERANGAN ABSEN (5 kolom)
+            { s: { r: 0, c: 29 }, e: { r: 0, c: 30 } }, // PENGAJUAN KETIDAKHADIRAN
+            { s: { r: 0, c: 31 }, e: { r: 0, c: 33 } }, // PEROLEHAN DURASI JAM KERJA
           ];
           ws["!merges"] = merges;
 
           // Set column widths for better readability
           const colWidths = [
             { wch: 12 }, // PERNER
-            { wch: 10 }, // TOTAL HARI
-            { wch: 10 }, // HARI KERJA
-            { wch: 10 }, // HARI LIBUR
+            { wch: 15 }, // NIP
+            { wch: 20 }, // NAMA
+            { wch: 15 }, // BIDANG/UNIT
+            { wch: 10 }, // TOTAL HARI REGULER
+            { wch: 10 }, // HARI KERJA REGULER
+            { wch: 10 }, // HARI LIBUR REGULER
+            { wch: 10 }, // TOTAL HARI REALISASI
+            { wch: 10 }, // HARI KERJA REALISASI
+            { wch: 10 }, // HARI LIBUR REALISASI
+            { wch: 12 }, // TOTAL TANPA KOREKSI
             { wch: 12 }, // TOTAL HARI KOREKSI
             { wch: 10 }, // KOREKSI IN
             { wch: 10 }, // KOREKSI OUT
@@ -794,8 +974,9 @@
             { wch: 10 }, // SHIFT SIANG
             { wch: 10 }, // SHIFT MALAM
             { wch: 10 }, // SHIFT OFF
-            { wch: 12 }, // ABSEN LENGKAP
-            { wch: 10 }, // TIDAK ABSEN
+            { wch: 12 }, // TOTAL ABSEN LENGKAP
+            { wch: 15 }, // TOTAL ABSEN TIDAK LENGKAP
+            { wch: 12 }, // IN & OUT KOSONG
             { wch: 10 }, // IN KOSONG
             { wch: 10 }, // OUT KOSONG
             { wch: 15 }, // SPPD/TUGAS LUAR DLL
@@ -830,7 +1011,7 @@
           );
         } catch (error) {
           console.error("Download error:", error);
-          let errorMessage = "❌ Gagal mengunduh file: ";
+          let errorMessage = "⚠ Gagal mengunduh file: ";
 
           if (error.message.includes("XLSX is not defined")) {
             errorMessage +=
@@ -855,25 +1036,22 @@
           refreshBtn.disabled = true;
 
           console.log("🚀 Generate rekap started...");
-          console.log("🔗 POST URL:", `${API_BASE_URL}/generate-rekap-absensi`);
+          console.log("🔗 POST URL:", `${BASE_URL}/generate-rekap-absensi`);
 
-          const response = await fetch(
-            `${API_BASE_URL}/generate-rekap-absensi`,
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              mode: "cors", // Explicit CORS mode
-            }
-          );
+          const response = await fetch(`${BASE_URL}/generate-rekap-absensi`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            mode: "cors",
+          });
 
           console.log("📡 Response status:", response.status);
           console.log("📡 Response headers:", [...response.headers.entries()]);
 
           if (!response.ok) {
             const errorText = await response.text();
-            console.error("❌ Server response error:", errorText);
+            console.error("⚠ Server response error:", errorText);
             throw new Error(
               `HTTP Error: ${response.status} - ${
                 response.statusText
@@ -886,7 +1064,7 @@
 
           if (!contentType || !contentType.includes("application/json")) {
             const text = await response.text();
-            console.error("❌ Non-JSON response:", text);
+            console.error("⚠ Non-JSON response:", text);
             throw new Error(
               `Server mengembalikan response non-JSON: ${text.substring(
                 0,
@@ -905,21 +1083,18 @@
             }
             await loadRekapData();
           } else {
-            showAlert(
-              `❌ ${result.message || "Generate rekap gagal"}`,
-              "error"
-            );
+            showAlert(`⚠ ${result.message || "Generate rekap gagal"}`, "error");
           }
         } catch (error) {
-          console.error("❌ Generate rekap error:", error);
+          console.error("⚠ Generate rekap error:", error);
 
           // Better error messages
-          let errorMessage = "❌ Terjadi kesalahan: ";
+          let errorMessage = "⚠ Terjadi kesalahan: ";
           if (
             error.message.includes("Failed to fetch") ||
             error.message.includes("NetworkError")
           ) {
-            errorMessage += `Server tidak dapat diakses. Pastikan server sudah berjalan di ${API_BASE_URL}.`;
+            errorMessage += `Server tidak dapat diakses. Pastikan server sudah berjalan di ${BASE_URL}.`;
           } else if (error.message.includes("404")) {
             errorMessage +=
               "Endpoint tidak ditemukan. Periksa apakah server sudah running dengan benar.";
@@ -947,12 +1122,20 @@
           showLoading(true);
 
           const offset = (currentPage - 1) * itemsPerPage;
-          const url = `${API_BASE_URL}/get-rekap-absensi?limit=${itemsPerPage}&offset=${offset}&search=${encodeURIComponent(
-            searchQuery
-          )}`;
+
+          // Enhanced search with multiple fields including NIP
+          const searchParams = new URLSearchParams({
+            limit: itemsPerPage,
+            offset: offset,
+            search: searchQuery,
+            search_fields: "PERNER,NAMA,NIP,BIDANG_UNIT",
+          });
+
+          const url = `${BASE_URL}/get-rekap-absensi?${searchParams.toString()}`;
 
           console.log("🔗 API Request URL:", url);
-          console.log("🔗 API Base URL:", API_BASE_URL);
+          console.log("🔍 Search Query:", searchQuery);
+          console.log("🎯 Search Fields: PERNER, NAMA, NIP, BIDANG_UNIT");
 
           const response = await fetch(url);
           const result = await response.json();
@@ -969,21 +1152,21 @@
               noDataMessage.style.display = "block";
               downloadBtn.disabled = true;
               noDataMessage.innerHTML = searchQuery
-                ? "🔍 Tidak ada data yang sesuai dengan pencarian."
+                ? `🔍 Tidak ada data yang sesuai dengan pencarian "${searchQuery}".`
                 : '📋 Belum ada data rekap. Klik tombol "Generate Rekap Absensi" untuk memulai.';
             }
           } else {
-            showAlert(`❌ ${result.message}`, "error");
+            showAlert(`⚠ ${result.message}`, "error");
           }
         } catch (error) {
           console.error("Error loading data:", error);
-          showAlert("❌ Terjadi kesalahan saat memuat data.", "error");
+          showAlert("⚠ Terjadi kesalahan saat memuat data.", "error");
         } finally {
           showLoading(false);
         }
       }
 
-      // Display Rekap Data in Table
+      // Display Rekap Data in Table - UPDATE struktur tabel
       function displayRekapData(data) {
         if (!data || data.length === 0) {
           tableScrollWrapper.innerHTML = `<div class="no-data">📋 Tidak ada data untuk ditampilkan.</div>`;
@@ -999,12 +1182,16 @@
           <table>
             <thead>
               <tr class="main-header">
-                <th rowspan="2">PERNER</th>
-                <th colspan="3">JUMLAH HARI</th>
-                <th colspan="4">DATA KOREKSI</th>
+                <th rowspan="2" class="sticky-left-1">PERNER</th>
+                <th rowspan="2" class="sticky-left-2">NIP</th>
+                <th rowspan="2" class="sticky-left-3">NAMA</th>
+                <th rowspan="2">BIDANG/UNIT</th>
+                <th colspan="3">JUMLAH HARI REGULER</th>
+                <th colspan="3">JUMLAH HARI REALISASI</th>
+                <th colspan="5">DATA KOREKSI</th>
                 <th colspan="4">POLA JAM KERJA NORMAL</th>
                 <th colspan="5">POLA JAM KERJA SHIFT</th>
-                <th colspan="4">KETERANGAN ABSEN MASUK DAN PULANG</th>
+                <th colspan="5">KETERANGAN ABSEN MASUK DAN PULANG</th>
                 <th colspan="2">PENGAJUAN KETIDAKHADIRAN</th>
                 <th colspan="3">PEROLEHAN DURASI JAM KERJA</th>
               </tr>
@@ -1012,6 +1199,10 @@
                 <th>TOTAL HARI</th>
                 <th>HARI KERJA</th>
                 <th>HARI LIBUR</th>
+                <th>TOTAL HARI</th>
+                <th>HARI KERJA</th>
+                <th>HARI LIBUR</th>
+                <th>TOTAL TANPA KOREKSI</th>
                 <th>TOTAL HARI KOREKSI</th>
                 <th>KOREKSI IN</th>
                 <th>KOREKSI OUT</th>
@@ -1025,8 +1216,9 @@
                 <th>SHIFT SIANG</th>
                 <th>SHIFT MALAM</th>
                 <th>SHIFT OFF</th>
-                <th>ABSEN LENGKAP</th>
-                <th>TIDAK ABSEN</th>
+                <th>TOTAL ABSEN LENGKAP</th>
+                <th>TOTAL ABSEN TIDAK LENGKAP</th>
+                <th>IN & OUT KOSONG</th>
                 <th>IN KOSONG</th>
                 <th>OUT KOSONG</th>
                 <th>SPPD/TUGAS LUAR DLL</th>
@@ -1041,34 +1233,42 @@
                 .map(
                   (row) => `
                   <tr>
-                    <td class="perner">${row.PERNER}</td>
-                    <td>${row.TOTAL_HARI}</td>
-                    <td>${row.HARI_KERJA}</td>
-                    <td>${row.HARI_LIBUR}</td>
-                    <td>${row.TOTAL_HARI_KOREKSI}</td>
-                    <td>${row.KOREKSI_IN}</td>
-                    <td>${row.KOREKSI_OUT}</td>
-                    <td>${row.KOREKSI_IN_OUT}</td>
-                    <td>${row.TOTAL_JAM_KERJA_NORMAL}</td>
-                    <td>${row.PIKET}</td>
-                    <td>${row.PDKB}</td>
-                    <td>${row.REGULER}</td>
-                    <td>${row.TOTAL_JAM_KERJA_SHIFT}</td>
-                    <td>${row.SHIFT_PAGI}</td>
-                    <td>${row.SHIFT_SIANG}</td>
-                    <td>${row.SHIFT_MALAM}</td>
-                    <td>${row.SHIFT_OFF}</td>
-                    <td>${row.ABSEN_LENGKAP}</td>
-                    <td>${row.TIDAK_ABSEN}</td>
-                    <td>${row.IN_KOSONG}</td>
-                    <td>${row.OUT_KOSONG}</td>
-                    <td>${row.SPPD_TUGAS_LUAR_DLL}</td>
-                    <td>${row.CUTI_IJIN}</td>
-                    <td>${parseFloat(row.JAM_REALISASI).toFixed(2)}</td>
-                    <td>${parseFloat(row.JAM_SEHARUSNYA).toFixed(2)}</td>
+                    <td class="sticky-left-1">${row.PERNER}</td>
+                    <td class="sticky-left-2">${row.NIP || "-"}</td>
+                    <td class="sticky-left-3">${row.NAMA || "-"}</td>
+                    <td class="bidang-unit">${row.BIDANG_UNIT || "-"}</td>
+                    <td>${row.TOTAL_HARI_REGULER || 0}</td>
+                    <td>${row.HARI_KERJA_REGULER || 0}</td>
+                    <td>${row.HARI_LIBUR_REGULER || 0}</td>
+                    <td>${row.TOTAL_HARI_REALISASI || 0}</td>
+                    <td>${row.HARI_KERJA_REALISASI || 0}</td>
+                    <td>${row.HARI_LIBUR_REALISASI || 0}</td>
+                    <td>${row.TOTAL_HARI_TANPA_KOREKSI || 0}</td>
+                    <td>${row.TOTAL_HARI_KOREKSI || 0}</td>
+                    <td>${row.KOREKSI_IN || 0}</td>
+                    <td>${row.KOREKSI_OUT || 0}</td>
+                    <td>${row.KOREKSI_IN_OUT || 0}</td>
+                    <td>${row.TOTAL_JAM_KERJA_NORMAL || 0}</td>
+                    <td>${row.PIKET || 0}</td>
+                    <td>${row.PDKB || 0}</td>
+                    <td>${row.REGULER || 0}</td>
+                    <td>${row.TOTAL_JAM_KERJA_SHIFT || 0}</td>
+                    <td>${row.SHIFT_PAGI || 0}</td>
+                    <td>${row.SHIFT_SIANG || 0}</td>
+                    <td>${row.SHIFT_MALAM || 0}</td>
+                    <td>${row.SHIFT_OFF || 0}</td>
+                    <td>${row.ABSEN_LENGKAP || 0}</td>
+                    <td>${row.ABSEN_TIDAK_LENGKAP || 0}</td>
+                    <td>${row.IN_OUT_KOSONG || 0}</td>
+                    <td>${row.IN_KOSONG || 0}</td>
+                    <td>${row.OUT_KOSONG || 0}</td>
+                    <td>${row.SPPD_TUGAS_LUAR_DLL || 0}</td>
+                    <td>${row.CUTI_IJIN || 0}</td>
+                    <td>${parseFloat(row.JAM_REALISASI || 0).toFixed(2)}</td>
+                    <td>${parseFloat(row.JAM_SEHARUSNYA || 0).toFixed(2)}</td>
                     <td class="percentage ${getPercentageClass(
                       row.PERSENTASE_JKP
-                    )}">${parseFloat(row.PERSENTASE_JKP).toFixed(2)}</td>
+                    )}">${parseFloat(row.PERSENTASE_JKP || 0).toFixed(2)}</td>
                   </tr>
                 `
                 )
@@ -1079,7 +1279,7 @@
 
         tableScrollWrapper.innerHTML = table;
 
-        // Hitung tinggi baris header agar offset sticky akurat di semua device
+        // Calculate header heights for sticky positioning
         const mainHeaderRow = tableScrollWrapper.querySelector(
           "thead tr.main-header"
         );
@@ -1088,12 +1288,10 @@
         );
 
         if (mainHeaderRow && subHeaderRow) {
-          // Pakai getBoundingClientRect untuk tinggi aktual
           const h1 = Math.ceil(mainHeaderRow.getBoundingClientRect().height);
           const h2 = Math.ceil(subHeaderRow.getBoundingClientRect().height);
           tableScrollWrapper.style.setProperty("--header-row-1", `${0}px`);
           tableScrollWrapper.style.setProperty("--header-row-2", `${h1}px`);
-          // Subheader akan ditempatkan di bawah main header via top: var(--header-row-1)+var(--header-row-2)
         }
 
         // Show scroll indicator for wide tables
@@ -1139,7 +1337,7 @@
 
       // Display Pagination
       function displayPagination(pagination) {
-        if (!pagination || pagination.totalPages <= 1) {
+        if (!pagination) {
           paginationContainer.style.display = "none";
           return;
         }
@@ -1147,39 +1345,214 @@
         totalPages = pagination.totalPages;
         currentPage = Math.floor(pagination.offset / pagination.limit) + 1;
 
+        // Calculate display information
+        const startIndex = pagination.offset + 1;
+        const endIndex = Math.min(
+          pagination.offset + pagination.limit,
+          pagination.total
+        );
+        const totalRecords = pagination.total;
+
         let paginationHTML = `
-          <button onclick="goToPage(1)" ${
-            currentPage === 1 ? "disabled" : ""
-          }>««</button>
-          <button onclick="goToPage(${currentPage - 1})" ${
+          <!-- Informasi Data -->
+          <div class="pagination-info">
+            <div class="primary-info">
+              Menampilkan ${startIndex} - ${endIndex} dari ${totalRecords} data
+            </div>
+            <div class="secondary-info">
+              Halaman ${currentPage} dari ${totalPages} halaman
+              ${
+                searchQuery
+                  ? ` | Pencarian: "${searchQuery}" (PERNER, NIP, Nama, Bidang)`
+                  : ""
+              }
+            </div>
+          </div>
+
+          <div class="pagination-controls">
+            <!-- Items per page -->
+            <div class="items-per-page-group">
+              <span>Tampilkan:</span>
+              <select class="items-per-page-select" onchange="changeItemsPerPage(this.value)">
+                <option value="25" ${
+                  itemsPerPage === 25 ? "selected" : ""
+                }>25</option>
+                <option value="50" ${
+                  itemsPerPage === 50 ? "selected" : ""
+                }>50</option>
+                <option value="100" ${
+                  itemsPerPage === 100 ? "selected" : ""
+                }>100</option>
+                <option value="200" ${
+                  itemsPerPage === 200 ? "selected" : ""
+                }>200</option>
+              </select>
+              <span>per halaman</span>
+            </div>
+
+            <!-- Navigation Controls -->
+            <div class="pagination-navigation">
+              <button onclick="goToPage(1)" ${
+                currentPage === 1 ? "disabled" : ""
+              } title="Halaman Pertama">
+                ««
+              </button>
+              <button onclick="goToPage(${currentPage - 1})" ${
           currentPage === 1 ? "disabled" : ""
-        }>‹</button>
+        } title="Halaman Sebelumnya">
+                ‹
+              </button>
         `;
 
-        // Show page numbers (simplified)
-        for (
-          let i = Math.max(1, currentPage - 2);
-          i <= Math.min(totalPages, currentPage + 2);
-          i++
-        ) {
-          paginationHTML += `
-            <button onclick="goToPage(${i})" class="${
-            i === currentPage ? "active" : ""
-          }">${i}</button>
-          `;
+        // Show page numbers with smart truncation
+        if (totalPages <= 7) {
+          // Show all pages if 7 or fewer
+          for (let i = 1; i <= totalPages; i++) {
+            paginationHTML += `
+              <button onclick="goToPage(${i})" class="${
+              i === currentPage ? "active" : ""
+            }" title="Halaman ${i}">
+                ${i}
+              </button>
+            `;
+          }
+        } else {
+          // Smart pagination with ellipsis
+          if (currentPage <= 3) {
+            // Show: 1 2 3 4 ... last
+            for (let i = 1; i <= 4; i++) {
+              paginationHTML += `
+                <button onclick="goToPage(${i})" class="${
+                i === currentPage ? "active" : ""
+              }" title="Halaman ${i}">
+                  ${i}
+                </button>
+              `;
+            }
+            paginationHTML += `<span style="padding: 8px;">...</span>`;
+            paginationHTML += `
+              <button onclick="goToPage(${totalPages})" title="Halaman ${totalPages}">
+                ${totalPages}
+              </button>
+            `;
+          } else if (currentPage >= totalPages - 2) {
+            // Show: 1 ... last-3 last-2 last-1 last
+            paginationHTML += `
+              <button onclick="goToPage(1)" title="Halaman 1">1</button>
+            `;
+            paginationHTML += `<span style="padding: 8px;">...</span>`;
+            for (let i = totalPages - 3; i <= totalPages; i++) {
+              paginationHTML += `
+                <button onclick="goToPage(${i})" class="${
+                i === currentPage ? "active" : ""
+              }" title="Halaman ${i}">
+                  ${i}
+                </button>
+              `;
+            }
+          } else {
+            // Show: 1 ... current-1 current current+1 ... last
+            paginationHTML += `
+              <button onclick="goToPage(1)" title="Halaman 1">1</button>
+            `;
+            paginationHTML += `<span style="padding: 8px;">...</span>`;
+            for (let i = currentPage - 1; i <= currentPage + 1; i++) {
+              paginationHTML += `
+                <button onclick="goToPage(${i})" class="${
+                i === currentPage ? "active" : ""
+              }" title="Halaman ${i}">
+                  ${i}
+                </button>
+              `;
+            }
+            paginationHTML += `<span style="padding: 8px;">...</span>`;
+            paginationHTML += `
+              <button onclick="goToPage(${totalPages})" title="Halaman ${totalPages}">
+                ${totalPages}
+              </button>
+            `;
+          }
         }
 
         paginationHTML += `
-          <button onclick="goToPage(${currentPage + 1})" ${
+              <button onclick="goToPage(${currentPage + 1})" ${
           currentPage === totalPages ? "disabled" : ""
-        }>›</button>
-          <button onclick="goToPage(${totalPages})" ${
+        } title="Halaman Berikutnya">
+                ›
+              </button>
+              <button onclick="goToPage(${totalPages})" ${
           currentPage === totalPages ? "disabled" : ""
-        }>»»</button>
+        } title="Halaman Terakhir">
+                »»
+              </button>
+            </div>
+
+            <!-- Jump to page -->
+            <div class="page-input-group">
+              <span>Ke halaman:</span>
+              <input 
+                type="number" 
+                class="page-input" 
+                min="1" 
+                max="${totalPages}" 
+                value="${currentPage}"
+                onkeypress="handlePageInputKeypress(event, ${totalPages})"
+                onchange="handlePageInputChange(event, ${totalPages})"
+                title="Masukkan nomor halaman (1-${totalPages})"
+              >
+              <button onclick="goToPageFromInput(${totalPages})" title="Pergi ke halaman">
+                Go
+              </button>
+            </div>
+          </div>
         `;
 
         paginationContainer.innerHTML = paginationHTML;
         paginationContainer.style.display = "flex";
+      }
+
+      // Change items per page
+      function changeItemsPerPage(newItemsPerPage) {
+        itemsPerPage = parseInt(newItemsPerPage);
+        currentPage = 1; // Reset to first page
+        loadRekapData();
+      }
+
+      // Handle page input keypress (Enter key)
+      function handlePageInputKeypress(event, maxPages) {
+        if (event.key === "Enter") {
+          goToPageFromInput(maxPages);
+        }
+      }
+
+      // Handle page input change
+      function handlePageInputChange(event, maxPages) {
+        const input = event.target;
+        let value = parseInt(input.value);
+
+        if (isNaN(value) || value < 1) {
+          input.value = 1;
+        } else if (value > maxPages) {
+          input.value = maxPages;
+        }
+      }
+
+      // Go to page from input
+      function goToPageFromInput(maxPages) {
+        const input = document.querySelector(".page-input");
+        let page = parseInt(input.value);
+
+        if (isNaN(page) || page < 1) {
+          page = 1;
+          input.value = 1;
+        } else if (page > maxPages) {
+          page = maxPages;
+          input.value = maxPages;
+        }
+
+        if (page !== currentPage) {
+          goToPage(page);
+        }
       }
 
       // Go to specific page
@@ -1191,8 +1564,26 @@
 
       // Handle search
       function handleSearch() {
-        searchQuery = searchInput.value.trim();
-        currentPage = 1;
+        const newSearchQuery = searchInput.value.trim();
+
+        // Log search activity for debugging
+        console.log("🔍 Search triggered:", {
+          previousQuery: searchQuery,
+          newQuery: newSearchQuery,
+          searchFields: ["PERNER", "NAMA", "NIP", "BIDANG_UNIT"],
+        });
+
+        searchQuery = newSearchQuery;
+        currentPage = 1; // Reset to first page when searching
+
+        // Show loading state immediately for better UX
+        if (searchQuery) {
+          showAlert(
+            `🔍 Mencari "${searchQuery}" di PERNER, NIP, Nama, dan Bidang...`,
+            "info"
+          );
+        }
+
         loadRekapData();
       }
 
@@ -1250,6 +1641,5 @@
         loadRekapData();
       });
     </script>
-    <script src="script.js?v=20250812"></script>
   </body>
 </html>

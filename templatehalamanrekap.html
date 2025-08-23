@@ -241,7 +241,7 @@
         width: 100%;
         border-collapse: collapse;
         font-size: 11px;
-        min-width: 2900px; /* Increased min-width untuk menambah kolom NIP */
+        min-width: 2400px; /* Increased min-width for more columns */
       }
 
       th,
@@ -249,6 +249,7 @@
         border: 1px solid #e1e8ed;
         padding: 12px 8px;
         text-align: center;
+        white-space: nowrap;
       }
 
       /* Sticky header */
@@ -287,7 +288,7 @@
         transition: all 0.2s ease;
       }
 
-      /* PERNER yang sticky kiri */
+      /* PERNER, NIP, dan NAMA yang sticky kiri */
       .sticky-left-1 {
         position: sticky;
         left: 0;
@@ -298,25 +299,24 @@
         max-width: 100px;
       }
 
-      /* NIP sticky - kolom kedua */
       .sticky-left-2 {
         position: sticky;
         left: 100px; /* Tepat setelah PERNER (100px) */
         z-index: 90;
         background: rgba(102, 126, 234, 0.18);
         font-weight: 600;
-        min-width: 120px;
-        max-width: 120px;
+        min-width: 100px;
+        max-width: 100px;
       }
 
-      /* NAMA tidak sticky lagi - kolom normal */
-      .nama-column {
+      .sticky-left-3 {
+        position: sticky;
+        left: 200px; /* Tepat setelah PERNER + NIP (200px) */
+        z-index: 90;
+        background: rgba(102, 126, 234, 0.15);
         font-weight: 600;
-        background: rgba(102, 126, 234, 0.05);
-        min-width: 180px;
-        white-space: normal;
-        word-wrap: break-word;
-        line-height: 1.3;
+        min-width: 120px;
+        max-width: 120px;
       }
 
       /* BIDANG/UNIT tidak sticky - normal column */
@@ -393,12 +393,6 @@
         background: rgba(231, 76, 60, 0.1);
         color: #e74c3c;
         border: 2px solid rgba(231, 76, 60, 0.2);
-      }
-
-      .alert-info {
-        background: rgba(52, 152, 219, 0.1);
-        color: #3498db;
-        border: 2px solid rgba(52, 152, 219, 0.2);
       }
 
       .pagination {
@@ -683,7 +677,7 @@
         try {
           if (!currentData || currentData.length === 0) {
             showAlert(
-              "⚠ Tidak ada data untuk diunduh. Generate rekap terlebih dahulu.",
+              "❌ Tidak ada data untuk diunduh. Generate rekap terlebih dahulu.",
               "error"
             );
             return;
@@ -697,7 +691,7 @@
             limit: 10000,
             offset: 0,
             search: searchQuery,
-            search_fields: "PERNER,NAMA,BIDANG_UNIT",
+            search_fields: "PERNER,NAMA,NIP,BIDANG_UNIT",
           });
 
           const allDataResponse = await fetch(
@@ -718,15 +712,15 @@
           // Create worksheet data manually with merged headers
           const ws = {};
 
-          // Set worksheet range - Updated untuk struktur dengan NIP
+          // Set worksheet range
           const totalRows = data.length + 2; // +2 for header rows
-          const totalCols = 34; // Total columns sesuai struktur dengan NIP
+          const totalCols = 34; // Total columns (increased for NIP column)
           ws["!ref"] = XLSX.utils.encode_range({
             s: { c: 0, r: 0 },
             e: { c: totalCols - 1, r: totalRows - 1 },
           });
 
-          // Row 1: Main headers (merged) - UPDATE sesuai struktur dengan NIP
+          // Row 1: Main headers (merged) - sesuai dengan struktur baru
           const mainHeaders = [
             { value: "PERNER", col: 0 },
             { value: "NIP", col: 1 },
@@ -737,12 +731,12 @@
             { value: "DATA KOREKSI", col: 10, span: 5 },
             { value: "POLA JAM KERJA NORMAL", col: 15, span: 4 },
             { value: "POLA JAM KERJA SHIFT", col: 19, span: 5 },
-            { value: "KETERANGAN ABSEN MASUK DAN PULANG", col: 24, span: 5 },
-            { value: "PENGAJUAN KETIDAKHADIRAN", col: 29, span: 2 },
-            { value: "PEROLEHAN DURASI JAM KERJA", col: 31, span: 3 },
+            { value: "KETERANGAN ABSEN MASUK DAN PULANG", col: 24, span: 3 },
+            { value: "PENGAJUAN KETIDAKHADIRAN", col: 27, span: 2 },
+            { value: "PEROLEHAN DURASI JAM KERJA", col: 29, span: 3 },
           ];
 
-          // Row 2: Sub headers - UPDATE sesuai struktur dengan NIP
+          // Row 2: Sub headers - sesuai dengan struktur baru
           const subHeaders = [
             "PERNER",
             "NIP",
@@ -776,7 +770,7 @@
             // KETERANGAN ABSEN MASUK DAN PULANG
             "TOTAL ABSEN LENGKAP",
             "TOTAL ABSEN TIDAK LENGKAP",
-            "IN & OUT KOSONG",
+            "TIDAK ABSEN",
             "IN KOSONG",
             "OUT KOSONG",
             // PENGAJUAN KETIDAKHADIRAN
@@ -828,7 +822,7 @@
             };
           });
 
-          // Add data rows (starting from row 2) - UPDATE mapping sesuai struktur dengan NIP
+          // Add data rows (starting from row 2) - sesuai dengan mapping baru
           data.forEach((row, rowIndex) => {
             const dataRow = [
               row.PERNER,
@@ -862,8 +856,8 @@
               parseInt(row.SHIFT_OFF || 0),
               // KETERANGAN ABSEN MASUK DAN PULANG
               parseInt(row.ABSEN_LENGKAP || 0),
-              parseInt(row.ABSEN_TIDAK_LENGKAP || 0),
-              parseInt(row.IN_OUT_KOSONG || 0),
+              0, // TOTAL ABSEN TIDAK LENGKAP (calculated)
+              parseInt(row.TIDAK_ABSEN || 0),
               parseInt(row.IN_KOSONG || 0),
               parseInt(row.OUT_KOSONG || 0),
               // PENGAJUAN KETIDAKHADIRAN
@@ -891,22 +885,18 @@
               };
 
               // Special formatting for specific columns
-              if (colIndex === 0) {
-                // PERNER column (sticky)
+              if (colIndex === 0 || colIndex === 1 || colIndex === 2) {
+                // PERNER, NIP, NAMA columns (sticky)
                 cellStyle.font = { bold: true };
                 cellStyle.fill = { fgColor: { rgb: "E3F2FD" } };
-              } else if (colIndex === 1) {
-                // NIP column (sticky)
-                cellStyle.font = { bold: true };
-                cellStyle.fill = { fgColor: { rgb: "E8F5E8" } };
-              } else if (colIndex === 2 || colIndex === 3) {
-                // NAMA, BIDANG/UNIT columns
+              } else if (colIndex === 3) {
+                // BIDANG/UNIT column (non-sticky)
                 cellStyle.font = { bold: true };
                 cellStyle.fill = { fgColor: { rgb: "F5F5F5" } };
-              } else if (colIndex >= 31 && colIndex <= 32) {
+              } else if (colIndex >= 29 && colIndex <= 30) {
                 // JAM REALISASI & JAM SEHARUSNYA
                 cellStyle.numFmt = "#,##0.00";
-              } else if (colIndex === 33) {
+              } else if (colIndex === 31) {
                 // PERSENTASE JKP
                 cellStyle.numFmt = "#,##0.00";
 
@@ -932,7 +922,7 @@
             });
           });
 
-          // Set merge ranges for main headers - UPDATE sesuai struktur dengan NIP
+          // Set merge ranges for main headers - sesuai dengan struktur baru
           const merges = [
             { s: { r: 0, c: 0 }, e: { r: 1, c: 0 } }, // PERNER (span 2 rows)
             { s: { r: 0, c: 1 }, e: { r: 1, c: 1 } }, // NIP (span 2 rows)
@@ -943,7 +933,7 @@
             { s: { r: 0, c: 10 }, e: { r: 0, c: 14 } }, // DATA KOREKSI
             { s: { r: 0, c: 15 }, e: { r: 0, c: 18 } }, // POLA JAM KERJA NORMAL
             { s: { r: 0, c: 19 }, e: { r: 0, c: 23 } }, // POLA JAM KERJA SHIFT
-            { s: { r: 0, c: 24 }, e: { r: 0, c: 28 } }, // KETERANGAN ABSEN (5 kolom)
+            { s: { r: 0, c: 24 }, e: { r: 0, c: 28 } }, // KETERANGAN ABSEN MASUK DAN PULANG
             { s: { r: 0, c: 29 }, e: { r: 0, c: 30 } }, // PENGAJUAN KETIDAKHADIRAN
             { s: { r: 0, c: 31 }, e: { r: 0, c: 33 } }, // PEROLEHAN DURASI JAM KERJA
           ];
@@ -952,8 +942,7 @@
           // Set column widths for better readability
           const colWidths = [
             { wch: 12 }, // PERNER
-            { wch: 15 }, // NIP
-            { wch: 20 }, // NAMA
+            { wch: 15 }, // NAMA
             { wch: 15 }, // BIDANG/UNIT
             { wch: 10 }, // TOTAL HARI REGULER
             { wch: 10 }, // HARI KERJA REGULER
@@ -977,7 +966,7 @@
             { wch: 10 }, // SHIFT OFF
             { wch: 12 }, // TOTAL ABSEN LENGKAP
             { wch: 15 }, // TOTAL ABSEN TIDAK LENGKAP
-            { wch: 12 }, // IN & OUT KOSONG
+            { wch: 10 }, // TIDAK ABSEN
             { wch: 10 }, // IN KOSONG
             { wch: 10 }, // OUT KOSONG
             { wch: 15 }, // SPPD/TUGAS LUAR DLL
@@ -1012,7 +1001,7 @@
           );
         } catch (error) {
           console.error("Download error:", error);
-          let errorMessage = "⚠ Gagal mengunduh file: ";
+          let errorMessage = "❌ Gagal mengunduh file: ";
 
           if (error.message.includes("XLSX is not defined")) {
             errorMessage +=
@@ -1052,7 +1041,7 @@
 
           if (!response.ok) {
             const errorText = await response.text();
-            console.error("⚠ Server response error:", errorText);
+            console.error("❌ Server response error:", errorText);
             throw new Error(
               `HTTP Error: ${response.status} - ${
                 response.statusText
@@ -1065,7 +1054,7 @@
 
           if (!contentType || !contentType.includes("application/json")) {
             const text = await response.text();
-            console.error("⚠ Non-JSON response:", text);
+            console.error("❌ Non-JSON response:", text);
             throw new Error(
               `Server mengembalikan response non-JSON: ${text.substring(
                 0,
@@ -1084,13 +1073,16 @@
             }
             await loadRekapData();
           } else {
-            showAlert(`⚠ ${result.message || "Generate rekap gagal"}`, "error");
+            showAlert(
+              `❌ ${result.message || "Generate rekap gagal"}`,
+              "error"
+            );
           }
         } catch (error) {
-          console.error("⚠ Generate rekap error:", error);
+          console.error("❌ Generate rekap error:", error);
 
           // Better error messages
-          let errorMessage = "⚠ Terjadi kesalahan: ";
+          let errorMessage = "❌ Terjadi kesalahan: ";
           if (
             error.message.includes("Failed to fetch") ||
             error.message.includes("NetworkError")
@@ -1124,19 +1116,19 @@
 
           const offset = (currentPage - 1) * itemsPerPage;
 
-          // Enhanced search with multiple fields including NIP from data_pegawai
+          // Enhanced search with multiple fields
           const searchParams = new URLSearchParams({
             limit: itemsPerPage,
             offset: offset,
             search: searchQuery,
-            search_fields: "PERNER,NIP,NAMA,BIDANG_UNIT",
+            search_fields: "PERNER,NAMA,NIP,BIDANG_UNIT", // Specify which fields to search
           });
 
           const url = `${BASE_URL}/get-rekap-absensi?${searchParams.toString()}`;
 
           console.log("🔗 API Request URL:", url);
           console.log("🔍 Search Query:", searchQuery);
-          console.log("🎯 Search Fields: PERNER, NIP, NAMA, BIDANG_UNIT");
+          console.log("🎯 Search Fields: PERNER, NAMA, NIP, BIDANG_UNIT");
 
           const response = await fetch(url);
           const result = await response.json();
@@ -1157,17 +1149,17 @@
                 : '📋 Belum ada data rekap. Klik tombol "Generate Rekap Absensi" untuk memulai.';
             }
           } else {
-            showAlert(`⚠ ${result.message}`, "error");
+            showAlert(`❌ ${result.message}`, "error");
           }
         } catch (error) {
           console.error("Error loading data:", error);
-          showAlert("⚠ Terjadi kesalahan saat memuat data.", "error");
+          showAlert("❌ Terjadi kesalahan saat memuat data.", "error");
         } finally {
           showLoading(false);
         }
       }
 
-      // Display Rekap Data in Table - UPDATE struktur tabel sesuai schema baru
+      // Display Rekap Data in Table
       function displayRekapData(data) {
         if (!data || data.length === 0) {
           tableScrollWrapper.innerHTML = `<div class="no-data">📋 Tidak ada data untuk ditampilkan.</div>`;
@@ -1185,7 +1177,7 @@
               <tr class="main-header">
                 <th rowspan="2" class="sticky-left-1">PERNER</th>
                 <th rowspan="2" class="sticky-left-2">NIP</th>
-                <th rowspan="2" class="nama-column">NAMA</th>
+                <th rowspan="2" class="sticky-left-3">NAMA</th>
                 <th rowspan="2">BIDANG/UNIT</th>
                 <th colspan="3">JUMLAH HARI REGULER</th>
                 <th colspan="3">JUMLAH HARI REALISASI</th>
@@ -1219,7 +1211,7 @@
                 <th>SHIFT OFF</th>
                 <th>TOTAL ABSEN LENGKAP</th>
                 <th>TOTAL ABSEN TIDAK LENGKAP</th>
-                <th>IN & OUT KOSONG</th>
+                <th>TIDAK ABSEN</th>
                 <th>IN KOSONG</th>
                 <th>OUT KOSONG</th>
                 <th>SPPD/TUGAS LUAR DLL</th>
@@ -1236,7 +1228,7 @@
                   <tr>
                     <td class="sticky-left-1">${row.PERNER}</td>
                     <td class="sticky-left-2">${row.NIP || "-"}</td>
-                    <td class="nama-column">${row.NAMA || "-"}</td>
+                    <td class="sticky-left-3">${row.NAMA || "-"}</td>
                     <td class="bidang-unit">${row.BIDANG_UNIT || "-"}</td>
                     <td>${row.TOTAL_HARI_REGULER || 0}</td>
                     <td>${row.HARI_KERJA_REGULER || 0}</td>
@@ -1259,8 +1251,8 @@
                     <td>${row.SHIFT_MALAM || 0}</td>
                     <td>${row.SHIFT_OFF || 0}</td>
                     <td>${row.ABSEN_LENGKAP || 0}</td>
-                    <td>${row.ABSEN_TIDAK_LENGKAP || 0}</td>
-                    <td>${row.IN_OUT_KOSONG || 0}</td>
+                    <td>${calculateTotalAbsenTidakLengkap(row)}</td>
+                    <td>${row.TIDAK_ABSEN || 0}</td>
                     <td>${row.IN_KOSONG || 0}</td>
                     <td>${row.OUT_KOSONG || 0}</td>
                     <td>${row.SPPD_TUGAS_LUAR_DLL || 0}</td>
@@ -1280,7 +1272,7 @@
 
         tableScrollWrapper.innerHTML = table;
 
-        // Calculate header heights for sticky positioning
+        // Hitung tinggi baris header agar offset sticky akurat di semua device
         const mainHeaderRow = tableScrollWrapper.querySelector(
           "thead tr.main-header"
         );
@@ -1302,6 +1294,14 @@
         tableScrollWrapper.addEventListener("scroll", () => {
           scrollIndicator.style.display = "none";
         });
+      }
+
+      // Helper function to calculate Total Absen Tidak Lengkap
+      function calculateTotalAbsenTidakLengkap(row) {
+        const tidakAbsen = parseInt(row.TIDAK_ABSEN || 0);
+        const inKosong = parseInt(row.IN_KOSONG || 0);
+        const outKosong = parseInt(row.OUT_KOSONG || 0);
+        return tidakAbsen + inKosong + outKosong;
       }
 
       // Get percentage class for styling
@@ -1491,11 +1491,11 @@
             <!-- Jump to page -->
             <div class="page-input-group">
               <span>Ke halaman:</span>
-              <input
-                type="number"
-                class="page-input"
-                min="1"
-                max="${totalPages}"
+              <input 
+                type="number" 
+                class="page-input" 
+                min="1" 
+                max="${totalPages}" 
                 value="${currentPage}"
                 onkeypress="handlePageInputKeypress(event, ${totalPages})"
                 onchange="handlePageInputChange(event, ${totalPages})"
@@ -1571,11 +1571,19 @@
         console.log("🔍 Search triggered:", {
           previousQuery: searchQuery,
           newQuery: newSearchQuery,
-          searchFields: ["PERNER", "NIP", "NAMA", "BIDANG_UNIT"],
+          searchFields: ["PERNER", "NAMA", "NIP", "BIDANG_UNIT"],
         });
 
         searchQuery = newSearchQuery;
         currentPage = 1; // Reset to first page when searching
+
+        // Show loading state immediately for better UX
+        if (searchQuery) {
+          showAlert(
+            `🔍 Mencari "${searchQuery}" di PERNER, NIP, Nama, dan Bidang...`,
+            "info"
+          );
+        }
 
         loadRekapData();
       }
@@ -1634,5 +1642,6 @@
         loadRekapData();
       });
     </script>
+    <script src="script.js?v=20250812"></script>
   </body>
 </html>
