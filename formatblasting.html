@@ -830,7 +830,7 @@
             type="text"
             id="searchInput"
             class="search-input"
-            placeholder="🔍 Cari PERNER... (ketik untuk filter otomatis)"
+            placeholder="🔍 Cari PERNER/NIP/Nama/Bidang (server-side, ketik untuk cari)"
             autocomplete="off"
           />
           <button id="clearSearch" class="clear-btn" onclick="clearSearch()">
@@ -1001,12 +1001,12 @@
       function formatJamKerjaPegawai(realisasi, seharusnya) {
         if (!realisasi && !seharusnya) return "-";
 
-        const real = parseFloat(realisasi) || 0;
-        const target = parseFloat(seharusnya) || 0;
+        const real = parseFloat(parseFloat(realisasi).toFixed(2)) || 0;
+        const target = parseFloat(parseFloat(seharusnya).toFixed(2)) || 0;
 
         if (target === 0) return `${real}/-(-%)`;
 
-        const persentase = ((real / target) * 100).toFixed(1);
+        const persentase = ((real / target) * 100).toFixed(2);
         return `${real}/${target}(${persentase}%)`;
       }
 
@@ -1028,32 +1028,29 @@
         const nama = row.nama || "[Nama Belum Diisi]";
         const nip = row.nip || "[NIP Belum Diisi]";
         const bidang = row.bidang || "[Bidang Belum Diisi]";
-        const jamRealisasi = parseFloat(row.JAM_REALISASI || 0).toFixed(1);
-        const jamSeharusnya = parseFloat(row.JAM_SEHARUSNYA || 0).toFixed(1);
-        const persentaseJKP = parseFloat(row.PERSENTASE_JKP || 0).toFixed(1);
+        const jamRealisasi = parseFloat(row.JAM_REALISASI || 0).toFixed(2);
+        const jamSeharusnya = parseFloat(row.JAM_SEHARUSNYA || 0).toFixed(2);
+        const persentaseJKP = parseFloat(row.PERSENTASE_JKP || 0).toFixed(2);
+        const absensiTidakLengkap = parseInt(row.ABSEN_TIDAK_LENGKAP || 0);
 
         // Calculate jumlah absen tidak lengkap
-        const tidakAbsen = parseInt(row.TIDAK_ABSEN || 0);
-        const inKosong = parseInt(row.IN_KOSONG || 0);
-        const outKosong = parseInt(row.OUT_KOSONG || 0);
-        const jumlahAbsenTidakLengkap = tidakAbsen + inKosong + outKosong;
-
+        const jumlahAbsenTidakLengkap = absensiTidakLengkap;
         // Get koreksi dan hari kerja
         const totalHariKoreksi = parseInt(row.TOTAL_HARI_KOREKSI || 0);
         const hariKerja = parseInt(row.HARI_KERJA || 0);
 
         // Generate summary message
         let pesanTemplate = `Yth Bpk/Ibu ${nama} / ${nip}
-                
+
 Berikut kami sampaikan data absensi Bulan ${periodeBulan} ${periodeTahun} :
 
--> Perolehan JKP Bulanan :  
+-> Perolehan JKP Bulanan :
 ${jamRealisasi} / ${jamSeharusnya} jam (${persentaseJKP}%)
 
--> Jumlah Absen tidak lengkap :   
+-> Jumlah Absen tidak lengkap :
 ${jumlahAbsenTidakLengkap} hari
 
--> Jumlah Koreksi in/out :  
+-> Jumlah Koreksi in/out :
 ${totalHariKoreksi} dari ${hariKerja} hari kerja`;
 
         // PART 2: Daily details (NEW)
@@ -1122,7 +1119,8 @@ ${totalHariKoreksi} dari ${hariKerja} hari kerja`;
       // ENHANCED DATA LOADING with Daily Details
       // ======================================================
 
-      async function loadData() {
+      // === UBAH: tambahkan parameter q ===
+      async function loadData(q = "") {
         try {
           document.getElementById("loading").style.display = "block";
           document.getElementById("error").style.display = "none";
@@ -1133,49 +1131,44 @@ ${totalHariKoreksi} dari ${hariKerja} hari kerja`;
           disablePaginationControls();
 
           console.log(
-            "🚀 Fetching enhanced data from /getRekapAbsensiWithDaily..."
+            "🚀 Fetching enhanced data from /getRekapAbsensiWithDaily...",
+            { q }
           );
 
-          // Use enhanced endpoint with daily details
-          const response = await fetch(`${BASE_URL}/getRekapAbsensiWithDaily`);
+          // === UBAH: pakai query param q ke server ===
+          const qs = q && q.trim() ? `?q=${encodeURIComponent(q.trim())}` : "";
+          const response = await fetch(
+            `${BASE_URL}/getRekapAbsensiWithDaily${qs}`
+          );
 
           if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
           }
 
           const data = await response.json();
-          console.log(`✅ Enhanced data loaded: ${data.length} records`);
-
-          // Debug: Log sample data structure
-          if (data.length > 0) {
-            console.log("📊 Enhanced data structure:", {
-              perner: data[0].PERNER,
-              nama: data[0].nama,
-              daily_details_count: data[0].daily_details?.length || 0,
-              sample_daily: data[0].daily_details?.[0] || null,
-            });
-          }
+          console.log(
+            `✅ Enhanced data loaded: ${data.length} records (q="${q}")`
+          );
 
           allData = data;
-          filteredData = [...data];
+          filteredData = [...data]; // sekarang filteredData = hasil dari server
           totalRecords = data.length;
           totalPages = Math.ceil(totalRecords / recordsPerPage);
 
-          // Initialize blasting results from database
+          // Inisialisasi status blasting
           blastingResults = {};
           data.forEach((row) => {
             const perner = row.PERNER;
             const resultBlasting = row.RESULT_BLASTING;
-            if (resultBlasting === "Terkirim") {
-              blastingResults[perner] = "success";
-            } else if (resultBlasting === "Gagal") {
-              blastingResults[perner] = "failed";
-            } else {
-              blastingResults[perner] = "pending";
-            }
+            blastingResults[perner] =
+              resultBlasting === "Terkirim"
+                ? "success"
+                : resultBlasting === "Gagal"
+                ? "failed"
+                : "pending";
           });
 
-          // Update header info
+          // Header info
           document.getElementById(
             "totalRecords"
           ).innerHTML = `<strong>Total Records:</strong> ${totalRecords.toLocaleString()}`;
@@ -1183,21 +1176,31 @@ ${totalHariKoreksi} dari ${hariKerja} hari kerja`;
             new Date().toLocaleString("id-ID");
 
           if (totalRecords === 0) {
-            throw new Error("Tidak ada data yang ditemukan");
+            // Tampilkan info kosong tapi tetap lanjutkan agar UI update
+            console.warn("⚠️ Tidak ada data yang ditemukan");
           }
 
-          // Show first page
+          // === UBAH: simpan query aktif dan tampilkan info hasil pencarian ===
+          currentSearchTerm = q.trim();
+          if (currentSearchTerm) {
+            const info = document.getElementById("searchResults");
+            const infoText = document.getElementById("searchResultsText");
+            infoText.textContent = `🔍 Ditemukan ${totalRecords.toLocaleString()} hasil untuk "${currentSearchTerm}"`;
+            info.style.display = "block";
+          } else {
+            document.getElementById("searchResults").style.display = "none";
+          }
+
+          // Tampilkan halaman pertama
           currentPage = 1;
           displayPage(currentPage);
-          setupSearchListeners();
           enablePaginationControls();
 
-          // Show table
           document.getElementById("loading").style.display = "none";
           document.getElementById("tableContainer").style.display = "block";
 
           console.log(
-            `📊 Enhanced table created with ${totalPages} pages (${recordsPerPage} records per page)`
+            `📊 Enhanced table created with ${totalPages} pages (${recordsPerPage} records/page)`
           );
         } catch (error) {
           console.error("❌ Error loading enhanced data:", error);
@@ -1247,45 +1250,45 @@ ${totalHariKoreksi} dari ${hariKerja} hari kerja`;
 
         // Create enhanced modal with statistics
         const modalHTML = `
-          <div class="modal-overlay" id="pesanModal" onclick="closeModalOnOverlay(event)">
-            <div class="modal-content">
-              <div class="modal-header">
-                <h3 class="modal-title">📄 Enhanced Pesan - ${perner}</h3>
-                <button class="modal-close" onclick="closePesanModal()">&times;</button>
-              </div>
-              <div class="modal-body">
-                <div style="display: flex; gap: 10px; margin-bottom: 15px; font-size: 12px; color: #666; flex-wrap: wrap;">
-                  <span>📊 ${messageStats.total_chars} chars</span>
-                  <span>📄 ${messageStats.total_lines} lines</span>
-                  <span>📅 ${
-                    messageStats.daily_details_count
-                  } daily details</span>
-                  <span style="color: ${
-                    messageStats.whatsapp_safe ? "#48bb78" : "#e53e3e"
-                  }">
-                    ${
-                      messageStats.whatsapp_safe
-                        ? "✅ WhatsApp Safe"
-                        : "⚠️ Exceeds WhatsApp limit"
-                    }
-                  </span>
+                <div class="modal-overlay" id="pesanModal" onclick="closeModalOnOverlay(event)">
+                  <div class="modal-content">
+                    <div class="modal-header">
+                      <h3 class="modal-title">📄 Enhanced Pesan - ${perner}</h3>
+                      <button class="modal-close" onclick="closePesanModal()">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                      <div style="display: flex; gap: 10px; margin-bottom: 15px; font-size: 12px; color: #666; flex-wrap: wrap;">
+                        <span>📊 ${messageStats.total_chars} chars</span>
+                        <span>📄 ${messageStats.total_lines} lines</span>
+                        <span>📅 ${
+                          messageStats.daily_details_count
+                        } daily details</span>
+                        <span style="color: ${
+                          messageStats.whatsapp_safe ? "#48bb78" : "#e53e3e"
+                        }">
+                          ${
+                            messageStats.whatsapp_safe
+                              ? "✅ WhatsApp Safe"
+                              : "⚠️ Exceeds WhatsApp limit"
+                          }
+                        </span>
+                      </div>
+                      <div class="pesan-full" id="fullPesanText">${fullPesan}</div>
+                    </div>
+                    <div class="modal-footer">
+                      <button class="btn-modal btn-copy" onclick="copyPesan()">
+                        📋 Copy Pesan
+                      </button>
+                      <button class="btn-modal" onclick="downloadPesan('${perner}')" style="background: #4299e1; color: white;">
+                        💾 Download TXT
+                      </button>
+                      <button class="btn-modal btn-close-modal" onclick="closePesanModal()">
+                        Tutup
+                      </button>
+                    </div>
+                  </div>
                 </div>
-                <div class="pesan-full" id="fullPesanText">${fullPesan}</div>
-              </div>
-              <div class="modal-footer">
-                <button class="btn-modal btn-copy" onclick="copyPesan()">
-                  📋 Copy Pesan
-                </button>
-                <button class="btn-modal" onclick="downloadPesan('${perner}')" style="background: #4299e1; color: white;">
-                  💾 Download TXT
-                </button>
-                <button class="btn-modal btn-close-modal" onclick="closePesanModal()">
-                  Tutup
-                </button>
-              </div>
-            </div>
-          </div>
-        `;
+              `;
 
         // Add modal to page
         document.body.insertAdjacentHTML("beforeend", modalHTML);
@@ -1575,81 +1578,83 @@ ${totalHariKoreksi} dari ${hariKerja} hari kerja`;
           const dailyCount = row.daily_details?.length || 0;
 
           tr.innerHTML = `
-            <td class="field-no">${startIndex + index + 1}</td>
-            <td class="field-unit">${row.bidang || "-"}</td>
-            <td class="field-perner">${perner}</td>
-            <td class="field-nip">${row.nip || "-"}</td>
-            <td class="field-nama">${row.nama || "-"}</td>
-            <td class="field-phone">${phoneNumber}</td>
-         <td class="field-pesan">
-              <div class="pesan-container">
-              <div class="pesan-preview" id="pesan-preview-${perner}">${pesanGenerated.substring(
+                  <td class="field-no">${startIndex + index + 1}</td>
+                  <td class="field-unit">${row.bidang || "-"}</td>
+                  <td class="field-perner">${perner}</td>
+                  <td class="field-nip">${row.nip || "-"}</td>
+                  <td class="field-nama">${row.nama || "-"}</td>
+                  <td class="field-phone">${phoneNumber}</td>
+               <td class="field-pesan">
+                    <div class="pesan-container">
+                    <div class="pesan-preview" id="pesan-preview-${perner}">${pesanGenerated.substring(
             0,
             100
           )}...
-              </div>
-              <div style="display: flex; gap: 5px;">
-                <button class="btn-view-pesan" onclick="viewFullPesan('${perner}')">
-                  📄 Lihat Pesan
-                </button>
-                <button class="btn-copy-pesan" onclick="copyPesanDirect('${perner}')">
-                  📋 Copy
-                </button>
-              </div>
-            </div>
-        </td>
-            <td class="field-wa">
-              <a 
-                id="wa-${perner}" 
-                href="${waLink}" 
-                target="_blank" 
-                class="btn-wa">
-                Button WA
-              </a>
-            </td>
-            <td class="field-aksi">
-              <div class="action-buttons">
-                <button 
-                  id="terkirim-${perner}" 
-                  class="btn-success" 
-                  onclick="handleAction('${perner}', 'success')"
-                  style="opacity: ${
-                    currentResult === "success" ? "1" : "0.7"
-                  }; background: ${
+                    </div>
+                    <div style="display: flex; gap: 5px;">
+                      <button class="btn-view-pesan" onclick="viewFullPesan('${perner}')">
+                        📄 Lihat Pesan
+                      </button>
+                      <button class="btn-copy-pesan" onclick="copyPesanDirect('${perner}')">
+                        📋 Copy
+                      </button>
+                    </div>
+                  </div>
+              </td>
+                  <td class="field-wa">
+                    <a
+                      id="wa-${perner}"
+                      href="${waLink}"
+                      target="_blank"
+                      class="btn-wa">
+                      Button WA
+                    </a>
+                  </td>
+                  <td class="field-aksi">
+                    <div class="action-buttons">
+                      <button
+                        id="terkirim-${perner}"
+                        class="btn-success"
+                        onclick="handleAction('${perner}', 'success')"
+                        style="opacity: ${
+                          currentResult === "success" ? "1" : "0.7"
+                        }; background: ${
             currentResult === "success" ? "#38a169" : "#48bb78"
           }">
-                  Terkirim
-                </button>
-                <button 
-                  id="gagal-${perner}" 
-                  class="btn-danger" 
-                  onclick="handleAction('${perner}', 'failed')"
-                  style="opacity: ${
-                    currentResult === "failed" ? "1" : "0.7"
-                  }; background: ${
+                        Terkirim
+                      </button>
+                      <button
+                        id="gagal-${perner}"
+                        class="btn-danger"
+                        onclick="handleAction('${perner}', 'failed')"
+                        style="opacity: ${
+                          currentResult === "failed" ? "1" : "0.7"
+                        }; background: ${
             currentResult === "failed" ? "#c53030" : "#e53e3e"
           }">
-                  Gagal
-                </button>
-                <button 
-                  id="reset-${perner}" 
-                  class="btn-reset" 
-                  onclick="handleAction('${perner}', 'reset')"
-                  style="opacity: ${currentResult === "pending" ? "1" : "0.7"}">
-                  Reset
-                </button>
-              </div>
-            </td>
-            <td id="result-${perner}" class="field-result">
-              ${
-                currentResult === "success"
-                  ? '<span class="status-success">Terkirim</span>'
-                  : currentResult === "failed"
-                  ? '<span class="status-failed">Gagal</span>'
-                  : '<span class="status-pending"></span>'
-              }
-            </td>
-          `;
+                        Gagal
+                      </button>
+                      <button
+                        id="reset-${perner}"
+                        class="btn-reset"
+                        onclick="handleAction('${perner}', 'reset')"
+                        style="opacity: ${
+                          currentResult === "pending" ? "1" : "0.7"
+                        }">
+                        Reset
+                      </button>
+                    </div>
+                  </td>
+                  <td id="result-${perner}" class="field-result">
+                    ${
+                      currentResult === "success"
+                        ? '<span class="status-success">Terkirim</span>'
+                        : currentResult === "failed"
+                        ? '<span class="status-failed">Gagal</span>'
+                        : '<span class="status-pending"></span>'
+                    }
+                  </td>
+                `;
 
           // Store full message in data attribute for later access
           tr.setAttribute("data-full-pesan", pesanGenerated);
@@ -1718,9 +1723,33 @@ ${totalHariKoreksi} dari ${hariKerja} hari kerja`;
       }
 
       // Setup search listeners
+      // === UBAH: search server-side dengan debounce ===
       function setupSearchListeners() {
         const searchInput = document.getElementById("searchInput");
-        searchInput.addEventListener("input", debounce(performSearch, 300));
+        const debounced = debounce(() => {
+          const q = searchInput.value.trim();
+          // Simpan q ke URL agar shareable
+          const u = new URL(location.href);
+          if (q) u.searchParams.set("q", q);
+          else u.searchParams.delete("q");
+          history.replaceState(null, "", u);
+          loadData(q);
+        }, 400);
+
+        searchInput.addEventListener("input", debounced);
+
+        // Enter: cegah submit form dan trigger pencarian langsung
+        searchInput.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            const q = searchInput.value.trim();
+            const u = new URL(location.href);
+            if (q) u.searchParams.set("q", q);
+            else u.searchParams.delete("q");
+            history.replaceState(null, "", u);
+            loadData(q);
+          }
+        });
       }
 
       // Perform search
@@ -1764,10 +1793,14 @@ ${totalHariKoreksi} dari ${hariKerja} hari kerja`;
       function clearSearch() {
         document.getElementById("searchInput").value = "";
         currentSearchTerm = "";
-        filteredData = [...allData];
-        hideSearchResults();
-        currentPage = 1;
-        displayPage(currentPage);
+        document.getElementById("searchResults").style.display = "none";
+
+        // Hapus q dari URL dan muat ulang semua data periode
+        const u = new URL(location.href);
+        u.searchParams.delete("q");
+        history.replaceState(null, "", u);
+
+        loadData("");
       }
 
       // Update pagination controls
@@ -2204,34 +2237,45 @@ ${totalHariKoreksi} dari ${hariKerja} hari kerja`;
       document.addEventListener("DOMContentLoaded", function () {
         console.log("🚀 Enhanced Format Blasting initialized");
         console.log(`📋 Using BASE_URL: ${BASE_URL}`);
-        loadData();
+
+        // === UBAH: ambil q dari URL kalau ada
+        const urlQ = new URL(location.href).searchParams.get("q") || "";
+        const searchInput = document.getElementById("searchInput");
+        if (urlQ) searchInput.value = urlQ;
+
+        // load awal berdasarkan q
+        loadData(urlQ).then(() => {
+          setupSearchListeners();
+        });
       });
 
       // Auto-refresh every 10 minutes
-      setInterval(loadData, 10 * 60 * 1000);
+      // setInterval(loadData, 10 * 60 * 1000);
+      // === UBAH: refresh pakai query aktif
+      setInterval(() => loadData(currentSearchTerm || ""), 10 * 60 * 1000);
 
       // ======================================================
       // CONSOLE COMMANDS for Testing
       // ======================================================
 
       console.log(`
-🚀 ENHANCED FORMAT BLASTING - READY!
-==================================
+      🚀 ENHANCED FORMAT BLASTING - READY!
+      ==================================
 
-Quick Test Commands:
-- testEnhancedMessage()           // Test first PERNER
-- testEnhancedMessage("69890002") // Test specific PERNER  
-- validateDailyDetails()          // Check data completeness
-- viewFullPesan("69890002")       // Open modal for specific PERNER
+      Quick Test Commands:
+      - testEnhancedMessage()           // Test first PERNER
+      - testEnhancedMessage("69890002") // Test specific PERNER
+      - validateDailyDetails()          // Check data completeness
+      - viewFullPesan("69890002")       // Open modal for specific PERNER
 
-Expected Results:
-- Daily details: 31 days per PERNER
-- Message format: Summary + 31 daily sections
-- Enhanced modal with statistics
-- Download capability for long messages
+      Expected Results:
+      - Daily details: 31 days per PERNER
+      - Message format: Summary + 31 daily sections
+      - Enhanced modal with statistics
+      - Download capability for long messages
 
-Auto-validation will run after data loads...
-`);
+      Auto-validation will run after data loads...
+      `);
 
       // Auto-validation after data loads
       setTimeout(() => {

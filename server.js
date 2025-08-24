@@ -515,7 +515,7 @@ app.post("/hapus-data-db", (req, res) => {
       break;
     case "ci_co_daily":
       kolom =
-        "daily_in = NULL, daily_out = NULL, daily_in_cleansing = NULL, daily_out_cleansing = NULL, daily_in_default = NULL, daily_out_default = NULL, correction_in = NULL, correction_out = NULL";
+        "daily_in = NULL, daily_out = NULL, daily_in_cleansing = NULL, daily_out_cleansing = NULL, correction_in = NULL, correction_out = NULL";
       break;
     case "att_abs_daily":
       kolom = "att_daily = NULL, abs_daily = NULL";
@@ -3445,25 +3445,30 @@ const {
 } = require("./fungsiJKP"); // pastikan path-nya sesuai
 
 app.post("/update-status-absen-cleansing", (req, res) => {
-  // STEP 1: Ambil semua data dari tabel olah_absensi (termasuk field untuk cek wajib kerja)
   const ambilSQL = `
     SELECT perner, tanggal, daily_in_cleansing, daily_out_cleansing,
-           status_jam_kerja, jenis_hari
+           status_jam_kerja, jenis_hari, value_att_abs
     FROM olah_absensi
     WHERE tanggal IS NOT NULL
   `;
 
+  // Versi aman: anggap null/undefined/"null"/"undefined"/"" sebagai kosong
+  const isFilled = (v) => {
+    if (v === null || v === undefined) return false;
+    const s = String(v).trim().toLowerCase();
+    return s !== "" && s !== "null" && s !== "undefined";
+  };
+
   conn.query(ambilSQL, (err, rows) => {
     if (err) {
       console.error("❌ Gagal mengambil data:", err);
-      return res.status(500).json({
-        message: "❌ Gagal mengambil data absensi.",
-      });
+      return res
+        .status(500)
+        .json({ message: "❌ Gagal mengambil data absensi." });
     }
 
     const updateTasks = [];
 
-    // STEP 2: Loop setiap baris untuk evaluasi status_absen DAN jenis_hari_realisasi
     rows.forEach((row) => {
       const {
         perner,
@@ -3472,70 +3477,65 @@ app.post("/update-status-absen-cleansing", (req, res) => {
         daily_out_cleansing,
         status_jam_kerja,
         jenis_hari,
+        value_att_abs,
       } = row;
 
-      // 🔍 STEP 2.1: Cek apakah hari tersebut wajib kerja
       const isWajibKerja = cekWajibKerja(status_jam_kerja, jenis_hari);
-
-      // 🆕 STEP 2.2: Tentukan jenis_hari_realisasi berdasarkan cekWajibKerja
       const jenis_hari_realisasi = isWajibKerja
         ? "Hari kerja"
         : "Bukan hari kerja";
 
-      let status_absen = null;
+      let status_absen;
 
-      // 🎯 STEP 2.3: Logika evaluasi status_absen (sama seperti sebelumnya)
-      if (!isWajibKerja) {
-        // ❌ TIDAK WAJIB KERJA - Prioritas tertinggi
-        status_absen = "Bukan hari wajib kerja";
-      } else {
-        // ✅ WAJIB KERJA - Evaluasi berdasarkan ketersediaan absensi
-        const adaIn = daily_in_cleansing !== null;
-        const adaOut = daily_out_cleansing !== null;
-
-        if (adaIn && adaOut) {
-          status_absen = "Lengkap"; // ✅ Keduanya ada
-        } else if (!adaIn && adaOut) {
-          status_absen = "Tidak lengkap -> in kosong"; // ⚠️ Hanya out
-        } else if (adaIn && !adaOut) {
-          status_absen = "Tidak lengkap -> out kosong"; // ⚠️ Hanya in
+      if (isWajibKerja) {
+        // 🔺 PRIORITAS BARU:
+        // Jika WAJIB KERJA dan ada ATT/ABS khusus → SPPD/TL/Cuti/Ijin
+        if (isFilled(value_att_abs)) {
+          status_absen = "SPPD/Tugas Luar/Cuti/Ijin";
         } else {
-          status_absen = "Tidak lengkap -> tidak absen"; // ❌ Keduanya kosong
+          // Tidak ada ATT/ABS khusus → cek kelengkapan absensi cleansing
+          const adaIn = daily_in_cleansing !== null;
+          const adaOut = daily_out_cleansing !== null;
+
+          if (adaIn && adaOut) {
+            status_absen = "Lengkap";
+          } else if (!adaIn && adaOut) {
+            status_absen = "Tidak lengkap -> in kosong";
+          } else if (adaIn && !adaOut) {
+            status_absen = "Tidak lengkap -> out kosong";
+          } else {
+            status_absen = "Tidak lengkap -> tidak absen";
+          }
         }
+      } else {
+        // BUKAN hari wajib kerja
+        status_absen = "Bukan hari wajib kerja";
       }
 
-      // 🆕 STEP 3: Query update DENGAN jenis_hari_realisasi
       const sqlUpdate = `
         UPDATE olah_absensi
         SET status_absen = ?, jenis_hari_realisasi = ?
         WHERE perner = ? AND tanggal = ?
       `;
-
-      const params = [status_absen, jenis_hari_realisasi, perner, tanggal];
-
-      // STEP 4: Tambahkan ke task array untuk Promise.all
       updateTasks.push(
         new Promise((resolve, reject) => {
-          conn.query(sqlUpdate, params, (err) => {
-            if (err) return reject(err);
-            resolve();
-          });
+          conn.query(
+            sqlUpdate,
+            [status_absen, jenis_hari_realisasi, perner, tanggal],
+            (e) => (e ? reject(e) : resolve())
+          );
         })
       );
     });
 
-    // STEP 5: Execute semua update secara parallel
     Promise.all(updateTasks)
-      .then(() => {
+      .then(() =>
         res.json({
           message: `✅ Berhasil mengupdate status_absen dan jenis_hari_realisasi untuk ${rows.length} baris.`,
-        });
-      })
-      .catch((err) => {
-        console.error(
-          "❌ Gagal update status_absen dan jenis_hari_realisasi:",
-          err
-        );
+        })
+      )
+      .catch((e) => {
+        console.error("❌ Gagal update:", e);
         res.status(500).json({
           message: "❌ Gagal menyimpan status_absen dan jenis_hari_realisasi.",
         });
@@ -3810,11 +3810,11 @@ app.post("/update-status-in-out", (req, res) => {
 
       // 1. Cek kondisi khusus: status_absen != "Lengkap"
       if (status_absen !== "Lengkap") {
-        status_in_out = status_absen;
+        status_in_out = "-";
       }
       // 2. Cek kondisi khusus: status_jam_kerja mengandung "OFF"
       else if (status_jam_kerja && status_jam_kerja.includes("OFF")) {
-        status_in_out = status_absen;
+        status_in_out = "-";
       }
       // 3. Proses normal: bandingkan waktu
       else {
@@ -3928,52 +3928,52 @@ app.post("/reset-rekap-absensi", (req, res) => {
 // 📊 ENDPOINT 2: View Rekap Stats
 // ===================================================================
 
-app.post("/view-rekap-stats", (req, res) => {
-  console.log("📊 Getting rekap absensi statistics...");
+// app.post("/view-rekap-stats", (req, res) => {
+//   console.log("📊 Getting rekap absensi statistics...");
 
-  const sql = `
-    SELECT 
-      COUNT(*) as total_pegawai,
-      ROUND(AVG(PERSENTASE_JKP), 2) as avg_persentase,
-      ROUND(SUM(JUMLAH_JAM_KERJA_REALISASI), 2) as total_jam_realisasi,
-      ROUND(SUM(JUMLAH_JAM_KERJA_SEHARUSNYA), 2) as total_jam_seharusnya,
-      SUM(JUMLAH_HARI_KERJA) as total_hari_kerja,
-      SUM(JUMLAH_HARI_LIBUR) as total_hari_libur,
-      SUM(JUMLAH_STATUS_ABSENSI_LENGKAP) as total_absensi_lengkap,
-      SUM(JUMLAH_KOREKSI_IN + JUMLAH_KOREKSI_OUT + JUMLAH_KOREKSI_IN_DAN_OUT) as total_koreksi
-    FROM rekap_absensi
-  `;
+//   const sql = `
+//     SELECT
+//       COUNT(*) as total_pegawai,
+//       ROUND(AVG(PERSENTASE_JKP), 2) as avg_persentase,
+//       ROUND(SUM(JUMLAH_JAM_KERJA_REALISASI), 2) as total_jam_realisasi,
+//       ROUND(SUM(JUMLAH_JAM_KERJA_SEHARUSNYA), 2) as total_jam_seharusnya,
+//       SUM(JUMLAH_HARI_KERJA) as total_hari_kerja,
+//       SUM(JUMLAH_HARI_LIBUR) as total_hari_libur,
+//       SUM(JUMLAH_STATUS_ABSENSI_LENGKAP) as total_absensi_lengkap,
+//       SUM(JUMLAH_KOREKSI_IN + JUMLAH_KOREKSI_OUT + JUMLAH_KOREKSI_IN_DAN_OUT) as total_koreksi
+//     FROM rekap_absensi
+//   `;
 
-  conn.query(sql, (err, result) => {
-    if (err) {
-      console.error("❌ Gagal mengambil statistik rekap:", err);
-      return res.status(500).json({
-        message: "❌ Gagal mengambil statistik rekap absensi.",
-        error: err.message,
-      });
-    }
+//   conn.query(sql, (err, result) => {
+//     if (err) {
+//       console.error("❌ Gagal mengambil statistik rekap:", err);
+//       return res.status(500).json({
+//         message: "❌ Gagal mengambil statistik rekap absensi.",
+//         error: err.message,
+//       });
+//     }
 
-    const stats = result[0];
-    console.log(
-      `📊 Statistik berhasil diambil: ${stats.total_pegawai} pegawai`
-    );
+//     const stats = result[0];
+//     console.log(
+//       `📊 Statistik berhasil diambil: ${stats.total_pegawai} pegawai`
+//     );
 
-    res.json({
-      message: `📊 Statistik rekap absensi berhasil diambil untuk ${stats.total_pegawai} pegawai.`,
-      stats: {
-        total_pegawai: stats.total_pegawai,
-        avg_persentase: stats.avg_persentase,
-        total_jam_realisasi: stats.total_jam_realisasi,
-        total_jam_seharusnya: stats.total_jam_seharusnya,
-        total_hari_kerja: stats.total_hari_kerja,
-        total_hari_libur: stats.total_hari_libur,
-        total_absensi_lengkap: stats.total_absensi_lengkap,
-        total_koreksi: stats.total_koreksi,
-      },
-      retrieved_at: new Date().toISOString(),
-    });
-  });
-});
+//     res.json({
+//       message: `📊 Statistik rekap absensi berhasil diambil untuk ${stats.total_pegawai} pegawai.`,
+//       stats: {
+//         total_pegawai: stats.total_pegawai,
+//         avg_persentase: stats.avg_persentase,
+//         total_jam_realisasi: stats.total_jam_realisasi,
+//         total_jam_seharusnya: stats.total_jam_seharusnya,
+//         total_hari_kerja: stats.total_hari_kerja,
+//         total_hari_libur: stats.total_hari_libur,
+//         total_absensi_lengkap: stats.total_absensi_lengkap,
+//         total_koreksi: stats.total_koreksi,
+//       },
+//       retrieved_at: new Date().toISOString(),
+//     });
+//   });
+// });
 
 // ===================================================================
 // 📈 ENDPOINT 3: Generate Rekap Absensi (COMPLEX)
@@ -5224,27 +5224,45 @@ app.get("/getRekapAbsensi", (req, res) => {
 
     // Step 3: Enhanced query with JOIN and search
     const sql = `
-      SELECT 
-        r.PERNER,
-        dp.nama as NAMA,
-        dp.nip as NIP,
-        dp.bidang as BIDANG_UNIT,
-        dp.no_telp,
-        r.TOTAL_HARI_REGULER, r.HARI_KERJA_REGULER, r.HARI_LIBUR_REGULER,
-        r.TOTAL_HARI_REALISASI, r.HARI_KERJA_REALISASI, r.HARI_LIBUR_REALISASI,
-        r.TOTAL_HARI_TANPA_KOREKSI, r.TOTAL_HARI_KOREKSI,
-        r.KOREKSI_IN, r.KOREKSI_OUT, r.KOREKSI_IN_OUT,
-        r.TOTAL_JAM_KERJA_NORMAL, r.PIKET, r.PDKB, r.REGULER,
-        r.TOTAL_JAM_KERJA_SHIFT, r.SHIFT_PAGI, r.SHIFT_SIANG, r.SHIFT_MALAM, r.SHIFT_OFF,
-        r.ABSEN_LENGKAP, r.TIDAK_ABSEN, r.IN_KOSONG, r.OUT_KOSONG,
-        r.SPPD_TUGAS_LUAR_DLL, r.CUTI_IJIN,
-        r.JAM_REALISASI, r.JAM_SEHARUSNYA, r.PERSENTASE_JKP,
-        r.RESULT_BLASTING
-      FROM rekap_absensi r
-      LEFT JOIN data_pegawai dp ON r.PERNER = dp.perner
-      ${whereClause}
-      ORDER BY r.PERNER ASC
-    `;
+  SELECT 
+    r.PERNER,
+    r.NAMA,
+    r.BIDANG_UNIT,
+    r.TOTAL_HARI_REGULER, 
+    r.HARI_KERJA_REGULER, 
+    r.HARI_LIBUR_REGULER,
+    r.TOTAL_HARI_REALISASI, 
+    r.HARI_KERJA_REALISASI, 
+    r.HARI_LIBUR_REALISASI,
+    r.TOTAL_HARI_TANPA_KOREKSI, 
+    r.TOTAL_HARI_KOREKSI,
+    r.KOREKSI_IN, 
+    r.KOREKSI_OUT, 
+    r.KOREKSI_IN_OUT,
+    r.TOTAL_JAM_KERJA_NORMAL, 
+    r.PIKET, 
+    r.PDKB, 
+    r.REGULER,
+    r.TOTAL_JAM_KERJA_SHIFT, 
+    r.SHIFT_PAGI, 
+    r.SHIFT_SIANG, 
+    r.SHIFT_MALAM, 
+    r.SHIFT_OFF,
+    r.ABSEN_LENGKAP, 
+    r.ABSEN_TIDAK_LENGKAP,
+    r.IN_OUT_KOSONG,
+    r.IN_KOSONG, 
+    r.OUT_KOSONG,
+    r.SPPD_TUGAS_LUAR_DLL, 
+    r.CUTI_IJIN,
+    r.JAM_REALISASI, 
+    r.JAM_SEHARUSNYA, 
+    r.PERSENTASE_JKP,
+    r.RESULT_BLASTING
+  FROM rekap_absensi r
+  ${whereClause}
+  ORDER BY r.PERNER ASC
+`;
 
     conn.query(sql, params, (err, results) => {
       if (err) {
@@ -6458,12 +6476,20 @@ app.get("/getRekapAbsensiWithDaily", (req, res) => {
   const startTime = Date.now();
   console.log("🚀 Fetching rekap_absensi with daily details...");
 
+  // Util: format YYYY-MM-DD tanpa risiko offset timezone
+  const fmtDate = (d) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  };
+
   // Step 1: Ambil periode bulan dari olah_absensi
   const periodeSQL = `
-    SELECT tanggal 
-    FROM olah_absensi 
-    WHERE tanggal IS NOT NULL 
-    ORDER BY tanggal DESC 
+    SELECT tanggal
+    FROM olah_absensi
+    WHERE tanggal IS NOT NULL
+    ORDER BY tanggal DESC
     LIMIT 1
   `;
 
@@ -6477,7 +6503,7 @@ app.get("/getRekapAbsensiWithDaily", (req, res) => {
       });
     }
 
-    // Determine periode bulan dan tahun
+    // Tentukan periode bulan & tahun + rentang tanggal
     let periodeBulan = "Tidak Diketahui";
     let periodeTahun = new Date().getFullYear();
     let startDate = null;
@@ -6502,52 +6528,106 @@ app.get("/getRekapAbsensiWithDaily", (req, res) => {
       periodeBulan = monthNames[tanggalSample.getMonth()];
       periodeTahun = tanggalSample.getFullYear();
 
-      // Set date range for the month
+      // 1st day of target month .. last day of (target month + 1)
       startDate = new Date(periodeTahun, tanggalSample.getMonth(), 1);
       endDate = new Date(periodeTahun, tanggalSample.getMonth() + 2, 0);
     }
 
     console.log(`📅 Periode absensi: ${periodeBulan} ${periodeTahun}`);
 
+    // === Query param pencarian (lebih ketat) ===
+    const q = (req.query.q || "").trim();
+    const rawTerms = q.split(/\s+/).filter(Boolean);
+    const params = [];
+
+    // Clause tanggal
+    let dateClause = "";
+    if (startDate && endDate) {
+      dateClause = "AND od.tanggal BETWEEN ? AND ?";
+      params.push(fmtDate(startDate), fmtDate(endDate));
+    }
+
+    // Build clause pencarian ketat:
+    // - digit: ke PERNER/NIP prefix (dan exact utk PERNER jika panjang ≥ 8)
+    // - teks: match di awal kata (awal string atau setelah spasi) di NAMA/BIDANG
+    let searchClause = "";
+    if (rawTerms.length > 0) {
+      const perTermClauses = [];
+
+      rawTerms.forEach((term) => {
+        const isNumeric = /^\d+$/.test(term);
+        if (isNumeric) {
+          // Angka → PERNER/NIP prefix; PERNER exact jika panjang >= 8
+          const pieces = [];
+          if (term.length >= 8) {
+            pieces.push("r.PERNER = ?");
+            params.push(term);
+          }
+          // Prefix (gunakan index)
+          pieces.push("r.PERNER LIKE CONCAT(?, '%')");
+          pieces.push("dp.nip LIKE CONCAT(?, '%')");
+          params.push(term, term);
+
+          perTermClauses.push(`(${pieces.join(" OR ")})`);
+        } else {
+          // Teks → awal kata pada nama/bidang
+          // Pola: LIKE 'term%' (awal string) ATAU LIKE '% term%' (awal kata setelah spasi)
+          const pieces = [
+            "dp.nama   LIKE CONCAT(?, '%')",
+            "dp.nama   LIKE CONCAT('% ', ?, '%')",
+            "dp.bidang LIKE CONCAT(?, '%')",
+            "dp.bidang LIKE CONCAT('% ', ?, '%')",
+          ];
+          params.push(term, term, term, term);
+
+          // Tambahkan juga prefix di NIP (alfanumerik) jika user ketik kode seperti '6989'
+          pieces.push("dp.nip LIKE CONCAT(?, '%')");
+          params.push(term);
+
+          perTermClauses.push(`(${pieces.join(" OR ")})`);
+        }
+      });
+
+      searchClause = "AND " + perTermClauses.join(" AND ");
+    }
+
     // Step 2: Query dengan 3-way JOIN + daily details
     const sql = `
       SELECT 
-        -- Summary data dari rekap_absensi
         r.PERNER,
-        r.TOTAL_HARI, r.HARI_KERJA, r.HARI_LIBUR,
-        r.TOTAL_HARI_KOREKSI, r.KOREKSI_IN, r.KOREKSI_OUT, r.KOREKSI_IN_OUT,
+        dp.nama   AS nama,
+        dp.nip    AS nip,
+        dp.bidang AS bidang,
+        dp.no_telp,
+        r.BIDANG_UNIT,
+
+        r.TOTAL_HARI_REGULER, r.HARI_KERJA_REGULER, r.HARI_LIBUR_REGULER,
+        r.TOTAL_HARI_REALISASI, r.HARI_KERJA_REALISASI, r.HARI_LIBUR_REALISASI,
+        r.TOTAL_HARI_TANPA_KOREKSI, r.TOTAL_HARI_KOREKSI, r.KOREKSI_IN, r.KOREKSI_OUT, r.KOREKSI_IN_OUT,
         r.TOTAL_JAM_KERJA_NORMAL, r.PIKET, r.PDKB, r.REGULER,
         r.TOTAL_JAM_KERJA_SHIFT, r.SHIFT_PAGI, r.SHIFT_SIANG, r.SHIFT_MALAM, r.SHIFT_OFF,
-        r.ABSEN_LENGKAP, r.TIDAK_ABSEN, r.IN_KOSONG, r.OUT_KOSONG,
+        r.ABSEN_LENGKAP, r.ABSEN_TIDAK_LENGKAP, r.IN_OUT_KOSONG, r.IN_KOSONG, r.OUT_KOSONG,
         r.SPPD_TUGAS_LUAR_DLL, r.CUTI_IJIN,
         r.JAM_REALISASI, r.JAM_SEHARUSNYA, r.PERSENTASE_JKP,
         r.RESULT_BLASTING,
-        
-        -- Data pegawai
-        dp.nama, dp.nip, dp.bidang, dp.no_telp,
-        
+
         -- Daily details dari olah_absensi
         od.tanggal, od.nama_hari, od.jenis_hari, od.status_jam_kerja,
         od.daily_in_cleansing, od.daily_out_cleansing,
         od.correction_in, od.correction_out,
         od.value_att_abs, od.status_absen, od.status_in_out,
         od.jam_kerja_pegawai_cleansing, od.jam_kerja_seharusnya
-        
+
       FROM rekap_absensi r
       LEFT JOIN data_pegawai dp ON r.PERNER = dp.perner
       LEFT JOIN olah_absensi od ON r.PERNER = od.perner
       WHERE od.tanggal IS NOT NULL
-        ${
-          startDate && endDate
-            ? `AND od.tanggal BETWEEN '${startDate
-                .toISOString()
-                .slice(0, 10)}' AND '${endDate.toISOString().slice(0, 10)}'`
-            : ""
-        }
+        ${dateClause}
+        ${searchClause}
       ORDER BY r.PERNER, od.tanggal ASC
     `;
 
-    conn.query(sql, (err, results) => {
+    conn.query(sql, params, (err, results) => {
       if (err) {
         console.error("❌ Error fetching data with daily details:", err);
         return res.status(500).json({
@@ -6557,23 +6637,25 @@ app.get("/getRekapAbsensiWithDaily", (req, res) => {
         });
       }
 
-      const endTime = Date.now();
-      const duration = endTime - startTime;
-
+      const duration = Date.now() - startTime;
       console.log(
         `✅ Data with daily details fetched: ${results.length} records in ${duration}ms`
       );
 
       // Step 3: Group data by PERNER (summary + daily_details array)
       const groupedData = {};
+      const to2 = (v) =>
+        v == null
+          ? "0.00"
+          : typeof v === "number"
+          ? v.toFixed(2)
+          : Number(v).toFixed(2);
 
       results.forEach((row) => {
         const perner = row.PERNER;
 
-        // Initialize summary data (only once per PERNER)
         if (!groupedData[perner]) {
           groupedData[perner] = {
-            // Summary fields
             PERNER: row.PERNER,
             nama: row.nama,
             nip: row.nip,
@@ -6581,39 +6663,47 @@ app.get("/getRekapAbsensiWithDaily", (req, res) => {
             no_telp: row.no_telp,
             periode_bulan: periodeBulan,
             periode_tahun: periodeTahun,
-            TOTAL_HARI: parseInt(row.TOTAL_HARI) || 0,
-            HARI_KERJA: parseInt(row.HARI_KERJA) || 0,
-            HARI_LIBUR: parseInt(row.HARI_LIBUR) || 0,
+
+            // Gunakan *_REALISASI agar tidak 0
+            TOTAL_HARI: parseInt(row.TOTAL_HARI_REALISASI) || 0,
+            HARI_KERJA: parseInt(row.HARI_KERJA_REALISASI) || 0,
+            HARI_LIBUR: parseInt(row.HARI_LIBUR_REALISASI) || 0,
+
             TOTAL_HARI_KOREKSI: parseInt(row.TOTAL_HARI_KOREKSI) || 0,
             KOREKSI_IN: parseInt(row.KOREKSI_IN) || 0,
             KOREKSI_OUT: parseInt(row.KOREKSI_OUT) || 0,
             KOREKSI_IN_OUT: parseInt(row.KOREKSI_IN_OUT) || 0,
-            TOTAL_JAM_KERJA_NORMAL: parseInt(row.TOTAL_JAM_KERJA_NORMAL) || 0,
+
+            TOTAL_JAM_KERJA_NORMAL: parseFloat(row.TOTAL_JAM_KERJA_NORMAL) || 0,
             PIKET: parseInt(row.PIKET) || 0,
             PDKB: parseInt(row.PDKB) || 0,
             REGULER: parseInt(row.REGULER) || 0,
-            TOTAL_JAM_KERJA_SHIFT: parseInt(row.TOTAL_JAM_KERJA_SHIFT) || 0,
+
+            TOTAL_JAM_KERJA_SHIFT: parseFloat(row.TOTAL_JAM_KERJA_SHIFT) || 0,
             SHIFT_PAGI: parseInt(row.SHIFT_PAGI) || 0,
             SHIFT_SIANG: parseInt(row.SHIFT_SIANG) || 0,
             SHIFT_MALAM: parseInt(row.SHIFT_MALAM) || 0,
             SHIFT_OFF: parseInt(row.SHIFT_OFF) || 0,
+
             ABSEN_LENGKAP: parseInt(row.ABSEN_LENGKAP) || 0,
-            TIDAK_ABSEN: parseInt(row.TIDAK_ABSEN) || 0,
+            ABSEN_TIDAK_LENGKAP: parseInt(row.ABSEN_TIDAK_LENGKAP) || 0,
             IN_KOSONG: parseInt(row.IN_KOSONG) || 0,
             OUT_KOSONG: parseInt(row.OUT_KOSONG) || 0,
             SPPD_TUGAS_LUAR_DLL: parseInt(row.SPPD_TUGAS_LUAR_DLL) || 0,
             CUTI_IJIN: parseInt(row.CUTI_IJIN) || 0,
+
             JAM_REALISASI: parseFloat(row.JAM_REALISASI) || 0.0,
             JAM_SEHARUSNYA: parseFloat(row.JAM_SEHARUSNYA) || 0.0,
-            PERSENTASE_JKP: parseFloat(row.PERSENTASE_JKP) || 0.0,
-            RESULT_BLASTING: row.RESULT_BLASTING || null,
 
-            // Daily details array
+            // String 2 desimal, sama seperti DB
+            PERSENTASE_JKP: to2(row.PERSENTASE_JKP),
+
+            RESULT_BLASTING: row.RESULT_BLASTING ?? null,
+
             daily_details: [],
           };
         }
 
-        // Add daily detail if tanggal exists
         if (row.tanggal) {
           groupedData[perner].daily_details.push({
             tanggal: row.tanggal,
@@ -6634,17 +6724,15 @@ app.get("/getRekapAbsensiWithDaily", (req, res) => {
         }
       });
 
-      // Convert to array format
       const finalResults = Object.values(groupedData);
 
-      // Debug statistics
+      // Debug
       if (finalResults.length > 0) {
         const sampleData = finalResults[0];
         const totalDailyRecords = finalResults.reduce(
           (sum, item) => sum + item.daily_details.length,
           0
         );
-
         console.log(`📊 Grouping Statistics:`);
         console.log(`   - Total PERNER: ${finalResults.length}`);
         console.log(`   - Total daily records: ${totalDailyRecords}`);

@@ -1251,8 +1251,7 @@
                     <td>${row.SHIFT_MALAM || 0}</td>
                     <td>${row.SHIFT_OFF || 0}</td>
                     <td>${row.ABSEN_LENGKAP || 0}</td>
-                    <td>${calculateTotalAbsenTidakLengkap(row)}</td>
-                    <td>${row.TIDAK_ABSEN || 0}</td>
+                    
                     <td>${row.IN_KOSONG || 0}</td>
                     <td>${row.OUT_KOSONG || 0}</td>
                     <td>${row.SPPD_TUGAS_LUAR_DLL || 0}</td>
@@ -1297,12 +1296,12 @@
       }
 
       // Helper function to calculate Total Absen Tidak Lengkap
-      function calculateTotalAbsenTidakLengkap(row) {
-        const tidakAbsen = parseInt(row.TIDAK_ABSEN || 0);
-        const inKosong = parseInt(row.IN_KOSONG || 0);
-        const outKosong = parseInt(row.OUT_KOSONG || 0);
-        return tidakAbsen + inKosong + outKosong;
-      }
+      // function calculateTotalAbsenTidakLengkap(row) {
+      //   const tidakAbsen = parseInt(row.TIDAK_ABSEN || 0);
+      //   const inKosong = parseInt(row.IN_KOSONG || 0);
+      //   const outKosong = parseInt(row.OUT_KOSONG || 0);
+      //   return tidakAbsen + inKosong + outKosong;
+      // }
 
       // Get percentage class for styling
       function getPercentageClass(percentage) {
