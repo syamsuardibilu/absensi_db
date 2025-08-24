@@ -1,0 +1,2301 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Format Blasting - Enhanced with Daily Details</title>
+    <style>
+      /* Base Styles */
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        color: #333;
+        line-height: 1.6;
+        margin: 15px;
+        min-height: calc(100vh - 30px);
+      }
+
+      .container {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        overflow: hidden;
+        max-width: calc(100vw - 30px);
+        margin: 0 auto;
+      }
+
+      /* Header */
+      .header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 20px 25px;
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        border-bottom: 3px solid #5a67d8;
+      }
+
+      .header h1 {
+        font-size: 24px;
+        font-weight: 600;
+        margin-bottom: 8px;
+      }
+
+      .header-info {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 15px;
+        font-size: 14px;
+        opacity: 0.9;
+      }
+
+      .db-info {
+        display: flex;
+        gap: 20px;
+        flex-wrap: wrap;
+      }
+
+      /* Controls Section */
+      .controls {
+        background: white;
+        padding: 20px 25px;
+        border-bottom: 1px solid #e2e8f0;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 15px;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .search-section {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+        flex: 1;
+        min-width: 300px;
+      }
+
+      .search-input {
+        flex: 1;
+        min-width: 200px;
+        padding: 10px 15px;
+        border: 2px solid #e2e8f0;
+        border-radius: 8px;
+        font-size: 14px;
+        transition: all 0.2s ease;
+      }
+
+      .search-input:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+      }
+
+      .clear-btn {
+        padding: 10px 15px;
+        background: #e53e3e;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        transition: all 0.2s ease;
+      }
+
+      .clear-btn:hover {
+        background: #c53030;
+        transform: translateY(-1px);
+      }
+
+      .export-section {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+
+      .export-btn {
+        padding: 10px 15px;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+
+      .export-csv {
+        background: #48bb78;
+        color: white;
+      }
+
+      .export-csv:hover {
+        background: #38a169;
+        transform: translateY(-1px);
+      }
+
+      .export-excel {
+        background: #38b2ac;
+        color: white;
+      }
+
+      .export-excel:hover {
+        background: #319795;
+        transform: translateY(-1px);
+      }
+
+      /* Loading & Error States */
+      .loading {
+        text-align: center;
+        padding: 40px;
+        font-size: 18px;
+        color: #666;
+      }
+
+      .loading::after {
+        content: "";
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 2px solid #ddd;
+        border-radius: 50%;
+        border-top-color: #667eea;
+        animation: spin 1s ease-in-out infinite;
+        margin-left: 10px;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      .error {
+        text-align: center;
+        padding: 40px;
+        color: #e53e3e;
+        font-size: 16px;
+        background: #fed7d7;
+        border-radius: 8px;
+        margin: 20px;
+      }
+
+      .results-info {
+        background: #f0f8f0;
+        padding: 10px 15px;
+        margin: 0 25px;
+        border-radius: 6px;
+        font-size: 14px;
+        color: #2f855a;
+        border-left: 4px solid #48bb78;
+      }
+
+      /* Table Container */
+      .table-container {
+        overflow: auto;
+        max-height: calc(100vh - 200px);
+        border: 1px solid #e2e8f0;
+        margin: 0;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        min-width: 1400px;
+        font-size: 13px;
+      }
+
+      /* Table Header */
+      thead th {
+        background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%);
+        color: white;
+        padding: 12px 8px;
+        text-align: center;
+        font-weight: 600;
+        border-right: 1px solid #718096;
+        position: sticky;
+        top: 0;
+        z-index: 50;
+        white-space: nowrap;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        vertical-align: middle;
+      }
+
+      thead th:hover {
+        background: linear-gradient(135deg, #2d3748 0%, #1a202c 100%);
+        cursor: pointer;
+      }
+
+      /* Table Body */
+      tbody td {
+        padding: 10px 8px;
+        border-bottom: 1px solid #e2e8f0;
+        border-right: 1px solid #f1f5f9;
+        vertical-align: middle;
+        text-align: center;
+        word-wrap: break-word;
+        max-width: 150px;
+      }
+
+      tbody td:first-child {
+        font-weight: 600;
+        color: #667eea;
+        background: #f8fafc;
+        position: sticky;
+        left: 0;
+        z-index: 10;
+        border-right: 2px solid #e2e8f0;
+      }
+
+      tbody tr:nth-child(even) {
+        background-color: #f8fafc;
+      }
+
+      tbody tr:hover {
+        background-color: #edf2f7;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        transition: all 0.2s ease;
+      }
+
+      /* Action Buttons */
+      .btn-wa {
+        background: #25d366;
+        color: white;
+        border: none;
+        padding: 6px 12px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 11px;
+        font-weight: 500;
+        text-decoration: none;
+        display: inline-block;
+        transition: all 0.2s ease;
+      }
+
+      .btn-wa:hover {
+        background: #20ba5a;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 5px rgba(37, 211, 102, 0.3);
+      }
+
+      .btn-success {
+        background: #48bb78;
+        color: white;
+        border: none;
+        padding: 4px 8px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 10px;
+        font-weight: 500;
+        margin: 2px;
+        transition: all 0.2s ease;
+        min-width: 60px;
+      }
+
+      .btn-success:hover {
+        background: #38a169;
+        transform: translateY(-1px);
+      }
+
+      .btn-danger {
+        background: #e53e3e;
+        color: white;
+        border: none;
+        padding: 4px 8px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 10px;
+        font-weight: 500;
+        margin: 2px;
+        transition: all 0.2s ease;
+        min-width: 60px;
+      }
+
+      .btn-danger:hover {
+        background: #c53030;
+        transform: translateY(-1px);
+      }
+
+      .btn-reset {
+        background: #718096;
+        color: white;
+        border: none;
+        padding: 4px 8px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 10px;
+        font-weight: 500;
+        margin: 2px;
+        transition: all 0.2s ease;
+        min-width: 60px;
+      }
+
+      .btn-reset:hover {
+        background: #4a5568;
+        transform: translateY(-1px);
+      }
+
+      /* Enhanced Pesan Container Styles */
+      .pesan-container {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        min-width: 220px;
+        max-width: 280px;
+      }
+
+      .pesan-preview {
+        font-size: 11px;
+        color: #4a5568;
+        line-height: 1.4;
+        background: #f7fafc;
+        padding: 8px 10px;
+        border-radius: 4px;
+        border: 1px solid #e2e8f0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-height: 40px;
+      }
+
+      .btn-view-pesan {
+        background: #4299e1;
+        color: white;
+        border: none;
+        padding: 6px 10px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 11px;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        align-self: flex-start;
+      }
+
+      .btn-view-pesan:hover {
+        background: #3182ce;
+        transform: translateY(-1px);
+      }
+
+      /* Enhanced Modal Styles for Daily Details */
+      .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.6);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+        padding: 20px;
+      }
+
+      .modal-content {
+        background: white;
+        border-radius: 12px;
+        padding: 24px;
+        max-width: 900px;
+        width: 95%;
+        max-height: 90vh;
+        overflow: hidden;
+        position: relative;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        display: flex;
+        flex-direction: column;
+      }
+
+      .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 16px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid #e2e8f0;
+        flex-shrink: 0;
+      }
+
+      .modal-title {
+        font-size: 18px;
+        font-weight: 600;
+        color: #2d3748;
+      }
+
+      .modal-close {
+        background: none;
+        border: none;
+        font-size: 24px;
+        cursor: pointer;
+        color: #718096;
+        padding: 4px;
+        border-radius: 4px;
+        transition: all 0.2s ease;
+      }
+
+      .modal-close:hover {
+        background: #f7fafc;
+        color: #2d3748;
+      }
+
+      .modal-body {
+        margin-bottom: 20px;
+        flex: 1;
+        overflow-y: auto;
+        padding-right: 8px;
+      }
+
+      .pesan-full {
+        background: #f7fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 20px;
+        font-family: "Courier New", monospace;
+        font-size: 13px;
+        line-height: 1.6;
+        white-space: pre-wrap;
+        color: #2d3748;
+        word-wrap: break-word;
+      }
+
+      .modal-footer {
+        display: flex;
+        gap: 12px;
+        justify-content: flex-end;
+        flex-shrink: 0;
+        border-top: 1px solid #e2e8f0;
+        padding-top: 16px;
+        flex-wrap: wrap;
+      }
+
+      .btn-modal {
+        padding: 10px 16px;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .btn-copy {
+        background: #48bb78;
+        color: white;
+      }
+
+      .btn-copy:hover {
+        background: #38a169;
+        transform: translateY(-1px);
+      }
+
+      .btn-close-modal {
+        background: #e2e8f0;
+        color: #4a5568;
+      }
+
+      .btn-close-modal:hover {
+        background: #cbd5e0;
+      }
+
+      .action-buttons {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        align-items: center;
+      }
+
+      /* Result Status */
+      .status-success {
+        color: #38a169;
+        font-weight: 600;
+        font-size: 12px;
+      }
+
+      .status-failed {
+        color: #e53e3e;
+        font-weight: 600;
+        font-size: 12px;
+      }
+
+      .status-pending {
+        color: #ed8936;
+        font-weight: 600;
+        font-size: 12px;
+      }
+
+      /* Pagination */
+      .pagination-container {
+        background: #f8fafc;
+        padding: 20px 25px;
+        border-top: 1px solid #e2e8f0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 15px;
+        position: sticky;
+        bottom: 0;
+        z-index: 100;
+      }
+
+      .pagination {
+        display: flex;
+        gap: 5px;
+        align-items: center;
+      }
+
+      .pagination button {
+        padding: 8px 12px;
+        border: 1px solid #cbd5e0;
+        background: white;
+        color: #4a5568;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        min-width: 40px;
+      }
+
+      .pagination button:hover:not(:disabled) {
+        background: #667eea;
+        color: white;
+        border-color: #667eea;
+        transform: translateY(-1px);
+      }
+
+      .pagination button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        background: #f1f5f9;
+      }
+
+      .pagination button.active {
+        background: #667eea;
+        color: white;
+        border-color: #667eea;
+        font-weight: 600;
+      }
+
+      .pagination-info {
+        color: #718096;
+        font-size: 14px;
+        font-weight: 500;
+      }
+
+      .pagination-controls {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+      }
+
+      .page-jump {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .page-jump input {
+        width: 60px;
+        padding: 6px 8px;
+        border: 1px solid #cbd5e0;
+        border-radius: 4px;
+        text-align: center;
+        font-size: 14px;
+      }
+
+      .page-jump button {
+        padding: 6px 12px;
+        background: #48bb78;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 500;
+        transition: all 0.2s ease;
+      }
+
+      .page-jump button:hover {
+        background: #38a169;
+        transform: translateY(-1px);
+      }
+
+      /* Notification Styles */
+      .notification {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 12px 20px;
+        border-radius: 8px;
+        color: white;
+        font-weight: 500;
+        font-size: 14px;
+        z-index: 1000;
+        max-width: 400px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        animation: slideInRight 0.3s ease-out;
+      }
+
+      .notification-success {
+        background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+      }
+
+      .notification-error {
+        background: linear-gradient(135deg, #e53e3e 0%, #c53030 100%);
+      }
+
+      .notification-info {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      }
+
+      @keyframes slideInRight {
+        from {
+          transform: translateX(100%);
+          opacity: 0;
+        }
+        to {
+          transform: translateX(0);
+          opacity: 1;
+        }
+      }
+
+      /* Responsive Design */
+      @media (max-width: 768px) {
+        body {
+          margin: 10px;
+        }
+
+        .header {
+          padding: 15px 20px;
+        }
+
+        .header h1 {
+          font-size: 20px;
+        }
+
+        .table-container {
+          max-height: calc(100vh - 180px);
+        }
+
+        table {
+          font-size: 12px;
+          min-width: 1200px;
+        }
+
+        thead th {
+          padding: 8px 6px;
+          font-size: 11px;
+        }
+
+        tbody td {
+          padding: 8px 6px;
+          max-width: 120px;
+        }
+
+        .pagination-container {
+          padding: 15px 20px;
+          flex-direction: column;
+          gap: 10px;
+        }
+
+        .pagination {
+          flex-wrap: wrap;
+          justify-content: center;
+        }
+
+        .modal-content {
+          width: 98%;
+          max-width: none;
+          padding: 16px;
+          max-height: 95vh;
+        }
+
+        .modal-title {
+          font-size: 16px;
+        }
+
+        .pesan-full {
+          font-size: 12px;
+          padding: 12px;
+        }
+
+        .modal-footer {
+          justify-content: center;
+        }
+
+        .btn-modal {
+          flex: 1;
+          min-width: 120px;
+          justify-content: center;
+        }
+
+        .pesan-container {
+          min-width: 180px;
+          max-width: 200px;
+        }
+      }
+
+      /* Scrollbar Styling */
+      .modal-body::-webkit-scrollbar {
+        width: 6px;
+      }
+
+      .modal-body::-webkit-scrollbar-track {
+        background: #f1f5f9;
+        border-radius: 3px;
+      }
+
+      .modal-body::-webkit-scrollbar-thumb {
+        background: #cbd5e0;
+        border-radius: 3px;
+      }
+
+      .modal-body::-webkit-scrollbar-thumb:hover {
+        background: #a0aec0;
+      }
+
+      /* Field-specific styling */
+      .field-perner {
+        font-family: "Courier New", monospace;
+        color: #667eea;
+        font-weight: 600;
+      }
+
+      .field-phone {
+        font-family: "Courier New", monospace;
+        color: #2d3748;
+        font-weight: 500;
+      }
+
+      .btn-copy-pesan {
+        background: #48bb78;
+        color: white;
+        border: none;
+        padding: 6px 10px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 11px;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        align-self: flex-start;
+      }
+
+      .btn-copy-pesan:hover {
+        background: #38a169;
+        transform: translateY(-1px);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <!-- Header -->
+      <div class="header">
+        <h1>📱 Format Blasting - Enhanced with Daily Details</h1>
+        <div class="header-info">
+          <div class="db-info">
+            <span><strong>Database:</strong> absensi_db</span>
+            <span><strong>Tabel:</strong> rekap_absensi + olah_absensi</span>
+            <span id="totalRecords"
+              ><strong>Total Records:</strong> Loading...</span
+            >
+          </div>
+          <div id="lastUpdated">
+            <strong>Last Updated:</strong> <span id="updateTime">-</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Controls -->
+      <div class="controls">
+        <div class="search-section">
+          <input
+            type="text"
+            id="searchInput"
+            class="search-input"
+            placeholder="🔍 Cari PERNER/NIP/Nama/Bidang (server-side, ketik untuk cari)"
+            autocomplete="off"
+          />
+          <button id="clearSearch" class="clear-btn" onclick="clearSearch()">
+            🗑️ Clear Search
+          </button>
+        </div>
+        <div class="export-section">
+          <button class="export-btn export-csv" onclick="exportData('csv')">
+            📊 CSV
+          </button>
+          <button class="export-btn export-excel" onclick="exportData('excel')">
+            📈 Excel
+          </button>
+        </div>
+      </div>
+
+      <!-- Search Results Info -->
+      <div id="searchResults" class="results-info" style="display: none">
+        <span id="searchResultsText"></span>
+      </div>
+
+      <!-- Loading State -->
+      <div id="loading" class="loading">
+        Memuat data enhanced dengan daily details...
+      </div>
+
+      <!-- Error State -->
+      <div id="error" class="error" style="display: none">
+        <strong>Error:</strong> <span id="errorMessage"></span> <br /><br />
+        <button
+          onclick="loadData()"
+          style="
+            padding: 8px 16px;
+            background: #e53e3e;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+          "
+        >
+          🔄 Retry
+        </button>
+      </div>
+
+      <!-- Table Container -->
+      <div id="tableContainer" class="table-container" style="display: none">
+        <table id="dataTable">
+          <thead>
+            <tr>
+              <th style="width: 50px">NO</th>
+              <th style="width: 100px">UNIT/BIDANG</th>
+              <th style="width: 120px">PERNER</th>
+              <th style="width: 100px">NIP</th>
+              <th style="width: 150px">NAMA</th>
+              <th style="width: 120px">NO TELP</th>
+              <th style="width: 280px">ISI PESAN (Enhanced)</th>
+              <th style="width: 100px">LINK WA</th>
+              <th style="width: 150px">TOMBOL AKSI</th>
+              <th style="width: 100px">RESULT</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+
+      <!-- Pagination -->
+      <div id="paginationContainer" class="pagination-container">
+        <div class="pagination-info">
+          <span id="pageInfo">Memuat data...</span>
+        </div>
+        <div class="pagination-controls">
+          <div class="pagination">
+            <button id="firstBtn" onclick="goToPage(1)" disabled>⟪</button>
+            <button id="prevBtn" onclick="goToPage(currentPage - 1)" disabled>
+              ‹
+            </button>
+            <div id="pageNumbers"></div>
+            <button id="nextBtn" onclick="goToPage(currentPage + 1)" disabled>
+              ›
+            </button>
+            <button id="lastBtn" onclick="goToPage(totalPages)" disabled>
+              ⟫
+            </button>
+          </div>
+          <div class="page-jump">
+            <span>Halaman:</span>
+            <input
+              type="number"
+              id="pageJump"
+              min="1"
+              max="1"
+              value="1"
+              disabled
+            />
+            <button onclick="jumpToPage()" disabled>Go</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // BASE URL untuk API calls
+      const BASE_URL =
+        (window.BASE_URL && window.BASE_URL.trim()) || window.location.origin;
+
+      // Helper fetch
+      const api = (path, opts) => {
+        const p = path.startsWith("/") ? path : `/${path}`;
+        return fetch(`${BASE_URL}${p}`, opts);
+      };
+
+      // Global Variables
+      let allData = [];
+      let filteredData = [];
+      let currentPage = 1;
+      //   const recordsPerPage = 50;
+      let totalPages = 0;
+      let totalRecords = 0;
+      let currentSearchTerm = "";
+      let blastingResults = {}; // Store results for each PERNER
+
+      // ======================================================
+      // ENHANCED HELPER FUNCTIONS for Daily Details
+      // ======================================================
+
+      // 📅 Helper function: Format tanggal harian
+      function formatTanggalHarian(tanggal, nama_hari) {
+        if (!tanggal) return "-";
+
+        const date = new Date(tanggal);
+        const dd = String(date.getDate()).padStart(2, "0");
+        const mm = String(date.getMonth() + 1).padStart(2, "0");
+        const yyyy = date.getFullYear();
+
+        const hari = nama_hari ? nama_hari.toLowerCase() : "";
+        return `${dd}/${mm}/${yyyy}${hari ? ` (${hari})` : ""}`;
+      }
+
+      // 🏷️ Helper function: Format jenis hari (Title Case)
+      function formatJenisHari(jenis_hari) {
+        if (!jenis_hari) return "-";
+
+        return jenis_hari
+          .toLowerCase()
+          .split(" ")
+          .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(" ");
+      }
+
+      // ⏰ Helper function: Format clock in/out dengan correction status
+      function formatClockInOut(time, correction_status) {
+        // Jika waktu kosong/null
+        if (!time || time === null || time === "" || time === undefined) {
+          return "Kosong";
+        }
+
+        // Jika ada waktu, tambahkan status correction
+        if (correction_status) {
+          return `${time} (${correction_status})`;
+        } else {
+          // Default jika correction_status kosong
+          return `${time} (tidak koreksi)`;
+        }
+      }
+
+      // 📊 Helper function: Format jam kerja pegawai (JKP ratio)
+      function formatJamKerjaPegawai(realisasi, seharusnya) {
+        if (!realisasi && !seharusnya) return "-";
+
+        const real = parseFloat(parseFloat(realisasi).toFixed(2)) || 0;
+        const target = parseFloat(parseFloat(seharusnya).toFixed(2)) || 0;
+
+        if (target === 0) return `${real}/-(-%)`;
+
+        const persentase = ((real / target) * 100).toFixed(2);
+        return `${real}/${target}(${persentase}%)`;
+      }
+
+      // 📝 Helper function: Format keterangan absen
+      function formatKetAbsen(value_att_abs) {
+        return value_att_abs || "-";
+      }
+
+      // ======================================================
+      // MAIN FUNCTION: Enhanced generatePesan with Daily Details
+      // ======================================================
+
+      function generatePesan(row) {
+        // PART 1: Summary message (existing logic)
+        const periodeBulan = row.periode_bulan || "Tidak Diketahui";
+        const periodeTahun = row.periode_tahun || new Date().getFullYear();
+
+        const perner = row.PERNER || "[PERNER]";
+        const nama = row.nama || "[Nama Belum Diisi]";
+        const nip = row.nip || "[NIP Belum Diisi]";
+        const bidang = row.bidang || "[Bidang Belum Diisi]";
+        const jamRealisasi = parseFloat(row.JAM_REALISASI || 0).toFixed(2);
+        const jamSeharusnya = parseFloat(row.JAM_SEHARUSNYA || 0).toFixed(2);
+        const persentaseJKP = parseFloat(row.PERSENTASE_JKP || 0).toFixed(2);
+        const absensiTidakLengkap = parseInt(row.ABSEN_TIDAK_LENGKAP || 0);
+
+        // Calculate jumlah absen tidak lengkap
+        const jumlahAbsenTidakLengkap = absensiTidakLengkap;
+        // Get koreksi dan hari kerja
+        const totalHariKoreksi = parseInt(row.TOTAL_HARI_KOREKSI || 0);
+        const hariKerja = parseInt(row.HARI_KERJA || 0);
+
+        // Generate summary message
+        let pesanTemplate = `Yth Bpk/Ibu ${nama} / ${nip}
+
+Berikut kami sampaikan data absensi Bulan ${periodeBulan} ${periodeTahun} :
+
+-> Perolehan JKP Bulanan :
+${jamRealisasi} / ${jamSeharusnya} jam (${persentaseJKP}%)
+
+-> Jumlah Absen tidak lengkap :
+${jumlahAbsenTidakLengkap} hari
+
+-> Jumlah Koreksi in/out :
+${totalHariKoreksi} dari ${hariKerja} hari kerja`;
+
+        // PART 2: Daily details (NEW)
+        if (row.daily_details && row.daily_details.length > 0) {
+          pesanTemplate += "\n\ndengan rincian :\n\n";
+
+          // Sort daily details by date to ensure chronological order
+          const sortedDailyDetails = row.daily_details.sort((a, b) => {
+            return new Date(a.tanggal) - new Date(b.tanggal);
+          });
+
+          sortedDailyDetails.forEach((day, index) => {
+            pesanTemplate += "===================\n";
+            pesanTemplate += `Tanggal : ${formatTanggalHarian(
+              day.tanggal,
+              day.nama_hari
+            )}\n`;
+            pesanTemplate += `Jenis hari\t: ${formatJenisHari(
+              day.jenis_hari
+            )}\n`;
+            pesanTemplate += `Pola jam kerja\t: ${
+              day.status_jam_kerja || "-"
+            }\n`;
+            pesanTemplate += `Clock in\t: ${formatClockInOut(
+              day.daily_in_cleansing,
+              day.correction_in
+            )}\n`;
+            pesanTemplate += `Clock out\t: ${formatClockInOut(
+              day.daily_out_cleansing,
+              day.correction_out
+            )}\n`;
+            pesanTemplate += `Ket. Absen\t: ${formatKetAbsen(
+              day.value_att_abs
+            )}\n`;
+            pesanTemplate += `Status absen\t: ${day.status_absen || "-"}\n`;
+            pesanTemplate += `Status in/out\t: ${day.status_in_out || "-"}\n`;
+            pesanTemplate += `Jam kerja pegawai\t: ${formatJamKerjaPegawai(
+              day.jam_kerja_pegawai_cleansing,
+              day.jam_kerja_seharusnya
+            )}\n`;
+
+            // Add separator except for the last item
+            if (index < sortedDailyDetails.length - 1) {
+              pesanTemplate += "\n";
+            }
+          });
+        } else {
+          // Fallback jika tidak ada daily details
+          pesanTemplate += "\n\n(Detail harian tidak tersedia)";
+        }
+
+        return pesanTemplate;
+      }
+
+      // Generate WhatsApp link
+      function generateWALink(phoneNumber) {
+        // Remove any non-numeric characters and add country code
+        const cleanPhone = phoneNumber.replace(/\D/g, "");
+        const internationalPhone = cleanPhone.startsWith("62")
+          ? cleanPhone
+          : `62${cleanPhone.substring(1)}`;
+        return `https://wa.me/${internationalPhone}`;
+      }
+
+      // ======================================================
+      // ENHANCED DATA LOADING with Daily Details
+      // ======================================================
+
+      // === UBAH: tambahkan parameter q ===
+      async function loadData(q = "") {
+        try {
+          document.getElementById("loading").style.display = "block";
+          document.getElementById("error").style.display = "none";
+          document.getElementById("tableContainer").style.display = "none";
+
+          document.getElementById("pageInfo").textContent =
+            "Memuat data enhanced...";
+          disablePaginationControls();
+
+          console.log(
+            "🚀 Fetching enhanced data from /getRekapAbsensiWithDaily...",
+            { q }
+          );
+
+          // === UBAH: pakai query param q ke server ===
+          const qs = q && q.trim() ? `?q=${encodeURIComponent(q.trim())}` : "";
+          const response = await fetch(
+            `${BASE_URL}/getRekapAbsensiWithDaily${qs}`
+          );
+
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+
+          const data = await response.json();
+          console.log(
+            `✅ Enhanced data loaded: ${data.length} records (q="${q}")`
+          );
+
+          allData = data;
+          filteredData = [...data]; // sekarang filteredData = hasil dari server
+          totalRecords = data.length;
+          recordsPerPage = totalRecords;
+
+          totalPages = Math.ceil(totalRecords / recordsPerPage);
+
+          // Inisialisasi status blasting
+          blastingResults = {};
+          data.forEach((row) => {
+            const perner = row.PERNER;
+            const resultBlasting = row.RESULT_BLASTING;
+            blastingResults[perner] =
+              resultBlasting === "Terkirim"
+                ? "success"
+                : resultBlasting === "Gagal"
+                ? "failed"
+                : "pending";
+          });
+
+          // Header info
+          document.getElementById(
+            "totalRecords"
+          ).innerHTML = `<strong>Total Records:</strong> ${totalRecords.toLocaleString()}`;
+          document.getElementById("updateTime").textContent =
+            new Date().toLocaleString("id-ID");
+
+          if (totalRecords === 0) {
+            // Tampilkan info kosong tapi tetap lanjutkan agar UI update
+            console.warn("⚠️ Tidak ada data yang ditemukan");
+          }
+
+          // === UBAH: simpan query aktif dan tampilkan info hasil pencarian ===
+          currentSearchTerm = q.trim();
+          if (currentSearchTerm) {
+            const info = document.getElementById("searchResults");
+            const infoText = document.getElementById("searchResultsText");
+            infoText.textContent = `🔍 Ditemukan ${totalRecords.toLocaleString()} hasil untuk "${currentSearchTerm}"`;
+            info.style.display = "block";
+          } else {
+            document.getElementById("searchResults").style.display = "none";
+          }
+
+          // Tampilkan halaman pertama
+          currentPage = 1;
+          displayPage(currentPage);
+          enablePaginationControls();
+
+          document.getElementById("loading").style.display = "none";
+          document.getElementById("tableContainer").style.display = "block";
+
+          console.log(
+            `📊 Enhanced table created with ${totalPages} pages (${recordsPerPage} records/page)`
+          );
+        } catch (error) {
+          console.error("❌ Error loading enhanced data:", error);
+          document.getElementById("loading").style.display = "none";
+          document.getElementById("error").style.display = "block";
+          document.getElementById("errorMessage").textContent = error.message;
+          document.getElementById("tableContainer").style.display = "none";
+
+          document.getElementById("pageInfo").textContent =
+            "Error - tidak ada data";
+          disablePaginationControls();
+        }
+      }
+
+      // ======================================================
+      // ENHANCED MODAL for Daily Details
+      // ======================================================
+
+      function viewFullPesan(perner) {
+        console.log(`📄 Opening enhanced full pesan for PERNER: ${perner}`);
+
+        // Find the row with this PERNER in current dataset
+        const rowData = allData.find((row) => row.PERNER === perner);
+
+        if (!rowData) {
+          showNotification(`❌ Data untuk ${perner} tidak ditemukan`, "error");
+          return;
+        }
+
+        // Generate enhanced message with daily details
+        const fullPesan = generatePesan(rowData);
+
+        if (!fullPesan) {
+          showNotification(`❌ Gagal generate pesan untuk ${perner}`, "error");
+          return;
+        }
+
+        // Calculate message statistics
+        const messageStats = {
+          total_chars: fullPesan.length,
+          total_lines: fullPesan.split("\n").length,
+          daily_details_count: rowData.daily_details?.length || 0,
+          whatsapp_safe: fullPesan.length <= 4096, // WhatsApp character limit
+        };
+
+        console.log(`📊 Enhanced message stats for ${perner}:`, messageStats);
+
+        // Create enhanced modal with statistics
+        const modalHTML = `
+                <div class="modal-overlay" id="pesanModal" onclick="closeModalOnOverlay(event)">
+                  <div class="modal-content">
+                    <div class="modal-header">
+                      <h3 class="modal-title">📄 Enhanced Pesan - ${perner}</h3>
+                      <button class="modal-close" onclick="closePesanModal()">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                      <div style="display: flex; gap: 10px; margin-bottom: 15px; font-size: 12px; color: #666; flex-wrap: wrap;">
+                        <span>📊 ${messageStats.total_chars} chars</span>
+                        <span>📄 ${messageStats.total_lines} lines</span>
+                        <span>📅 ${
+                          messageStats.daily_details_count
+                        } daily details</span>
+                        <span style="color: ${
+                          messageStats.whatsapp_safe ? "#48bb78" : "#e53e3e"
+                        }">
+                          ${
+                            messageStats.whatsapp_safe
+                              ? "✅ WhatsApp Safe"
+                              : "⚠️ Exceeds WhatsApp limit"
+                          }
+                        </span>
+                      </div>
+                      <div class="pesan-full" id="fullPesanText">${fullPesan}</div>
+                    </div>
+                    <div class="modal-footer">
+                      <button class="btn-modal btn-copy" onclick="copyPesan()">
+                        📋 Copy Pesan
+                      </button>
+                      <button class="btn-modal" onclick="downloadPesan('${perner}')" style="background: #4299e1; color: white;">
+                        💾 Download TXT
+                      </button>
+                      <button class="btn-modal btn-close-modal" onclick="closePesanModal()">
+                        Tutup
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              `;
+
+        // Add modal to page
+        document.body.insertAdjacentHTML("beforeend", modalHTML);
+
+        // Prevent body scroll
+        document.body.style.overflow = "hidden";
+      }
+
+      // Download pesan as TXT file
+      function downloadPesan(perner) {
+        const pesanText = document.getElementById("fullPesanText").textContent;
+
+        const blob = new Blob([pesanText], {
+          type: "text/plain;charset=utf-8",
+        });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = `pesan_absensi_enhanced_${perner}_${new Date()
+          .toISOString()
+          .slice(0, 10)}.txt`;
+
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        showNotification(
+          `💾 Enhanced pesan ${perner} berhasil didownload`,
+          "success"
+        );
+      }
+
+      // Close modal when clicking overlay (not content)
+      function closeModalOnOverlay(event) {
+        if (event.target.classList.contains("modal-overlay")) {
+          closePesanModal();
+        }
+      }
+
+      // Close pesan modal
+      function closePesanModal() {
+        const modal = document.getElementById("pesanModal");
+        if (modal) {
+          modal.remove();
+        }
+
+        // Restore body scroll
+        document.body.style.overflow = "auto";
+      }
+
+      // Copy pesan to clipboard
+      async function copyPesan() {
+        const pesanText = document.getElementById("fullPesanText").textContent;
+
+        try {
+          await navigator.clipboard.writeText(pesanText);
+          showNotification(
+            "✅ Enhanced pesan berhasil dicopy ke clipboard!",
+            "success"
+          );
+        } catch (err) {
+          console.error("Error copying to clipboard:", err);
+
+          // Fallback for older browsers
+          const textArea = document.createElement("textarea");
+          textArea.value = pesanText;
+          document.body.appendChild(textArea);
+          textArea.select();
+          document.execCommand("copy");
+          document.body.removeChild(textArea);
+
+          showNotification("✅ Enhanced pesan berhasil dicopy!", "success");
+        }
+      }
+
+      // Handle action buttons
+      async function handleAction(perner, action) {
+        const successBtn = document.querySelector(`#terkirim-${perner}`);
+        const failBtn = document.querySelector(`#gagal-${perner}`);
+        const resetBtn = document.querySelector(`#reset-${perner}`);
+        const resultCell = document.querySelector(`#result-${perner}`);
+
+        console.log(`🎯 handleAction called: ${perner} -> ${action}`);
+
+        // Show loading state
+        const originalSuccessText = successBtn.textContent;
+        const originalFailText = failBtn.textContent;
+        const originalResetText = resetBtn.textContent;
+
+        if (action === "success") {
+          successBtn.textContent = "⳼";
+          successBtn.disabled = true;
+          successBtn.style.opacity = "0.6";
+        } else if (action === "failed") {
+          failBtn.textContent = "⳼";
+          failBtn.disabled = true;
+          failBtn.style.opacity = "0.6";
+        } else if (action === "reset") {
+          resetBtn.textContent = "⳼";
+          resetBtn.disabled = true;
+          resetBtn.style.opacity = "0.6";
+        }
+
+        try {
+          console.log(`📡 Sending request to server...`);
+
+          let requestPayload;
+          if (action === "reset") {
+            requestPayload = {
+              perner: perner,
+              result_blasting: null, // Set to NULL for reset
+            };
+          } else {
+            requestPayload = {
+              perner: perner,
+              result_blasting: action === "success" ? "Terkirim" : "Gagal",
+            };
+          }
+
+          console.log(`📋 Request payload:`, requestPayload);
+
+          // API call to update database
+          const response = await fetch(`${BASE_URL}/updateResultBlasting`, {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(requestPayload),
+          });
+
+          console.log(`📡 Response status: ${response.status}`);
+
+          // Get response text first to debug
+          const responseText = await response.text();
+          console.log(`📄 Response text:`, responseText);
+
+          let result;
+          try {
+            result = JSON.parse(responseText);
+          } catch (parseErr) {
+            console.error("❌ Error parsing JSON response:", parseErr);
+            throw new Error(
+              `Invalid JSON response: ${responseText.substring(0, 100)}...`
+            );
+          }
+
+          if (!response.ok) {
+            console.error(`❌ Server error ${response.status}:`, result);
+            throw new Error(
+              result.message ||
+                `HTTP ${response.status}: ${response.statusText}`
+            );
+          }
+
+          console.log(`✅ Server response:`, result);
+
+          // Update local state
+          if (action === "reset") {
+            blastingResults[perner] = "pending";
+          } else {
+            blastingResults[perner] = action;
+          }
+
+          // Update the result cell and button states
+          if (action === "success") {
+            resultCell.innerHTML =
+              '<span class="status-success">Terkirim</span>';
+            successBtn.style.opacity = "1";
+            successBtn.style.background = "#38a169";
+            failBtn.style.opacity = "0.5";
+            failBtn.style.background = "#e53e3e";
+            resetBtn.style.opacity = "0.5";
+          } else if (action === "failed") {
+            resultCell.innerHTML = '<span class="status-failed">Gagal</span>';
+            failBtn.style.opacity = "1";
+            failBtn.style.background = "#c53030";
+            successBtn.style.opacity = "0.5";
+            successBtn.style.background = "#48bb78";
+            resetBtn.style.opacity = "0.5";
+          } else if (action === "reset") {
+            resultCell.innerHTML = '<span class="status-pending"></span>';
+            successBtn.style.opacity = "0.7";
+            successBtn.style.background = "#48bb78";
+            failBtn.style.opacity = "0.7";
+            failBtn.style.background = "#e53e3e";
+            resetBtn.style.opacity = "1";
+            resetBtn.style.background = "#4a5568";
+          }
+
+          // Show success notification
+          const statusText =
+            action === "success"
+              ? "Terkirim"
+              : action === "failed"
+              ? "Gagal"
+              : "Reset (Kosong)";
+          showNotification(`✅ ${perner}: ${statusText}`, "success");
+
+          // Update the data in allData and filteredData
+          const dbValue =
+            action === "reset"
+              ? null
+              : action === "success"
+              ? "Terkirim"
+              : "Gagal";
+          updateLocalData(perner, dbValue);
+        } catch (error) {
+          console.error(`❌ Error updating ${perner}:`, error);
+
+          // Show error notification with more details
+          let errorMessage = error.message;
+          if (errorMessage.includes("Failed to fetch")) {
+            errorMessage =
+              "Tidak dapat terhubung ke server. Pastikan server berjalan.";
+          } else if (errorMessage.includes("500")) {
+            errorMessage =
+              "Server error. Periksa database connection dan table structure.";
+          }
+
+          showNotification(`❌ ${perner}: ${errorMessage}`, "error");
+        } finally {
+          // Reset button states
+          successBtn.textContent = originalSuccessText;
+          failBtn.textContent = originalFailText;
+          resetBtn.textContent = originalResetText;
+          successBtn.disabled = false;
+          failBtn.disabled = false;
+          resetBtn.disabled = false;
+        }
+      }
+
+      // Update local data arrays
+      function updateLocalData(perner, resultBlasting) {
+        // Update allData
+        const allDataIndex = allData.findIndex((row) => row.PERNER === perner);
+        if (allDataIndex !== -1) {
+          allData[allDataIndex].RESULT_BLASTING = resultBlasting;
+        }
+
+        // Update filteredData
+        const filteredDataIndex = filteredData.findIndex(
+          (row) => row.PERNER === perner
+        );
+        if (filteredDataIndex !== -1) {
+          filteredData[filteredDataIndex].RESULT_BLASTING = resultBlasting;
+        }
+      }
+
+      // Display specific page
+      function displayPage(page) {
+        const tbody = document.getElementById("tableBody");
+        tbody.innerHTML = "";
+
+        const startIndex = (page - 1) * recordsPerPage;
+        const endIndex = Math.min(
+          startIndex + recordsPerPage,
+          filteredData.length
+        );
+        const pageData = filteredData.slice(startIndex, endIndex);
+
+        console.log(
+          `📄 Displaying enhanced page ${page}: showing ${
+            pageData.length
+          } records (${startIndex + 1} - ${endIndex} of ${filteredData.length})`
+        );
+
+        pageData.forEach((row, index) => {
+          const tr = document.createElement("tr");
+          const perner = row.PERNER || "";
+
+          // Get result from database first, then from local state as fallback
+          let currentResult = "pending";
+          const dbResult = row.RESULT_BLASTING;
+          if (dbResult === "Terkirim") {
+            currentResult = "success";
+          } else if (dbResult === "Gagal") {
+            currentResult = "failed";
+          } else {
+            currentResult = "pending";
+          }
+
+          // Phone number from data_pegawai
+          const phoneNumber = row.no_telp || "081355265063";
+          const waLink = generateWALink(phoneNumber);
+
+          // Generate enhanced pesan dengan daily details
+          const pesanGenerated = generatePesan(row);
+          const dailyCount = row.daily_details?.length || 0;
+
+          tr.innerHTML = `
+                  <td class="field-no">${startIndex + index + 1}</td>
+                  <td class="field-unit">${row.bidang || "-"}</td>
+                  <td class="field-perner">${perner}</td>
+                  <td class="field-nip">${row.nip || "-"}</td>
+                  <td class="field-nama">${row.nama || "-"}</td>
+                  <td class="field-phone">${phoneNumber}</td>
+               <td class="field-pesan">
+                    <div class="pesan-container">
+                    <div class="pesan-preview" id="pesan-preview-${perner}">${pesanGenerated.substring(
+            0,
+            100
+          )}...
+                    </div>
+                    <div style="display: flex; gap: 5px;">
+                      <button class="btn-view-pesan" onclick="viewFullPesan('${perner}')">
+                        📄 Lihat Pesan
+                      </button>
+                      <button class="btn-copy-pesan" onclick="copyPesanDirect('${perner}')">
+                        📋 Copy
+                      </button>
+                    </div>
+                  </div>
+              </td>
+                  <td class="field-wa">
+                    <a
+                      id="wa-${perner}"
+                      href="${waLink}"
+                      target="_blank"
+                      class="btn-wa">
+                      Button WA
+                    </a>
+                  </td>
+                  <td class="field-aksi">
+                    <div class="action-buttons">
+                      <button
+                        id="terkirim-${perner}"
+                        class="btn-success"
+                        onclick="handleAction('${perner}', 'success')"
+                        style="opacity: ${
+                          currentResult === "success" ? "1" : "0.7"
+                        }; background: ${
+            currentResult === "success" ? "#38a169" : "#48bb78"
+          }">
+                        Terkirim
+                      </button>
+                      <button
+                        id="gagal-${perner}"
+                        class="btn-danger"
+                        onclick="handleAction('${perner}', 'failed')"
+                        style="opacity: ${
+                          currentResult === "failed" ? "1" : "0.7"
+                        }; background: ${
+            currentResult === "failed" ? "#c53030" : "#e53e3e"
+          }">
+                        Gagal
+                      </button>
+                      <button
+                        id="reset-${perner}"
+                        class="btn-reset"
+                        onclick="handleAction('${perner}', 'reset')"
+                        style="opacity: ${
+                          currentResult === "pending" ? "1" : "0.7"
+                        }">
+                        Reset
+                      </button>
+                    </div>
+                  </td>
+                  <td id="result-${perner}" class="field-result">
+                    ${
+                      currentResult === "success"
+                        ? '<span class="status-success">Terkirim</span>'
+                        : currentResult === "failed"
+                        ? '<span class="status-failed">Gagal</span>'
+                        : '<span class="status-pending"></span>'
+                    }
+                  </td>
+                `;
+
+          // Store full message in data attribute for later access
+          tr.setAttribute("data-full-pesan", pesanGenerated);
+
+          tbody.appendChild(tr);
+        });
+
+        updatePaginationControls();
+      }
+
+      // Show notification
+      function showNotification(message, type = "info") {
+        // Remove existing notification
+        const existingNotification = document.querySelector(".notification");
+        if (existingNotification) {
+          existingNotification.remove();
+        }
+
+        // Create notification element
+        const notification = document.createElement("div");
+        notification.className = `notification notification-${type}`;
+        notification.textContent = message;
+
+        // Add to page
+        document.body.appendChild(notification);
+
+        // Auto remove after 3 seconds
+        setTimeout(() => {
+          if (notification.parentNode) {
+            notification.remove();
+          }
+        }, 3000);
+      }
+
+      // ======================================================
+      // STANDARD FUNCTIONS (Search, Pagination, etc.)
+      // ======================================================
+
+      // Disable/Enable pagination controls
+      function disablePaginationControls() {
+        document.getElementById("firstBtn").disabled = true;
+        document.getElementById("prevBtn").disabled = true;
+        document.getElementById("nextBtn").disabled = true;
+        document.getElementById("lastBtn").disabled = true;
+        document.getElementById("pageJump").disabled = true;
+        document.querySelector(".page-jump button").disabled = true;
+        document.getElementById("pageNumbers").innerHTML = "";
+      }
+
+      function enablePaginationControls() {
+        document.getElementById("pageJump").disabled = false;
+        document.querySelector(".page-jump button").disabled = false;
+      }
+
+      // Debounce function
+      function debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+          const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+          };
+          clearTimeout(timeout);
+          timeout = setTimeout(later, wait);
+        };
+      }
+
+      // Setup search listeners
+      // === UBAH: search server-side dengan debounce ===
+      function setupSearchListeners() {
+        const searchInput = document.getElementById("searchInput");
+        const debounced = debounce(() => {
+          const q = searchInput.value.trim();
+          // Simpan q ke URL agar shareable
+          const u = new URL(location.href);
+          if (q) u.searchParams.set("q", q);
+          else u.searchParams.delete("q");
+          history.replaceState(null, "", u);
+          loadData(q);
+        }, 400);
+
+        searchInput.addEventListener("input", debounced);
+
+        // Enter: cegah submit form dan trigger pencarian langsung
+        searchInput.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            const q = searchInput.value.trim();
+            const u = new URL(location.href);
+            if (q) u.searchParams.set("q", q);
+            else u.searchParams.delete("q");
+            history.replaceState(null, "", u);
+            loadData(q);
+          }
+        });
+      }
+
+      // Perform search
+      function performSearch() {
+        const searchTerm = document
+          .getElementById("searchInput")
+          .value.toLowerCase()
+          .trim();
+        currentSearchTerm = searchTerm;
+
+        console.log(`🔍 Performing search: "${searchTerm}"`);
+
+        if (searchTerm) {
+          filteredData = allData.filter((row) => {
+            const perner = String(row.PERNER || "").toLowerCase();
+            return perner.includes(searchTerm);
+          });
+          showSearchResults();
+        } else {
+          filteredData = [...allData];
+          hideSearchResults();
+        }
+
+        currentPage = 1;
+        displayPage(currentPage);
+      }
+
+      // Show/Hide search results
+      function showSearchResults() {
+        const searchResults = document.getElementById("searchResults");
+        const searchResultsText = document.getElementById("searchResultsText");
+        searchResultsText.textContent = `🔍 Ditemukan ${filteredData.length.toLocaleString()} hasil untuk "${currentSearchTerm}"`;
+        searchResults.style.display = "block";
+      }
+
+      function hideSearchResults() {
+        document.getElementById("searchResults").style.display = "none";
+      }
+
+      // Clear search
+      function clearSearch() {
+        document.getElementById("searchInput").value = "";
+        currentSearchTerm = "";
+        document.getElementById("searchResults").style.display = "none";
+
+        // Hapus q dari URL dan muat ulang semua data periode
+        const u = new URL(location.href);
+        u.searchParams.delete("q");
+        history.replaceState(null, "", u);
+
+        loadData("");
+      }
+
+      // Update pagination controls
+      function updatePaginationControls() {
+        const totalFilteredRecords = filteredData.length;
+        const totalFilteredPages = Math.ceil(
+          totalFilteredRecords / recordsPerPage
+        );
+
+        totalRecords = totalFilteredRecords;
+        totalPages = totalFilteredPages;
+
+        const startRecord =
+          totalRecords > 0 ? (currentPage - 1) * recordsPerPage + 1 : 0;
+        const endRecord = Math.min(currentPage * recordsPerPage, totalRecords);
+
+        document.getElementById(
+          "pageInfo"
+        ).textContent = `Menampilkan ${startRecord.toLocaleString()}-${endRecord.toLocaleString()} dari ${totalRecords.toLocaleString()} records`;
+
+        // Update navigation buttons
+        document.getElementById("firstBtn").disabled =
+          currentPage === 1 || totalPages === 0;
+        document.getElementById("prevBtn").disabled =
+          currentPage === 1 || totalPages === 0;
+        document.getElementById("nextBtn").disabled =
+          currentPage === totalPages || totalPages === 0;
+        document.getElementById("lastBtn").disabled =
+          currentPage === totalPages || totalPages === 0;
+
+        // Update page jump input
+        const pageJumpInput = document.getElementById("pageJump");
+        pageJumpInput.max = totalPages > 0 ? totalPages : 1;
+        pageJumpInput.value = totalPages > 0 ? currentPage : 1;
+
+        createPageNumbers();
+      }
+
+      // Create page number buttons
+      function createPageNumbers() {
+        const pageNumbersDiv = document.getElementById("pageNumbers");
+        pageNumbersDiv.innerHTML = "";
+
+        if (totalPages === 0) return;
+
+        const maxVisiblePages = 7;
+        let startPage, endPage;
+
+        if (totalPages <= maxVisiblePages) {
+          startPage = 1;
+          endPage = totalPages;
+        } else {
+          const halfVisible = Math.floor(maxVisiblePages / 2);
+          if (currentPage <= halfVisible) {
+            startPage = 1;
+            endPage = maxVisiblePages;
+          } else if (currentPage + halfVisible >= totalPages) {
+            startPage = totalPages - maxVisiblePages + 1;
+            endPage = totalPages;
+          } else {
+            startPage = currentPage - halfVisible;
+            endPage = currentPage + halfVisible;
+          }
+        }
+
+        if (startPage > 1) {
+          addPageButton(1);
+          if (startPage > 2) {
+            const ellipsis = document.createElement("span");
+            ellipsis.textContent = "...";
+            ellipsis.style.padding = "8px 4px";
+            ellipsis.style.color = "#718096";
+            pageNumbersDiv.appendChild(ellipsis);
+          }
+        }
+
+        for (let i = startPage; i <= endPage; i++) {
+          addPageButton(i);
+        }
+
+        if (endPage < totalPages) {
+          if (endPage < totalPages - 1) {
+            const ellipsis = document.createElement("span");
+            ellipsis.textContent = "...";
+            ellipsis.style.padding = "8px 4px";
+            ellipsis.style.color = "#718096";
+            pageNumbersDiv.appendChild(ellipsis);
+          }
+          addPageButton(totalPages);
+        }
+      }
+
+      // Add page button
+      function addPageButton(pageNumber) {
+        const pageNumbersDiv = document.getElementById("pageNumbers");
+        const button = document.createElement("button");
+        button.textContent = pageNumber;
+        button.onclick = () => goToPage(pageNumber);
+
+        if (pageNumber === currentPage) {
+          button.classList.add("active");
+        }
+
+        pageNumbersDiv.appendChild(button);
+      }
+
+      // Go to specific page
+      function goToPage(page) {
+        if (
+          page < 1 ||
+          page > totalPages ||
+          page === currentPage ||
+          totalPages === 0
+        )
+          return;
+
+        currentPage = page;
+        displayPage(currentPage);
+        document.getElementById("tableContainer").scrollTop = 0;
+      }
+
+      // Jump to page from input
+      function jumpToPage() {
+        const pageInput = document.getElementById("pageJump");
+        const page = parseInt(pageInput.value);
+
+        if (totalPages === 0) {
+          pageInput.value = 1;
+          return;
+        }
+
+        if (page >= 1 && page <= totalPages) {
+          goToPage(page);
+        } else {
+          pageInput.value = currentPage;
+          alert(`Halaman harus antara 1 dan ${totalPages}`);
+        }
+      }
+
+      // Export data
+      function exportData(format) {
+        const dataToExport = filteredData.map((row, index) => {
+          const perner = row.PERNER || "";
+          const phoneNumber = row.no_telp || "081355265063";
+          const waLink = generateWALink(phoneNumber);
+          const pesanGenerated = generatePesan(row);
+          const dailyCount = row.daily_details?.length || 0;
+
+          let result = "";
+          const dbResult = row.RESULT_BLASTING;
+          if (dbResult === "Terkirim") {
+            result = "Terkirim";
+          } else if (dbResult === "Gagal") {
+            result = "Gagal";
+          } else if (blastingResults[perner] === "success") {
+            result = "Terkirim";
+          } else if (blastingResults[perner] === "failed") {
+            result = "Gagal";
+          } else if (
+            dbResult === null ||
+            dbResult === undefined ||
+            dbResult === ""
+          ) {
+            result = "";
+          }
+
+          return {
+            NO: index + 1,
+            UNIT: row.bidang || "-",
+            PERNER: perner,
+            NIP: row.nip || "-",
+            NAMA: row.nama || "-",
+            NO_TELP: phoneNumber,
+            ISI_PESAN: pesanGenerated,
+            DAILY_COUNT: dailyCount,
+            LINK_WA: waLink,
+            RESULT: result,
+          };
+        });
+
+        if (dataToExport.length === 0) {
+          alert("Tidak ada data untuk diekspor");
+          return;
+        }
+
+        const timestamp = new Date()
+          .toISOString()
+          .replace(/[:.]/g, "-")
+          .slice(0, -5);
+        const filename = `format_blasting_enhanced_${timestamp}`;
+
+        if (format === "csv") {
+          exportCSV(dataToExport, filename);
+        } else if (format === "excel") {
+          exportExcel(dataToExport, filename);
+        }
+      }
+
+      // Export to CSV
+      function exportCSV(data, filename) {
+        const headers = Object.keys(data[0]);
+        let csvContent = headers.join(",") + "\n";
+
+        data.forEach((row) => {
+          const values = headers.map((header) => {
+            let value = row[header];
+            if (value == null) value = "";
+            value = String(value).replace(/"/g, '""');
+            if (
+              value.includes(",") ||
+              value.includes("\n") ||
+              value.includes('"')
+            ) {
+              value = `"${value}"`;
+            }
+            return value;
+          });
+          csvContent += values.join(",") + "\n";
+        });
+
+        const blob = new Blob([csvContent], {
+          type: "text/csv;charset=utf-8;",
+        });
+        const link = document.createElement("a");
+        if (link.download !== undefined) {
+          const url = URL.createObjectURL(blob);
+          link.setAttribute("href", url);
+          link.setAttribute("download", filename + ".csv");
+          link.style.visibility = "hidden";
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        }
+      }
+
+      // Export to Excel
+      function exportExcel(data, filename) {
+        const headers = Object.keys(data[0]);
+        let htmlContent = "<table><thead><tr>";
+        headers.forEach((header) => {
+          htmlContent += `<th>${header}</th>`;
+        });
+        htmlContent += "</tr></thead><tbody>";
+
+        data.forEach((row) => {
+          htmlContent += "<tr>";
+          headers.forEach((header) => {
+            let value = row[header];
+            if (value == null) value = "";
+            htmlContent += `<td>${value}</td>`;
+          });
+          htmlContent += "</tr>";
+        });
+        htmlContent += "</tbody></table>";
+
+        const blob = new Blob([htmlContent], {
+          type: "application/vnd.ms-excel;charset=utf-8;",
+        });
+        const link = document.createElement("a");
+        if (link.download !== undefined) {
+          const url = URL.createObjectURL(blob);
+          link.setAttribute("href", url);
+          link.setAttribute("download", filename + ".xls");
+          link.style.visibility = "hidden";
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        }
+      }
+
+      // ======================================================
+      // TESTING FUNCTIONS
+      // ======================================================
+
+      // Quick test function
+      function testEnhancedMessage(perner) {
+        console.log(
+          `🧪 Testing enhanced message for ${perner || "first PERNER"}`
+        );
+
+        if (!allData || allData.length === 0) {
+          console.error("❌ No data loaded. Call loadData() first.");
+          return;
+        }
+
+        const testPerner = perner || allData[0].PERNER;
+        const rowData = allData.find((row) => row.PERNER === testPerner);
+
+        if (!rowData) {
+          console.error(`❌ PERNER ${testPerner} not found`);
+          return;
+        }
+
+        const message = generatePesan(rowData);
+        const dailyCount = rowData.daily_details?.length || 0;
+        const messageLength = message.length;
+
+        console.log(`📊 Enhanced Test Results for ${testPerner}:`);
+        console.log(`   - Daily details: ${dailyCount} days`);
+        console.log(`   - Message length: ${messageLength} chars`);
+        console.log(
+          `   - WhatsApp safe: ${messageLength <= 4096 ? "YES" : "NO"}`
+        );
+        console.log(`   - Message preview:`, message.substring(0, 200) + "...");
+
+        return { testPerner, dailyCount, messageLength, message };
+      }
+
+      // Quick validation function
+      function validateDailyDetails() {
+        console.log("🔍 Validating enhanced daily details...");
+
+        if (!allData || allData.length === 0) {
+          console.error("❌ No data to validate");
+          return;
+        }
+
+        const stats = {
+          total_perner: allData.length,
+          with_daily_details: 0,
+          without_daily_details: 0,
+          total_daily_records: 0,
+          min_days: Infinity,
+          max_days: 0,
+          avg_days: 0,
+        };
+
+        allData.forEach((row) => {
+          const dailyCount = row.daily_details?.length || 0;
+          stats.total_daily_records += dailyCount;
+
+          if (dailyCount > 0) {
+            stats.with_daily_details++;
+            stats.min_days = Math.min(stats.min_days, dailyCount);
+            stats.max_days = Math.max(stats.max_days, dailyCount);
+          } else {
+            stats.without_daily_details++;
+          }
+        });
+
+        stats.avg_days = Math.round(
+          stats.total_daily_records / stats.total_perner
+        );
+        if (stats.min_days === Infinity) stats.min_days = 0;
+
+        console.log("📊 Enhanced Validation Results:", stats);
+
+        if (stats.without_daily_details > 0) {
+          console.warn(
+            `⚠️ ${stats.without_daily_details} PERNER have no daily details`
+          );
+        }
+
+        if (stats.max_days >= 31) {
+          console.log("✅ Found PERNER with full month data (31+ days)");
+        } else {
+          console.warn(
+            `⚠️ Maximum days per PERNER: ${stats.max_days} (expected: 31)`
+          );
+        }
+
+        return stats;
+      }
+
+      // Copy pesan directly without opening modal
+      async function copyPesanDirect(perner) {
+        console.log(`📋 Direct copy pesan for PERNER: ${perner}`);
+
+        // Find the row data
+        const rowData = allData.find((row) => row.PERNER === perner);
+
+        if (!rowData) {
+          showNotification(`❌ Data untuk ${perner} tidak ditemukan`, "error");
+          return;
+        }
+
+        // Generate enhanced message
+        const fullPesan = generatePesan(rowData);
+
+        if (!fullPesan) {
+          showNotification(`❌ Gagal generate pesan untuk ${perner}`, "error");
+          return;
+        }
+
+        try {
+          await navigator.clipboard.writeText(fullPesan);
+          showNotification(`✅ Pesan ${perner} berhasil dicopy!`, "success");
+        } catch (err) {
+          console.error("Error copying to clipboard:", err);
+
+          // Fallback for older browsers
+          const textArea = document.createElement("textarea");
+          textArea.value = fullPesan;
+          textArea.style.position = "fixed";
+          textArea.style.opacity = "0";
+          document.body.appendChild(textArea);
+          textArea.select();
+          document.execCommand("copy");
+          document.body.removeChild(textArea);
+
+          showNotification(`✅ Pesan ${perner} berhasil dicopy!`, "success");
+        }
+      }
+
+      // Keyboard navigation
+      document.addEventListener("keydown", function (e) {
+        if (e.target.tagName.toLowerCase() === "input") return;
+        if (totalPages === 0) return;
+
+        switch (e.key) {
+          case "ArrowLeft":
+            if (currentPage > 1) goToPage(currentPage - 1);
+            break;
+          case "ArrowRight":
+            if (currentPage < totalPages) goToPage(currentPage + 1);
+            break;
+          case "Home":
+            goToPage(1);
+            break;
+          case "End":
+            goToPage(totalPages);
+            break;
+        }
+      });
+
+      // Close modal on Escape key
+      document.addEventListener("keydown", function (event) {
+        if (event.key === "Escape") {
+          closePesanModal();
+        }
+      });
+
+      // Initialize when page loads
+      document.addEventListener("DOMContentLoaded", function () {
+        console.log("🚀 Enhanced Format Blasting initialized");
+        console.log(`📋 Using BASE_URL: ${BASE_URL}`);
+
+        // === UBAH: ambil q dari URL kalau ada
+        const urlQ = new URL(location.href).searchParams.get("q") || "";
+        const searchInput = document.getElementById("searchInput");
+        if (urlQ) searchInput.value = urlQ;
+
+        // load awal berdasarkan q
+        loadData(urlQ).then(() => {
+          setupSearchListeners();
+        });
+      });
+
+      // Auto-refresh every 10 minutes
+      // setInterval(loadData, 10 * 60 * 1000);
+      // === UBAH: refresh pakai query aktif
+      setInterval(() => loadData(currentSearchTerm || ""), 10 * 60 * 1000);
+
+      // ======================================================
+      // CONSOLE COMMANDS for Testing
+      // ======================================================
+
+      console.log(`
+      🚀 ENHANCED FORMAT BLASTING - READY!
+      ==================================
+
+      Quick Test Commands:
+      - testEnhancedMessage()           // Test first PERNER
+      - testEnhancedMessage("69890002") // Test specific PERNER
+      - validateDailyDetails()          // Check data completeness
+      - viewFullPesan("69890002")       // Open modal for specific PERNER
+
+      Expected Results:
+      - Daily details: 31 days per PERNER
+      - Message format: Summary + 31 daily sections
+      - Enhanced modal with statistics
+      - Download capability for long messages
+
+      Auto-validation will run after data loads...
+      `);
+
+      // Auto-validation after data loads
+      setTimeout(() => {
+        if (allData && allData.length > 0) {
+          console.log("🔍 Auto-validating enhanced format...");
+          const validation = validateDailyDetails();
+
+          if (validation.avg_days >= 31) {
+            console.log(
+              "🎉 SUCCESS: Enhanced format working with full month data!"
+            );
+          } else {
+            console.warn(
+              `⚠️ Partial data: Average ${validation.avg_days} days per PERNER`
+            );
+          }
+        }
+      }, 3000);
+    </script>
+  </body>
+</html>
