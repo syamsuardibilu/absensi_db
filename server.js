@@ -42,18 +42,24 @@ function getLanIPv4() {
   return null;
 }
 
-// ===== Env (works on Render + Local) =====
+// ===== Env (Render + Local) =====
 const NODE_ENV = process.env.NODE_ENV || "development";
 const HOST = process.env.HOST || "0.0.0.0";
 const PORT = Number(process.env.PORT || 3000);
 
+// Internal base URL untuk server sendiri
 const INTERNAL_BASE_URL =
   process.env.INTERNAL_BASE_URL ||
   (NODE_ENV === "development" ? `http://127.0.0.1:${PORT}` : "");
 
-// const INTERNAL_BASE_URL = `http://127.0.0.1:${PORT}`;
+// Base URL eksternal (diakses dari luar)
 const BASE_URL =
-  process.env.BASE_URL || process.env.RENDER_EXTERNAL_URL || INTERNAL_BASE_URL;
+  process.env.BASE_URL || // kalau kamu set manual di .env
+  process.env.RENDER_EXTERNAL_URL || // otomatis dari Render
+  INTERNAL_BASE_URL;
+
+console.log("🚀 Running in", NODE_ENV);
+console.log("🌐 BASE_URL =", BASE_URL);
 
 // Polyfill fetch for Node < 18
 const fetch = global.fetch

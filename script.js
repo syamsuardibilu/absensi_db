@@ -1,18 +1,22 @@
-// === KONFIG API (final) ===
-// Opsional: bisa override dari HTML sebelum script ini dimuat.
-// <script>window.BASE_URL = "https://absensi-db.onrender.com";</script>
-const BASE_URL =
-  (window.BASE_URL && window.BASE_URL.trim()) || window.location.origin;
+const PROD_API = "https://absensi-db.onrender.com"; // API di Render
+const LOCAL_API = "http://localhost:3000"; // Dev lokal
 
-// Helper fetch: aman jika path tanpa "/" di depan.
-const api = (path, opts) => {
+const host = location.hostname;
+const isLocalHost = /^(localhost|127\.0\.0\.1)$/.test(host);
+const isPrivateLAN =
+  /^(10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+)$/.test(
+    host
+  );
+
+const BASE_URL =
+  (window.BASE_URL && window.BASE_URL.trim()) ||
+  (isLocalHost || isPrivateLAN ? LOCAL_API : PROD_API);
+
+const api = (path, opts = {}) => {
   const p = path.startsWith("/") ? path : `/${path}`;
   return fetch(`${BASE_URL}${p}`, opts);
 };
-// === END KONFIG ===
 
-// TAMBAH DI ATAS (setelah variabel jenisData)
-// === DEBOUNCE UTILITY ===
 function debounce(func, wait) {
   let timeout;
   return function executedFunction(...args) {
