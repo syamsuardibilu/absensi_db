@@ -5,27 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Dashboard Absensi - Management Analytics</title>
 
-    <!-- 1) Tetapkan BASE_URL lebih dulu (tidak deklarasi const lain agar tidak tabrakan) -->
+    <!-- Configuration Script -->
     <script>
-      // Pakai API Render saat online; localhost hanya untuk pengembangan
-      // (function () {
-      //   var isLocal = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
-      //   window.BASE_URL =
-      //     window.BASE_URL ||
-      //     (isLocal
-      //       ? "http://localhost:3000"
-      //       : "https://absensi-db.onrender.com");
-      // })();
-
       const BASE_URL =
         (window.BASE_URL && window.BASE_URL.trim()) || window.location.origin;
 
-      // Helper fetch: aman jika path tanpa "/" di depan.
       const api = (path, opts) => {
         const p = path.startsWith("/") ? path : `/${path}`;
         return fetch(`${BASE_URL}${p}`, opts);
       };
-      // === END KONFIG ===
     </script>
 
     <!-- Chart.js Library -->
@@ -35,12 +23,12 @@
     ></script>
 
     <style>
-      /* === CSS tetap seperti versi kamu === */
       * {
         margin: 0;
         padding: 0;
         box-sizing: border-box;
       }
+
       body {
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
           "Helvetica Neue", Arial, sans-serif;
@@ -48,15 +36,19 @@
         min-height: 100vh;
         color: #2c3e50;
       }
+
+      /* Modern Navigation Styles */
       .navbar {
-        background: rgba(255, 255, 255, 0.95);
+        background: rgba(255, 255, 255, 0.98);
         backdrop-filter: blur(20px);
         box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
         position: sticky;
         top: 0;
         z-index: 1000;
         padding: 0;
+        border-bottom: 1px solid rgba(102, 126, 234, 0.1);
       }
+
       .nav-container {
         max-width: 1400px;
         margin: 0 auto;
@@ -66,48 +58,171 @@
         padding: 0 20px;
         height: 70px;
       }
+
       .nav-logo {
-        font-size: 1.2rem;
+        font-size: 1.3rem;
         font-weight: 700;
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         background-clip: text;
         text-decoration: none;
+        display: flex;
+        align-items: center;
+        gap: 8px;
       }
+
       .nav-menu {
         display: flex;
         list-style: none;
         gap: 0;
         margin: 0;
         padding: 0;
+        align-items: center;
       }
+
       .nav-item {
         position: relative;
       }
+
       .nav-link {
-        display: block;
-        padding: 25px 20px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 20px 16px;
         text-decoration: none;
         color: #2c3e50;
         font-weight: 600;
-        font-size: 0.95rem;
-        transition: 0.3s;
-        border-bottom: 3px solid transparent;
+        font-size: 0.9rem;
+        transition: all 0.3s ease;
+        border-radius: 8px;
+        margin: 0 2px;
         white-space: nowrap;
       }
-      .nav-link:hover,
+
+      .nav-link:hover {
+        color: #667eea;
+        background: rgba(102, 126, 234, 0.08);
+        transform: translateY(-1px);
+      }
+
       .nav-link.active {
         color: #667eea;
-        border-bottom-color: #667eea;
-        background: rgba(102, 126, 234, 0.05);
+        background: rgba(102, 126, 234, 0.12);
+        box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
       }
+
+      /* Dropdown Styles */
+      .dropdown {
+        position: relative;
+      }
+
+      .dropdown-toggle {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 20px 16px;
+        text-decoration: none;
+        color: #2c3e50;
+        font-weight: 600;
+        font-size: 0.9rem;
+        transition: all 0.3s ease;
+        border-radius: 8px;
+        margin: 0 2px;
+        cursor: pointer;
+        border: none;
+        background: transparent;
+      }
+
+      .dropdown-toggle:hover,
+      .dropdown.active .dropdown-toggle {
+        color: #667eea;
+        background: rgba(102, 126, 234, 0.08);
+        transform: translateY(-1px);
+      }
+
+      .dropdown-arrow {
+        transition: transform 0.3s ease;
+        font-size: 0.7rem;
+      }
+
+      .dropdown.active .dropdown-arrow {
+        transform: rotate(180deg);
+      }
+
+      .dropdown-menu {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        background: rgba(255, 255, 255, 0.98);
+        backdrop-filter: blur(20px);
+        border-radius: 12px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+        opacity: 0;
+        visibility: hidden;
+        transform: translateY(-10px);
+        transition: all 0.3s ease;
+        min-width: 220px;
+        border: 1px solid rgba(102, 126, 234, 0.1);
+      }
+
+      .dropdown.active .dropdown-menu {
+        opacity: 1;
+        visibility: visible;
+        transform: translateY(5px);
+      }
+
+      .dropdown-header {
+        padding: 12px 16px 8px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #667eea;
+        border-bottom: 1px solid rgba(102, 126, 234, 0.1);
+        background: rgba(102, 126, 234, 0.03);
+      }
+
+      .dropdown-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 12px 16px;
+        text-decoration: none;
+        color: #2c3e50;
+        font-size: 0.85rem;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        border-left: 3px solid transparent;
+      }
+
+      .dropdown-item:hover {
+        background: rgba(102, 126, 234, 0.06);
+        color: #667eea;
+        border-left-color: #667eea;
+        transform: translateX(2px);
+      }
+
+      .dropdown-item .icon {
+        font-size: 1rem;
+        width: 18px;
+        text-align: center;
+      }
+
+      /* Mobile Toggle */
       .nav-toggle {
         display: none;
         flex-direction: column;
         cursor: pointer;
-        padding: 5px;
+        padding: 8px;
+        border-radius: 6px;
+        transition: all 0.3s ease;
       }
+
+      .nav-toggle:hover {
+        background: rgba(102, 126, 234, 0.08);
+      }
+
       .nav-toggle span {
         width: 25px;
         height: 3px;
@@ -116,11 +231,26 @@
         transition: 0.3s;
         border-radius: 2px;
       }
+
+      .nav-toggle.active span:nth-child(1) {
+        transform: rotate(-45deg) translate(-5px, 6px);
+      }
+
+      .nav-toggle.active span:nth-child(2) {
+        opacity: 0;
+      }
+
+      .nav-toggle.active span:nth-child(3) {
+        transform: rotate(45deg) translate(-5px, -6px);
+      }
+
+      /* Dashboard Content Styles */
       .main-container {
         max-width: 1400px;
         margin: 0 auto;
         padding: 30px 20px;
       }
+
       .dashboard-header {
         background: rgba(255, 255, 255, 0.95);
         backdrop-filter: blur(20px);
@@ -130,6 +260,7 @@
         box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
         text-align: center;
       }
+
       .dashboard-header h1 {
         font-size: 3rem;
         font-weight: 700;
@@ -139,11 +270,13 @@
         -webkit-text-fill-color: transparent;
         background-clip: text;
       }
+
       .dashboard-header p {
         font-size: 1.2rem;
         color: #6c757d;
         margin-bottom: 20px;
       }
+
       .last-update {
         background: rgba(102, 126, 234, 0.1);
         color: #667eea;
@@ -152,12 +285,15 @@
         font-weight: 600;
         display: inline-block;
       }
+
+      /* KPI Cards */
       .kpi-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
         gap: 25px;
         margin-bottom: 30px;
       }
+
       .kpi-card {
         background: rgba(255, 255, 255, 0.95);
         backdrop-filter: blur(20px);
@@ -168,6 +304,7 @@
         position: relative;
         overflow: hidden;
       }
+
       .kpi-card::before {
         content: "";
         position: absolute;
@@ -177,16 +314,19 @@
         height: 4px;
         background: linear-gradient(90deg, #667eea, #764ba2);
       }
+
       .kpi-card:hover {
         transform: translateY(-5px);
         box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
       }
+
       .kpi-header {
         display: flex;
         align-items: center;
         gap: 15px;
         margin-bottom: 20px;
       }
+
       .kpi-icon {
         width: 50px;
         height: 50px;
@@ -198,6 +338,7 @@
         color: #fff;
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       }
+
       .kpi-info h3 {
         font-size: 0.9rem;
         color: #6c757d;
@@ -205,12 +346,14 @@
         text-transform: uppercase;
         letter-spacing: 0.5px;
       }
+
       .kpi-value {
         font-size: 2.5rem;
         font-weight: 700;
         color: #2c3e50;
         margin-bottom: 10px;
       }
+
       .kpi-change {
         font-size: 0.9rem;
         font-weight: 600;
@@ -218,6 +361,7 @@
         align-items: center;
         gap: 5px;
       }
+
       .kpi-change.positive {
         color: #28a745;
       }
@@ -227,12 +371,15 @@
       .kpi-change.neutral {
         color: #6c757d;
       }
+
+      /* Charts */
       .charts-grid {
         display: grid;
         grid-template-columns: 2fr 1fr;
         gap: 25px;
         margin-bottom: 30px;
       }
+
       .chart-container {
         background: rgba(255, 255, 255, 0.95);
         backdrop-filter: blur(20px);
@@ -240,17 +387,20 @@
         padding: 30px;
         box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
       }
+
       .chart-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
         margin-bottom: 25px;
       }
+
       .chart-title {
         font-size: 1.3rem;
         font-weight: 700;
         color: #2c3e50;
       }
+
       .chart-period {
         padding: 8px 16px;
         background: rgba(102, 126, 234, 0.1);
@@ -259,10 +409,13 @@
         font-size: 0.85rem;
         font-weight: 600;
       }
+
       .chart-canvas {
         position: relative;
         height: 300px;
       }
+
+      /* Summary Section */
       .summary-section {
         background: rgba(255, 255, 255, 0.95);
         backdrop-filter: blur(20px);
@@ -271,17 +424,20 @@
         box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
         margin-bottom: 30px;
       }
+
       .section-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
         margin-bottom: 25px;
       }
+
       .section-title {
         font-size: 1.4rem;
         font-weight: 700;
         color: #2c3e50;
       }
+
       .refresh-btn {
         padding: 10px 20px;
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -295,16 +451,19 @@
         align-items: center;
         gap: 8px;
       }
+
       .refresh-btn:hover {
         transform: translateY(-2px);
         box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
       }
+
       .summary-table {
         width: 100%;
         border-collapse: collapse;
         overflow: hidden;
         border-radius: 12px;
       }
+
       .summary-table th {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: #fff;
@@ -313,14 +472,17 @@
         font-weight: 600;
         font-size: 0.9rem;
       }
+
       .summary-table td {
         padding: 15px;
         border-bottom: 1px solid #e9ecef;
         font-size: 0.9rem;
       }
+
       .summary-table tr:hover {
         background: rgba(102, 126, 234, 0.05);
       }
+
       .loading {
         display: flex;
         justify-content: center;
@@ -330,6 +492,7 @@
         font-size: 1.1rem;
         font-weight: 600;
       }
+
       .loading-spinner {
         width: 40px;
         height: 40px;
@@ -339,14 +502,17 @@
         animation: spin 1s linear infinite;
         margin-right: 15px;
       }
+
       @keyframes spin {
         0% {
-          transform: rotate(0);
+          transform: rotate(0deg);
         }
         100% {
           transform: rotate(360deg);
         }
       }
+
+      /* Responsive Design */
       @media (max-width: 1024px) {
         .charts-grid {
           grid-template-columns: 1fr;
@@ -355,6 +521,7 @@
           grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
         }
       }
+
       @media (max-width: 768px) {
         .nav-menu {
           position: fixed;
@@ -364,37 +531,65 @@
           background: rgba(255, 255, 255, 0.98);
           backdrop-filter: blur(20px);
           width: 100%;
-          text-align: center;
+          text-align: left;
           transition: 0.3s;
           box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+          max-height: calc(100vh - 70px);
+          overflow-y: auto;
+          padding: 20px 0;
         }
+
         .nav-menu.active {
           left: 0;
         }
+
         .nav-toggle {
           display: flex;
         }
-        .nav-toggle.active span:nth-child(2) {
-          opacity: 0;
+
+        .dropdown-menu {
+          position: static;
+          opacity: 1;
+          visibility: visible;
+          transform: none;
+          box-shadow: none;
+          background: rgba(102, 126, 234, 0.03);
+          border-radius: 8px;
+          margin: 8px 16px;
+          border: 1px solid rgba(102, 126, 234, 0.1);
         }
-        .nav-toggle.active span:nth-child(1) {
-          transform: translateY(8px) rotate(45deg);
+
+        .dropdown.active .dropdown-menu {
+          transform: none;
         }
-        .nav-toggle.active span:nth-child(3) {
-          transform: translateY(-8px) rotate(-45deg);
+
+        .nav-item {
+          width: 100%;
         }
+
+        .nav-link,
+        .dropdown-toggle {
+          padding: 16px 24px;
+          margin: 0;
+          justify-content: flex-start;
+        }
+
         .dashboard-header h1 {
           font-size: 2.2rem;
         }
+
         .main-container {
           padding: 20px 15px;
         }
+
         .kpi-grid {
           grid-template-columns: 1fr;
         }
+
         .chart-canvas {
           height: 250px;
         }
+
         .section-header {
           flex-direction: column;
           gap: 15px;
@@ -404,86 +599,155 @@
     </style>
   </head>
   <body>
-    <!-- Navigation Bar -->
+    <!-- Modern Navigation Bar -->
     <nav class="navbar">
       <div class="nav-container">
-        <a href="#" class="nav-logo">📊 Pelayanan HC</a>
+        <a href="#" class="nav-logo">
+          <span>📊</span>
+          <span>Pelayanan HC</span>
+        </a>
+
         <ul class="nav-menu" id="navMenu">
+          <!-- Dashboard Home -->
           <li class="nav-item">
-            <a
-              href="alldata.html"
-              class="nav-link"
-              target="_blank"
-              rel="noopener"
-              >📋 All Data</a
-            >
+            <a href="#" class="nav-link active">
+              <span class="icon">🏠</span>
+              <span>Dashboard</span>
+            </a>
           </li>
-          <li class="nav-item">
-            <a
-              href="halamanrekap.html"
-              class="nav-link"
-              target="_blank"
-              rel="noopener"
-              >📊 Rekap Absensi</a
-            >
+
+          <!-- Data Management Dropdown -->
+          <li class="nav-item dropdown" id="dataDropdown">
+            <button class="dropdown-toggle">
+              <span class="icon">📋</span>
+              <span>Data Management</span>
+              <span class="dropdown-arrow">▼</span>
+            </button>
+            <div class="dropdown-menu">
+              <div class="dropdown-header">📊 Data & Reports</div>
+              <a
+                href="alldata.html"
+                class="dropdown-item"
+                target="_blank"
+                rel="noopener"
+              >
+                <span class="icon">📋</span>
+                <span>All Data</span>
+              </a>
+              <a
+                href="halamanrekap.html"
+                class="dropdown-item"
+                target="_blank"
+                rel="noopener"
+              >
+                <span class="icon">📊</span>
+                <span>Rekap Absensi</span>
+              </a>
+              <a
+                href="input_data.html"
+                class="dropdown-item"
+                target="_blank"
+                rel="noopener"
+              >
+                <span class="icon">📝</span>
+                <span>Input Data</span>
+              </a>
+            </div>
           </li>
-          <li class="nav-item">
-            <a
-              href="formatblasting.html"
-              target="_blank"
-              rel="noopener"
-              class="nav-link"
-              >📊 Format Blasting</a
-            >
+
+          <!-- Monitoring & Analysis Dropdown -->
+          <li class="nav-item dropdown" id="monitoringDropdown">
+            <button class="dropdown-toggle">
+              <span class="icon">📊</span>
+              <span>Monitoring</span>
+              <span class="dropdown-arrow">▼</span>
+            </button>
+            <div class="dropdown-menu">
+              <div class="dropdown-header">📺 Monitoring Tools</div>
+              <a
+                href="blasting_monitor.html"
+                class="dropdown-item"
+                target="_blank"
+                rel="noopener"
+              >
+                <span class="icon">📊</span>
+                <span>Format Blasting</span>
+              </a>
+              <a
+                href="blasting_monitor_stat.html"
+                class="dropdown-item"
+                target="_blank"
+                rel="noopener"
+              >
+                <span class="icon">📺</span>
+                <span>Blasting Monitoring</span>
+              </a>
+              <a
+                href="blasting_monitor_stat.html"
+                class="dropdown-item"
+                target="_blank"
+                rel="noopener"
+              >
+                <span class="icon">📊</span>
+                <span>Blasting Statistics</span>
+              </a>
+            </div>
           </li>
-          <li class="nav-item">
-            <a
-              href="hitungjkp.html"
-              target="_blank"
-              rel="noopener"
-              class="nav-link"
-              >🧮 Hitung JKP</a
-            >
-          </li>
-          <li class="nav-item">
-            <a
-              href="input_data.html"
-              target="_blank"
-              rel="noopener"
-              class="nav-link"
-              >📝 Input Data</a
-            >
-          </li>
-          <li class="nav-item">
-            <a
-              href="pilih-data-ganda-sticky.html"
-              target="_blank"
-              rel="noopener"
-              class="nav-link"
-              >🔄 Data Ganda</a
-            >
-          </li>
-          <li class="nav-item">
-            <a
-              href="pilih-shift-ganda-modifikasi.html"
-              target="_blank"
-              rel="noopener"
-              class="nav-link"
-              >⏰ Shift Ganda</a
-            >
-          </li>
-          <li class="nav-item">
-            <a
-              href="input_abs_att_sap.html"
-              class="nav-link"
-              target="_blank"
-              rel="noopener"
-              >📝att/abs to SAP</a
-            >
+
+          <!-- Utilities & Tools Dropdown -->
+          <li class="nav-item dropdown" id="toolsDropdown">
+            <button class="dropdown-toggle">
+              <span class="icon">🔧</span>
+              <span>Tools</span>
+              <span class="dropdown-arrow">▼</span>
+            </button>
+            <div class="dropdown-menu">
+              <div class="dropdown-header">🧮 Calculation Tools</div>
+              <a
+                href="hitungjkp.html"
+                class="dropdown-item"
+                target="_blank"
+                rel="noopener"
+              >
+                <span class="icon">🧮</span>
+                <span>Hitung JKP</span>
+              </a>
+              <div class="dropdown-header">🔄 Data Processing</div>
+              <a
+                href="pilih-data-ganda-sticky.html"
+                class="dropdown-item"
+                target="_blank"
+                rel="noopener"
+              >
+                <span class="icon">🔄</span>
+                <span>Data Ganda</span>
+              </a>
+              <a
+                href="pilih-shift-ganda-modifikasi.html"
+                class="dropdown-item"
+                target="_blank"
+                rel="noopener"
+              >
+                <span class="icon">⏰</span>
+                <span>Shift Ganda</span>
+              </a>
+              <a
+                href="input_abs_att_sap.html"
+                class="dropdown-item"
+                target="_blank"
+                rel="noopener"
+              >
+                <span class="icon">📝</span>
+                <span>Att/Abs to SAP</span>
+              </a>
+            </div>
           </li>
         </ul>
+
         <div class="nav-toggle" id="navToggle">
-          <span></span><span></span><span></span>
+          <span></span>
+          <span></span>
+          <span></span>
         </div>
       </div>
     </nav>
@@ -576,22 +840,51 @@
     </div>
 
     <script>
-      // ======= DASHBOARD SCRIPT =======
-      // Toggle menu
+      // Navigation functionality
       const navToggle = document.getElementById("navToggle");
       const navMenu = document.getElementById("navMenu");
+      const dropdowns = document.querySelectorAll(".dropdown");
+
+      // Mobile menu toggle
       navToggle.addEventListener("click", () => {
         navMenu.classList.toggle("active");
         navToggle.classList.toggle("active");
       });
+
+      // Dropdown functionality
+      dropdowns.forEach((dropdown) => {
+        const toggle = dropdown.querySelector(".dropdown-toggle");
+        toggle.addEventListener("click", (e) => {
+          e.preventDefault();
+
+          // Close other dropdowns
+          dropdowns.forEach((d) => {
+            if (d !== dropdown) {
+              d.classList.remove("active");
+            }
+          });
+
+          // Toggle current dropdown
+          dropdown.classList.toggle("active");
+        });
+      });
+
+      // Close dropdowns when clicking outside
       document.addEventListener("click", (e) => {
+        if (!e.target.closest(".dropdown")) {
+          dropdowns.forEach((dropdown) => {
+            dropdown.classList.remove("active");
+          });
+        }
+
+        // Close mobile menu when clicking outside
         if (!navToggle.contains(e.target) && !navMenu.contains(e.target)) {
           navMenu.classList.remove("active");
           navToggle.classList.remove("active");
         }
       });
 
-      // Data dan chart state
+      // Dashboard data and functionality
       let dashboardData = {
         totalPegawai: 0,
         avgJKP: 0,
@@ -604,19 +897,19 @@
       let jkpTrendChart = null,
         shiftDistributionChart = null;
 
-      // Matikan fetch API dashboard jika endpoint belum dibuat (agar tidak ada 404)
       const USE_DASHBOARD_API = false;
 
       async function loadDashboardData() {
         try {
-          console.log(`🔗 Loading dashboard data from: ${window.BASE_URL}`);
+          console.log(`🔗 Loading dashboard data from: ${BASE_URL}`);
           if (!USE_DASHBOARD_API) throw new Error("API dashboard dimatikan");
 
           const [r1, r2, r3] = await Promise.all([
-            fetch(`${window.BASE_URL}/dashboard-stats`),
-            fetch(`${window.BASE_URL}/dashboard-trend`),
-            fetch(`${window.BASE_URL}/dashboard-summary`),
+            fetch(`${BASE_URL}/dashboard-stats`),
+            fetch(`${BASE_URL}/dashboard-trend`),
+            fetch(`${BASE_URL}/dashboard-summary`),
           ]);
+
           if (r1.ok) {
             const stats = await r1.json();
             dashboardData.totalPegawai = stats.totalPegawai ?? 847;
@@ -634,7 +927,7 @@
             dashboardData.performanceSummary = await r3.json();
           }
         } catch (e) {
-          // Fallback mock data (tidak ada 404 di console)
+          // Fallback mock data
           dashboardData = {
             totalPegawai: 847,
             avgJKP: 87.5,
@@ -682,6 +975,7 @@
         document.getElementById("totalJamKerja").textContent = `${(
           dashboardData.totalJamKerja / 1000
         ).toFixed(0)}K`;
+
         const jkpChange = document.getElementById("jkpChange");
         const jkpDiff = dashboardData.avgJKP - 85;
         if (jkpDiff > 0) {
@@ -826,7 +1120,7 @@
       }
 
       document.addEventListener("DOMContentLoaded", () => {
-        console.log("🚀 Dashboard initialized with BASE_URL:", window.BASE_URL);
+        console.log("🚀 Dashboard initialized with BASE_URL:", BASE_URL);
         updateLastUpdate();
         loadDashboardData().then(() => {
           updateKPICards();
@@ -836,10 +1130,9 @@
       });
 
       setInterval(refreshDashboard, 300000);
-      // ======= END DASHBOARD SCRIPT ===== perubahan====
     </script>
 
-    <!-- script.js milik aplikasi (berisi helper BASE_URL untuk halaman lain) -->
+    <!-- External script file -->
     <script src="script.js?v=20250812" defer></script>
   </body>
 </html>
