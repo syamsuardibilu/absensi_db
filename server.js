@@ -42,56 +42,80 @@ function getLanIPv4() {
   return null;
 }
 
-// ===== Env (Render + Local) =====
+// ===== Env (Render + Local + LAN) =====
+const os = require("os");
+
 const NODE_ENV = process.env.NODE_ENV || "development";
 const HOST = process.env.HOST || "0.0.0.0";
 const PORT = Number(process.env.PORT || 3000);
 
-// Internal base URL untuk server sendiri
+// Cari IP LAN (IPv4 non-internal)
+function getLANIP() {
+  const ifaces = os.networkInterfaces();
+  for (const name of Object.keys(ifaces)) {
+    for (const iface of ifaces[name]) {
+      if (iface.family === "IPv4" && !iface.internal) return iface.address;
+    }
+  }
+  return "127.0.0.1";
+}
+const LAN_IP = getLANIP();
+
+// Internal base URL (self fetch)
 const INTERNAL_BASE_URL =
   process.env.INTERNAL_BASE_URL ||
   (NODE_ENV === "development" ? `http://127.0.0.1:${PORT}` : "");
 
-// Base URL eksternal (diakses dari luar)
+// Base URL eksternal (untuk log/fetch)
 const BASE_URL =
-  process.env.BASE_URL || // kalau kamu set manual di .env
-  process.env.RENDER_EXTERNAL_URL || // otomatis dari Render
+  process.env.BASE_URL || // manual di .env
+  process.env.RENDER_EXTERNAL_URL || // auto dari Render
   INTERNAL_BASE_URL;
 
 console.log("🚀 Running in", NODE_ENV);
-console.log("🌐 BASE_URL =", BASE_URL);
+console.log("🌐 BASE_URL   =", BASE_URL);
+console.log("💻 Local URL  =", `http://127.0.0.1:${PORT}`);
+console.log("📱 LAN URL    =", `http://${LAN_IP}:${PORT}`);
+
+// ===== CORS whitelist =====
+const extraOrigins = (process.env.CORS_ORIGINS || "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+
+const allowOriginHost = new Set([
+  "localhost",
+  "127.0.0.1",
+  LAN_IP, // IP LAN dinamis
+  "daengbilu.com",
+  "www.daengbilu.com",
+]);
+
+app.use(
+  cors({
+    origin: (origin, cb) => {
+      if (!origin) return cb(null, true); // curl/same-origin
+      try {
+        const u = new URL(origin);
+        if (allowOriginHost.has(u.hostname)) return cb(null, true);
+        if (extraOrigins.includes(origin)) return cb(null, true);
+        if (NODE_ENV !== "production") return cb(null, true); // longgar saat dev
+        return cb(null, false);
+      } catch {
+        return cb(null, false);
+      }
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
+app.options("*", cors());
 
 // Polyfill fetch for Node < 18
 const fetch = global.fetch
   ? global.fetch
   : (...args) => import("node-fetch").then(({ default: f }) => f(...args));
-
-// CORS
-const extraOrigins = (process.env.CORS_ORIGINS || "")
-  .split(",")
-  .map((s) => s.trim())
-  .filter(Boolean);
-app.use(
-  cors({
-    origin: (origin, cb) => {
-      const whitelist = new Set([
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "https://daengbilu.com",
-        "https://www.daengbilu.com",
-        "http://daengbilu.com",
-        "http://www.daengbilu.com",
-        ...extraOrigins,
-      ]);
-      if (!origin || whitelist.has(origin)) return cb(null, true);
-      if (NODE_ENV !== "production") return cb(null, true);
-      return cb(null, false);
-    },
-    credentials: true,
-  })
-);
 
 app.use(express.json({ limit: "100mb" }));
 

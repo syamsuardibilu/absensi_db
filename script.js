@@ -1,6 +1,9 @@
-const PROD_API = "https://absensi-db.onrender.com"; // API di Render
-const LOCAL_API = "http://localhost:3000"; // Dev lokal
+// === API endpoints ===
+const PROD_API = "https://absensi-db.onrender.com"; // Render (Produksi)
+const LOCAL_API = "http://localhost:3000"; // Local dev
+const LAN_API = `http://${location.hostname}:3000`; // Akses via IP LAN
 
+// Deteksi host
 const host = location.hostname;
 const isLocalHost = /^(localhost|127\.0\.0\.1)$/.test(host);
 const isPrivateLAN =
@@ -8,10 +11,12 @@ const isPrivateLAN =
     host
   );
 
+// Urutan prioritas: window.BASE_URL (override) -> Local -> LAN -> Prod
 const BASE_URL =
   (window.BASE_URL && window.BASE_URL.trim()) ||
-  (isLocalHost || isPrivateLAN ? LOCAL_API : PROD_API);
+  (isLocalHost ? LOCAL_API : isPrivateLAN ? LAN_API : PROD_API);
 
+// Helper fetch
 const api = (path, opts = {}) => {
   const p = path.startsWith("/") ? path : `/${path}`;
   return fetch(`${BASE_URL}${p}`, opts);
