@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Format Blasting - Enhanced with Daily Details</title>
+    <title>📊 Blasting Monitor - Real-time Statistics</title>
     <style>
       /* Base Styles */
       * {
@@ -61,6 +61,128 @@
         display: flex;
         gap: 20px;
         flex-wrap: wrap;
+      }
+
+      /* Real-time Stats Section */
+      .stats-section {
+        background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);
+        color: white;
+        padding: 20px 25px;
+        border-bottom: 3px solid #2c5aa0;
+      }
+
+      .stats-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+        margin-bottom: 15px;
+      }
+
+      .stat-card {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 12px;
+        padding: 20px;
+        text-align: center;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        backdrop-filter: blur(10px);
+        transition: all 0.3s ease;
+      }
+
+      .stat-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        background: rgba(255, 255, 255, 0.15);
+      }
+
+      .stat-number {
+        font-size: 28px;
+        font-weight: 700;
+        margin-bottom: 5px;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+      }
+
+      .stat-label {
+        font-size: 14px;
+        opacity: 0.9;
+        font-weight: 500;
+      }
+
+      .stat-percentage {
+        font-size: 12px;
+        margin-top: 5px;
+        opacity: 0.8;
+      }
+
+      /* Progress Bar */
+      .progress-section {
+        margin-top: 15px;
+      }
+
+      .progress-label {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 8px;
+        font-size: 14px;
+        font-weight: 500;
+      }
+
+      .progress-bar {
+        width: 100%;
+        height: 20px;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 10px;
+        overflow: hidden;
+        position: relative;
+      }
+
+      .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #48bb78 0%, #38a169 100%);
+        transition: width 0.5s ease;
+        position: relative;
+      }
+
+      .progress-text {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 12px;
+        font-weight: 600;
+        color: white;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+      }
+
+      /* Real-time Indicator */
+      .realtime-indicator {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+        opacity: 0.9;
+      }
+
+      .pulse-dot {
+        width: 8px;
+        height: 8px;
+        background: #48bb78;
+        border-radius: 50%;
+        animation: pulse 2s infinite;
+      }
+
+      @keyframes pulse {
+        0% {
+          transform: scale(0.95);
+          box-shadow: 0 0 0 0 rgba(72, 187, 120, 0.7);
+        }
+        70% {
+          transform: scale(1);
+          box-shadow: 0 0 0 10px rgba(72, 187, 120, 0);
+        }
+        100% {
+          transform: scale(0.95);
+          box-shadow: 0 0 0 0 rgba(72, 187, 120, 0);
+        }
       }
 
       /* Controls Section */
@@ -156,6 +278,16 @@
         transform: translateY(-1px);
       }
 
+      .refresh-btn {
+        background: #667eea;
+        color: white;
+      }
+
+      .refresh-btn:hover {
+        background: #5a67d8;
+        transform: translateY(-1px);
+      }
+
       /* Loading & Error States */
       .loading {
         text-align: center;
@@ -205,7 +337,7 @@
       /* Table Container */
       .table-container {
         overflow: auto;
-        max-height: calc(100vh - 200px);
+        max-height: calc(100vh - 400px);
         border: 1px solid #e2e8f0;
         margin: 0;
       }
@@ -213,7 +345,7 @@
       table {
         width: 100%;
         border-collapse: collapse;
-        min-width: 1400px;
+        min-width: 1200px;
         font-size: 13px;
       }
 
@@ -291,63 +423,6 @@
         background: #20ba5a;
         transform: translateY(-1px);
         box-shadow: 0 2px 5px rgba(37, 211, 102, 0.3);
-      }
-
-      .btn-success {
-        background: #48bb78;
-        color: white;
-        border: none;
-        padding: 4px 8px;
-        border-radius: 4px;
-        cursor: pointer;
-        font-size: 10px;
-        font-weight: 500;
-        margin: 2px;
-        transition: all 0.2s ease;
-        min-width: 60px;
-      }
-
-      .btn-success:hover {
-        background: #38a169;
-        transform: translateY(-1px);
-      }
-
-      .btn-danger {
-        background: #e53e3e;
-        color: white;
-        border: none;
-        padding: 4px 8px;
-        border-radius: 4px;
-        cursor: pointer;
-        font-size: 10px;
-        font-weight: 500;
-        margin: 2px;
-        transition: all 0.2s ease;
-        min-width: 60px;
-      }
-
-      .btn-danger:hover {
-        background: #c53030;
-        transform: translateY(-1px);
-      }
-
-      .btn-reset {
-        background: #718096;
-        color: white;
-        border: none;
-        padding: 4px 8px;
-        border-radius: 4px;
-        cursor: pointer;
-        font-size: 10px;
-        font-weight: 500;
-        margin: 2px;
-        transition: all 0.2s ease;
-        min-width: 60px;
-      }
-
-      .btn-reset:hover {
-        background: #4a5568;
-        transform: translateY(-1px);
       }
 
       /* Enhanced Pesan Container Styles */
@@ -514,30 +589,35 @@
         background: #cbd5e0;
       }
 
-      .action-buttons {
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-        align-items: center;
-      }
-
       /* Result Status */
       .status-success {
         color: #38a169;
         font-weight: 600;
         font-size: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
       }
 
       .status-failed {
         color: #e53e3e;
         font-weight: 600;
         font-size: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
       }
 
       .status-pending {
         color: #ed8936;
         font-weight: 600;
         font-size: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
       }
 
       /* Pagination */
@@ -691,13 +771,26 @@
           font-size: 20px;
         }
 
+        .stats-container {
+          grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+          gap: 10px;
+        }
+
+        .stat-card {
+          padding: 15px;
+        }
+
+        .stat-number {
+          font-size: 24px;
+        }
+
         .table-container {
-          max-height: calc(100vh - 180px);
+          max-height: calc(100vh - 350px);
         }
 
         table {
           font-size: 12px;
-          min-width: 1200px;
+          min-width: 1000px;
         }
 
         thead th {
@@ -802,13 +895,29 @@
         background: #38a169;
         transform: translateY(-1px);
       }
+
+      /* Status indicators with icons */
+      .status-success::before {
+        content: "✅";
+        margin-right: 4px;
+      }
+
+      .status-failed::before {
+        content: "❌";
+        margin-right: 4px;
+      }
+
+      .status-pending::before {
+        content: "⏳";
+        margin-right: 4px;
+      }
     </style>
   </head>
   <body>
     <div class="container">
       <!-- Header -->
       <div class="header">
-        <h1>📱 Format Blasting - Enhanced with Daily Details</h1>
+        <h1>📊 Blasting Monitor - Real-time Statistics</h1>
         <div class="header-info">
           <div class="db-info">
             <span><strong>Database:</strong> absensi_db</span>
@@ -820,6 +929,61 @@
           <div id="lastUpdated">
             <strong>Last Updated:</strong> <span id="updateTime">-</span>
           </div>
+        </div>
+      </div>
+
+      <!-- Real-time Statistics Section -->
+      <div class="stats-section">
+        <div class="stats-container">
+          <div class="stat-card">
+            <div class="stat-number" id="statTotal">0</div>
+            <div class="stat-label">Total Data</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number" id="statTerkirim">0</div>
+            <div class="stat-label">Terkirim</div>
+            <div class="stat-percentage" id="statTerkirimPct">0%</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number" id="statGagal">0</div>
+            <div class="stat-label">Gagal</div>
+            <div class="stat-percentage" id="statGagalPct">0%</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number" id="statPending">0</div>
+            <div class="stat-label">Pending/Proses</div>
+            <div class="stat-percentage" id="statPendingPct">0%</div>
+          </div>
+        </div>
+
+        <div class="progress-section">
+          <div class="progress-label">
+            <span>Progress Pengiriman</span>
+            <span id="progressPercentage">0%</span>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill" id="progressFill" style="width: 0%">
+              <div class="progress-text" id="progressText">0 / 0</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="realtime-indicator">
+          <div class="pulse-dot"></div>
+          <span>Menginisialisasi koneksi real-time...</span>
+          <button
+            id="reconnectBtn"
+            class="export-btn"
+            onclick="initializeRealTimeConnection()"
+            style="
+              display: none;
+              margin-left: 10px;
+              padding: 4px 8px;
+              font-size: 11px;
+            "
+          >
+            🔄 Reconnect
+          </button>
         </div>
       </div>
 
@@ -838,6 +1002,9 @@
           </button>
         </div>
         <div class="export-section">
+          <button class="export-btn refresh-btn" onclick="refreshData()">
+            🔄 Refresh Manual
+          </button>
           <button class="export-btn export-csv" onclick="exportData('csv')">
             📊 CSV
           </button>
@@ -854,7 +1021,7 @@
 
       <!-- Loading State -->
       <div id="loading" class="loading">
-        Memuat data enhanced dengan daily details...
+        Memuat data monitoring dengan statistik real-time...
       </div>
 
       <!-- Error State -->
@@ -889,8 +1056,7 @@
               <th style="width: 120px">NO TELP</th>
               <th style="width: 280px">ISI PESAN (Enhanced)</th>
               <th style="width: 100px">LINK WA</th>
-              <th style="width: 150px">TOMBOL AKSI</th>
-              <th style="width: 100px">RESULT</th>
+              <th style="width: 120px">STATUS RESULT</th>
             </tr>
           </thead>
           <tbody id="tableBody"></tbody>
@@ -947,11 +1113,26 @@
       let allData = [];
       let filteredData = [];
       let currentPage = 1;
-      //   const recordsPerPage = 50;
+      let recordsPerPage = 50;
       let totalPages = 0;
       let totalRecords = 0;
       let currentSearchTerm = "";
       let blastingResults = {}; // Store results for each PERNER
+
+      // Real-time connection variables
+      let eventSource = null;
+      let wsConnection = null;
+      let connectionStatus = "disconnected";
+      let reconnectAttempts = 0;
+      let maxReconnectAttempts = 5;
+
+      // Real-time statistics
+      let currentStats = {
+        total: 0,
+        terkirim: 0,
+        gagal: 0,
+        pending: 0,
+      };
 
       // ======================================================
       // ENHANCED HELPER FUNCTIONS for Daily Details
@@ -1013,6 +1194,382 @@
       // 📝 Helper function: Format keterangan absen
       function formatKetAbsen(value_att_abs) {
         return value_att_abs || "-";
+      }
+
+      // ======================================================
+      // REAL-TIME STATISTICS FUNCTIONS
+      // ======================================================
+
+      function calculateStatistics(data) {
+        const stats = {
+          total: data.length,
+          terkirim: 0,
+          gagal: 0,
+          pending: 0,
+        };
+
+        data.forEach((row) => {
+          const result = row.RESULT_BLASTING;
+          if (result === "Terkirim") {
+            stats.terkirim++;
+          } else if (result === "Gagal") {
+            stats.gagal++;
+          } else {
+            stats.pending++;
+          }
+        });
+
+        return stats;
+      }
+
+      function updateStatisticsDisplay(stats) {
+        // Update stat cards
+        document.getElementById("statTotal").textContent =
+          stats.total.toLocaleString();
+        document.getElementById("statTerkirim").textContent =
+          stats.terkirim.toLocaleString();
+        document.getElementById("statGagal").textContent =
+          stats.gagal.toLocaleString();
+        document.getElementById("statPending").textContent =
+          stats.pending.toLocaleString();
+
+        // Calculate percentages
+        const totalNonZero = stats.total || 1; // Prevent division by zero
+        const terkirimPct = ((stats.terkirim / totalNonZero) * 100).toFixed(1);
+        const gagalPct = ((stats.gagal / totalNonZero) * 100).toFixed(1);
+        const pendingPct = ((stats.pending / totalNonZero) * 100).toFixed(1);
+
+        document.getElementById(
+          "statTerkirimPct"
+        ).textContent = `${terkirimPct}%`;
+        document.getElementById("statGagalPct").textContent = `${gagalPct}%`;
+        document.getElementById(
+          "statPendingPct"
+        ).textContent = `${pendingPct}%`;
+
+        // Update progress bar
+        const completedPct = parseFloat(terkirimPct);
+        const progressFill = document.getElementById("progressFill");
+        const progressText = document.getElementById("progressText");
+        const progressPercentage =
+          document.getElementById("progressPercentage");
+
+        progressFill.style.width = `${completedPct}%`;
+        progressText.textContent = `${stats.terkirim} / ${stats.total}`;
+        progressPercentage.textContent = `${completedPct}%`;
+
+        // Store current stats globally
+        currentStats = stats;
+
+        console.log("📊 Statistics updated:", stats);
+      }
+
+      // ======================================================
+      // REAL-TIME CONNECTION FUNCTIONS
+      // ======================================================
+
+      function initializeRealTimeConnection() {
+        console.log("🔌 Initializing real-time connection...");
+
+        // Try WebSocket first, fallback to Server-Sent Events
+        if (window.WebSocket) {
+          initWebSocketConnection();
+        } else {
+          initServerSentEvents();
+        }
+      }
+
+      function initWebSocketConnection() {
+        try {
+          const protocol =
+            window.location.protocol === "https:" ? "wss:" : "ws:";
+          const wsUrl = `${protocol}//${window.location.host}/ws/blasting-monitor`;
+
+          console.log(`🔌 Connecting to WebSocket: ${wsUrl}`);
+          wsConnection = new WebSocket(wsUrl);
+
+          wsConnection.onopen = function (event) {
+            console.log("✅ WebSocket connected successfully");
+            connectionStatus = "connected";
+            reconnectAttempts = 0;
+            updateConnectionStatus();
+
+            // Send initial subscription message
+            wsConnection.send(
+              JSON.stringify({
+                type: "subscribe",
+                channel: "blasting_updates",
+              })
+            );
+          };
+
+          wsConnection.onmessage = function (event) {
+            try {
+              const data = JSON.parse(event.data);
+              handleRealTimeUpdate(data);
+            } catch (error) {
+              console.error("❌ Error parsing WebSocket message:", error);
+            }
+          };
+
+          wsConnection.onclose = function (event) {
+            console.log(
+              "🔌 WebSocket connection closed:",
+              event.code,
+              event.reason
+            );
+            connectionStatus = "disconnected";
+            updateConnectionStatus();
+
+            // Attempt to reconnect
+            attemptReconnect();
+          };
+
+          wsConnection.onerror = function (error) {
+            console.error("❌ WebSocket error:", error);
+            connectionStatus = "error";
+            updateConnectionStatus();
+
+            // Fallback to Server-Sent Events
+            initServerSentEvents();
+          };
+        } catch (error) {
+          console.error("❌ WebSocket initialization failed:", error);
+          initServerSentEvents();
+        }
+      }
+
+      function initServerSentEvents() {
+        try {
+          console.log("🔌 Initializing Server-Sent Events...");
+          eventSource = new EventSource(`${BASE_URL}/stream/blasting-updates`);
+
+          eventSource.onopen = function (event) {
+            console.log("✅ SSE connected successfully");
+            connectionStatus = "connected";
+            reconnectAttempts = 0;
+            updateConnectionStatus();
+          };
+
+          eventSource.onmessage = function (event) {
+            try {
+              const data = JSON.parse(event.data);
+              handleRealTimeUpdate(data);
+            } catch (error) {
+              console.error("❌ Error parsing SSE message:", error);
+            }
+          };
+
+          eventSource.onerror = function (event) {
+            console.error("❌ SSE error:", event);
+            connectionStatus = "error";
+            updateConnectionStatus();
+
+            // Attempt to reconnect
+            attemptReconnect();
+          };
+        } catch (error) {
+          console.error("❌ SSE initialization failed:", error);
+          connectionStatus = "error";
+          updateConnectionStatus();
+        }
+      }
+
+      function handleRealTimeUpdate(data) {
+        console.log("📡 Real-time update received:", data);
+
+        switch (data.type) {
+          case "blasting_result_update":
+            handleBlastingResultUpdate(data);
+            break;
+          case "statistics_update":
+            handleStatisticsUpdate(data);
+            break;
+          case "bulk_update":
+            handleBulkUpdate(data);
+            break;
+          default:
+            console.log("📡 Unknown update type:", data.type);
+        }
+      }
+
+      function handleBlastingResultUpdate(data) {
+        const { perner, result_blasting, timestamp } = data;
+
+        console.log(
+          `📱 Blasting result update: ${perner} -> ${result_blasting}`
+        );
+
+        // Update local data
+        updateLocalData(perner, result_blasting);
+
+        // Update UI immediately
+        updateResultCellRealTime(perner, result_blasting);
+
+        // Recalculate and update statistics
+        const newStats = calculateStatistics(allData);
+        updateStatisticsDisplay(newStats);
+
+        // Show notification
+        const statusText =
+          result_blasting === "Terkirim"
+            ? "✅ Terkirim"
+            : result_blasting === "Gagal"
+            ? "❌ Gagal"
+            : "⏳ Reset";
+        showNotification(
+          `${perner}: ${statusText}`,
+          result_blasting === "Terkirim"
+            ? "success"
+            : result_blasting === "Gagal"
+            ? "error"
+            : "info"
+        );
+      }
+
+      function handleStatisticsUpdate(data) {
+        const { statistics } = data;
+        console.log("📊 Statistics update received:", statistics);
+
+        // Update statistics display
+        updateStatisticsDisplay(statistics);
+
+        // Check for significant changes
+        const terkirimDiff = statistics.terkirim - currentStats.terkirim;
+        const gagalDiff = statistics.gagal - currentStats.gagal;
+
+        if (terkirimDiff > 0) {
+          showNotification(
+            `✅ ${terkirimDiff} pesan baru terkirim!`,
+            "success"
+          );
+        }
+        if (gagalDiff > 0) {
+          showNotification(`❌ ${gagalDiff} pesan gagal dikirim`, "error");
+        }
+      }
+
+      function handleBulkUpdate(data) {
+        const { updates } = data;
+        console.log(`📦 Bulk update received: ${updates.length} changes`);
+
+        let changesApplied = 0;
+        updates.forEach((update) => {
+          if (updateLocalData(update.perner, update.result_blasting)) {
+            updateResultCellRealTime(update.perner, update.result_blasting);
+            changesApplied++;
+          }
+        });
+
+        if (changesApplied > 0) {
+          // Recalculate statistics
+          const newStats = calculateStatistics(allData);
+          updateStatisticsDisplay(newStats);
+
+          showNotification(`📦 ${changesApplied} perubahan diterapkan`, "info");
+        }
+      }
+
+      function updateResultCellRealTime(perner, resultBlasting) {
+        const resultCell = document.querySelector(`#result-${perner}`);
+        if (!resultCell) return false;
+
+        let statusHTML = "";
+        if (resultBlasting === "Terkirim") {
+          statusHTML = '<span class="status-success">Terkirim</span>';
+        } else if (resultBlasting === "Gagal") {
+          statusHTML = '<span class="status-failed">Gagal</span>';
+        } else {
+          statusHTML = '<span class="status-pending">Pending</span>';
+        }
+
+        // Add animation effect
+        resultCell.style.transition = "all 0.3s ease";
+        resultCell.style.backgroundColor = "#e6fffa";
+        resultCell.innerHTML = statusHTML;
+
+        // Remove highlight after animation
+        setTimeout(() => {
+          resultCell.style.backgroundColor = "";
+        }, 1000);
+
+        return true;
+      }
+
+      function attemptReconnect() {
+        if (reconnectAttempts >= maxReconnectAttempts) {
+          console.error("❌ Max reconnection attempts reached");
+          connectionStatus = "failed";
+          updateConnectionStatus();
+          return;
+        }
+
+        reconnectAttempts++;
+        const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000); // Exponential backoff, max 30s
+
+        console.log(
+          `🔄 Attempting reconnection ${reconnectAttempts}/${maxReconnectAttempts} in ${delay}ms...`
+        );
+        connectionStatus = "reconnecting";
+        updateConnectionStatus();
+
+        setTimeout(() => {
+          initializeRealTimeConnection();
+        }, delay);
+      }
+
+      function updateConnectionStatus() {
+        const indicator = document.querySelector(".realtime-indicator");
+        const dot = document.querySelector(".pulse-dot");
+        const text = document.querySelector(".realtime-indicator span");
+
+        if (!indicator || !dot || !text) return;
+
+        switch (connectionStatus) {
+          case "connected":
+            dot.style.background = "#48bb78";
+            dot.style.animation = "pulse 2s infinite";
+            text.textContent = "Real-time monitoring aktif";
+            indicator.style.opacity = "1";
+            break;
+          case "connecting":
+          case "reconnecting":
+            dot.style.background = "#ed8936";
+            dot.style.animation = "pulse 1s infinite";
+            text.textContent = `Menghubungkan${
+              reconnectAttempts > 0
+                ? ` (${reconnectAttempts}/${maxReconnectAttempts})`
+                : ""
+            }...`;
+            indicator.style.opacity = "0.8";
+            break;
+          case "disconnected":
+          case "error":
+            dot.style.background = "#e53e3e";
+            dot.style.animation = "none";
+            text.textContent = "Koneksi terputus - monitoring tidak aktif";
+            indicator.style.opacity = "0.6";
+            break;
+          case "failed":
+            dot.style.background = "#a0aec0";
+            dot.style.animation = "none";
+            text.textContent = "Gagal terhubung - gunakan refresh manual";
+            indicator.style.opacity = "0.5";
+            break;
+        }
+      }
+
+      function closeRealTimeConnection() {
+        if (wsConnection) {
+          wsConnection.close();
+          wsConnection = null;
+        }
+        if (eventSource) {
+          eventSource.close();
+          eventSource = null;
+        }
+        connectionStatus = "disconnected";
+        updateConnectionStatus();
       }
 
       // ======================================================
@@ -1116,10 +1673,9 @@ ${totalHariKoreksi} dari ${hariKerja} hari kerja`;
       }
 
       // ======================================================
-      // ENHANCED DATA LOADING with Daily Details
+      // ENHANCED DATA LOADING with Real-time Statistics
       // ======================================================
 
-      // === UBAH: tambahkan parameter q ===
       async function loadData(q = "") {
         try {
           document.getElementById("loading").style.display = "block";
@@ -1127,15 +1683,14 @@ ${totalHariKoreksi} dari ${hariKerja} hari kerja`;
           document.getElementById("tableContainer").style.display = "none";
 
           document.getElementById("pageInfo").textContent =
-            "Memuat data enhanced...";
+            "Memuat data monitoring...";
           disablePaginationControls();
 
           console.log(
-            "🚀 Fetching enhanced data from /getRekapAbsensiWithDaily...",
+            "🚀 Fetching monitoring data from /getRekapAbsensiWithDaily...",
             { q }
           );
 
-          // === UBAH: pakai query param q ke server ===
           const qs = q && q.trim() ? `?q=${encodeURIComponent(q.trim())}` : "";
           const response = await fetch(
             `${BASE_URL}/getRekapAbsensiWithDaily${qs}`
@@ -1147,28 +1702,17 @@ ${totalHariKoreksi} dari ${hariKerja} hari kerja`;
 
           const data = await response.json();
           console.log(
-            `✅ Enhanced data loaded: ${data.length} records (q="${q}")`
+            `✅ Monitoring data loaded: ${data.length} records (q="${q}")`
           );
 
           allData = data;
-          filteredData = [...data]; // sekarang filteredData = hasil dari server
+          filteredData = [...data];
           totalRecords = data.length;
-          recordsPerPage = totalRecords;
-
           totalPages = Math.ceil(totalRecords / recordsPerPage);
 
-          // Inisialisasi status blasting
-          blastingResults = {};
-          data.forEach((row) => {
-            const perner = row.PERNER;
-            const resultBlasting = row.RESULT_BLASTING;
-            blastingResults[perner] =
-              resultBlasting === "Terkirim"
-                ? "success"
-                : resultBlasting === "Gagal"
-                ? "failed"
-                : "pending";
-          });
+          // Calculate and update statistics
+          const stats = calculateStatistics(data);
+          updateStatisticsDisplay(stats);
 
           // Header info
           document.getElementById(
@@ -1178,11 +1722,10 @@ ${totalHariKoreksi} dari ${hariKerja} hari kerja`;
             new Date().toLocaleString("id-ID");
 
           if (totalRecords === 0) {
-            // Tampilkan info kosong tapi tetap lanjutkan agar UI update
             console.warn("⚠️ Tidak ada data yang ditemukan");
           }
 
-          // === UBAH: simpan query aktif dan tampilkan info hasil pencarian ===
+          // Update search results info
           currentSearchTerm = q.trim();
           if (currentSearchTerm) {
             const info = document.getElementById("searchResults");
@@ -1193,7 +1736,7 @@ ${totalHariKoreksi} dari ${hariKerja} hari kerja`;
             document.getElementById("searchResults").style.display = "none";
           }
 
-          // Tampilkan halaman pertama
+          // Display first page
           currentPage = 1;
           displayPage(currentPage);
           enablePaginationControls();
@@ -1202,10 +1745,16 @@ ${totalHariKoreksi} dari ${hariKerja} hari kerja`;
           document.getElementById("tableContainer").style.display = "block";
 
           console.log(
-            `📊 Enhanced table created with ${totalPages} pages (${recordsPerPage} records/page)`
+            `📊 Monitoring table created with ${totalPages} pages (${recordsPerPage} records/page)`
+          );
+
+          // Show notification for data update
+          showNotification(
+            `📊 Data berhasil dimuat - Real-time monitoring aktif`,
+            "info"
           );
         } catch (error) {
-          console.error("❌ Error loading enhanced data:", error);
+          console.error("❌ Error loading monitoring data:", error);
           document.getElementById("loading").style.display = "none";
           document.getElementById("error").style.display = "block";
           document.getElementById("errorMessage").textContent = error.message;
@@ -1215,6 +1764,15 @@ ${totalHariKoreksi} dari ${hariKerja} hari kerja`;
             "Error - tidak ada data";
           disablePaginationControls();
         }
+      }
+
+      // Refresh data (manual refresh)
+      function refreshData() {
+        console.log("🔄 Manual refresh triggered");
+        const currentQuery = currentSearchTerm || "";
+        loadData(currentQuery);
+
+        showNotification("🔄 Data berhasil direfresh!", "success");
       }
 
       // ======================================================
@@ -1365,179 +1923,6 @@ ${totalHariKoreksi} dari ${hariKerja} hari kerja`;
         }
       }
 
-      // Handle action buttons
-      async function handleAction(perner, action) {
-        const successBtn = document.querySelector(`#terkirim-${perner}`);
-        const failBtn = document.querySelector(`#gagal-${perner}`);
-        const resetBtn = document.querySelector(`#reset-${perner}`);
-        const resultCell = document.querySelector(`#result-${perner}`);
-
-        console.log(`🎯 handleAction called: ${perner} -> ${action}`);
-
-        // Show loading state
-        const originalSuccessText = successBtn.textContent;
-        const originalFailText = failBtn.textContent;
-        const originalResetText = resetBtn.textContent;
-
-        if (action === "success") {
-          successBtn.textContent = "⳼";
-          successBtn.disabled = true;
-          successBtn.style.opacity = "0.6";
-        } else if (action === "failed") {
-          failBtn.textContent = "⳼";
-          failBtn.disabled = true;
-          failBtn.style.opacity = "0.6";
-        } else if (action === "reset") {
-          resetBtn.textContent = "⳼";
-          resetBtn.disabled = true;
-          resetBtn.style.opacity = "0.6";
-        }
-
-        try {
-          console.log(`📡 Sending request to server...`);
-
-          let requestPayload;
-          if (action === "reset") {
-            requestPayload = {
-              perner: perner,
-              result_blasting: null, // Set to NULL for reset
-            };
-          } else {
-            requestPayload = {
-              perner: perner,
-              result_blasting: action === "success" ? "Terkirim" : "Gagal",
-            };
-          }
-
-          console.log(`📋 Request payload:`, requestPayload);
-
-          // API call to update database
-          const response = await fetch(`${BASE_URL}/updateResultBlasting`, {
-            method: "PUT",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(requestPayload),
-          });
-
-          console.log(`📡 Response status: ${response.status}`);
-
-          // Get response text first to debug
-          const responseText = await response.text();
-          console.log(`📄 Response text:`, responseText);
-
-          let result;
-          try {
-            result = JSON.parse(responseText);
-          } catch (parseErr) {
-            console.error("❌ Error parsing JSON response:", parseErr);
-            throw new Error(
-              `Invalid JSON response: ${responseText.substring(0, 100)}...`
-            );
-          }
-
-          if (!response.ok) {
-            console.error(`❌ Server error ${response.status}:`, result);
-            throw new Error(
-              result.message ||
-                `HTTP ${response.status}: ${response.statusText}`
-            );
-          }
-
-          console.log(`✅ Server response:`, result);
-
-          // Update local state
-          if (action === "reset") {
-            blastingResults[perner] = "pending";
-          } else {
-            blastingResults[perner] = action;
-          }
-
-          // Update the result cell and button states
-          if (action === "success") {
-            resultCell.innerHTML =
-              '<span class="status-success">Terkirim</span>';
-            successBtn.style.opacity = "1";
-            successBtn.style.background = "#38a169";
-            failBtn.style.opacity = "0.5";
-            failBtn.style.background = "#e53e3e";
-            resetBtn.style.opacity = "0.5";
-          } else if (action === "failed") {
-            resultCell.innerHTML = '<span class="status-failed">Gagal</span>';
-            failBtn.style.opacity = "1";
-            failBtn.style.background = "#c53030";
-            successBtn.style.opacity = "0.5";
-            successBtn.style.background = "#48bb78";
-            resetBtn.style.opacity = "0.5";
-          } else if (action === "reset") {
-            resultCell.innerHTML = '<span class="status-pending"></span>';
-            successBtn.style.opacity = "0.7";
-            successBtn.style.background = "#48bb78";
-            failBtn.style.opacity = "0.7";
-            failBtn.style.background = "#e53e3e";
-            resetBtn.style.opacity = "1";
-            resetBtn.style.background = "#4a5568";
-          }
-
-          // Show success notification
-          const statusText =
-            action === "success"
-              ? "Terkirim"
-              : action === "failed"
-              ? "Gagal"
-              : "Reset (Kosong)";
-          showNotification(`✅ ${perner}: ${statusText}`, "success");
-
-          // Update the data in allData and filteredData
-          const dbValue =
-            action === "reset"
-              ? null
-              : action === "success"
-              ? "Terkirim"
-              : "Gagal";
-          updateLocalData(perner, dbValue);
-        } catch (error) {
-          console.error(`❌ Error updating ${perner}:`, error);
-
-          // Show error notification with more details
-          let errorMessage = error.message;
-          if (errorMessage.includes("Failed to fetch")) {
-            errorMessage =
-              "Tidak dapat terhubung ke server. Pastikan server berjalan.";
-          } else if (errorMessage.includes("500")) {
-            errorMessage =
-              "Server error. Periksa database connection dan table structure.";
-          }
-
-          showNotification(`❌ ${perner}: ${errorMessage}`, "error");
-        } finally {
-          // Reset button states
-          successBtn.textContent = originalSuccessText;
-          failBtn.textContent = originalFailText;
-          resetBtn.textContent = originalResetText;
-          successBtn.disabled = false;
-          failBtn.disabled = false;
-          resetBtn.disabled = false;
-        }
-      }
-
-      // Update local data arrays
-      function updateLocalData(perner, resultBlasting) {
-        // Update allData
-        const allDataIndex = allData.findIndex((row) => row.PERNER === perner);
-        if (allDataIndex !== -1) {
-          allData[allDataIndex].RESULT_BLASTING = resultBlasting;
-        }
-
-        // Update filteredData
-        const filteredDataIndex = filteredData.findIndex(
-          (row) => row.PERNER === perner
-        );
-        if (filteredDataIndex !== -1) {
-          filteredData[filteredDataIndex].RESULT_BLASTING = resultBlasting;
-        }
-      }
-
       // Display specific page
       function displayPage(page) {
         const tbody = document.getElementById("tableBody");
@@ -1551,7 +1936,7 @@ ${totalHariKoreksi} dari ${hariKerja} hari kerja`;
         const pageData = filteredData.slice(startIndex, endIndex);
 
         console.log(
-          `📄 Displaying enhanced page ${page}: showing ${
+          `📄 Displaying monitoring page ${page}: showing ${
             pageData.length
           } records (${startIndex + 1} - ${endIndex} of ${filteredData.length})`
         );
@@ -1560,15 +1945,20 @@ ${totalHariKoreksi} dari ${hariKerja} hari kerja`;
           const tr = document.createElement("tr");
           const perner = row.PERNER || "";
 
-          // Get result from database first, then from local state as fallback
+          // Get result from database
           let currentResult = "pending";
+          let statusHTML = "";
           const dbResult = row.RESULT_BLASTING;
+
           if (dbResult === "Terkirim") {
             currentResult = "success";
+            statusHTML = '<span class="status-success">Terkirim</span>';
           } else if (dbResult === "Gagal") {
             currentResult = "failed";
+            statusHTML = '<span class="status-failed">Gagal</span>';
           } else {
             currentResult = "pending";
+            statusHTML = '<span class="status-pending">Pending</span>';
           }
 
           // Phone number from data_pegawai
@@ -1586,23 +1976,23 @@ ${totalHariKoreksi} dari ${hariKerja} hari kerja`;
                   <td class="field-nip">${row.nip || "-"}</td>
                   <td class="field-nama">${row.nama || "-"}</td>
                   <td class="field-phone">${phoneNumber}</td>
-               <td class="field-pesan">
+                  <td class="field-pesan">
                     <div class="pesan-container">
-                    <div class="pesan-preview" id="pesan-preview-${perner}">${pesanGenerated.substring(
+                      <div class="pesan-preview" id="pesan-preview-${perner}">${pesanGenerated.substring(
             0,
             100
           )}...
+                      </div>
+                      <div style="display: flex; gap: 5px;">
+                        <button class="btn-view-pesan" onclick="viewFullPesan('${perner}')">
+                          📄 Lihat Pesan
+                        </button>
+                        <button class="btn-copy-pesan" onclick="copyPesanDirect('${perner}')">
+                          📋 Copy
+                        </button>
+                      </div>
                     </div>
-                    <div style="display: flex; gap: 5px;">
-                      <button class="btn-view-pesan" onclick="viewFullPesan('${perner}')">
-                        📄 Lihat Pesan
-                      </button>
-                      <button class="btn-copy-pesan" onclick="copyPesanDirect('${perner}')">
-                        📋 Copy
-                      </button>
-                    </div>
-                  </div>
-              </td>
+                  </td>
                   <td class="field-wa">
                     <a
                       id="wa-${perner}"
@@ -1612,49 +2002,8 @@ ${totalHariKoreksi} dari ${hariKerja} hari kerja`;
                       Button WA
                     </a>
                   </td>
-                  <td class="field-aksi">
-                    <div class="action-buttons">
-                      <button
-                        id="terkirim-${perner}"
-                        class="btn-success"
-                        onclick="handleAction('${perner}', 'success')"
-                        style="opacity: ${
-                          currentResult === "success" ? "1" : "0.7"
-                        }; background: ${
-            currentResult === "success" ? "#38a169" : "#48bb78"
-          }">
-                        Terkirim
-                      </button>
-                      <button
-                        id="gagal-${perner}"
-                        class="btn-danger"
-                        onclick="handleAction('${perner}', 'failed')"
-                        style="opacity: ${
-                          currentResult === "failed" ? "1" : "0.7"
-                        }; background: ${
-            currentResult === "failed" ? "#c53030" : "#e53e3e"
-          }">
-                        Gagal
-                      </button>
-                      <button
-                        id="reset-${perner}"
-                        class="btn-reset"
-                        onclick="handleAction('${perner}', 'reset')"
-                        style="opacity: ${
-                          currentResult === "pending" ? "1" : "0.7"
-                        }">
-                        Reset
-                      </button>
-                    </div>
-                  </td>
                   <td id="result-${perner}" class="field-result">
-                    ${
-                      currentResult === "success"
-                        ? '<span class="status-success">Terkirim</span>'
-                        : currentResult === "failed"
-                        ? '<span class="status-failed">Gagal</span>'
-                        : '<span class="status-pending"></span>'
-                    }
+                    ${statusHTML}
                   </td>
                 `;
 
@@ -1725,7 +2074,6 @@ ${totalHariKoreksi} dari ${hariKerja} hari kerja`;
       }
 
       // Setup search listeners
-      // === UBAH: search server-side dengan debounce ===
       function setupSearchListeners() {
         const searchInput = document.getElementById("searchInput");
         const debounced = debounce(() => {
@@ -1752,43 +2100,6 @@ ${totalHariKoreksi} dari ${hariKerja} hari kerja`;
             loadData(q);
           }
         });
-      }
-
-      // Perform search
-      function performSearch() {
-        const searchTerm = document
-          .getElementById("searchInput")
-          .value.toLowerCase()
-          .trim();
-        currentSearchTerm = searchTerm;
-
-        console.log(`🔍 Performing search: "${searchTerm}"`);
-
-        if (searchTerm) {
-          filteredData = allData.filter((row) => {
-            const perner = String(row.PERNER || "").toLowerCase();
-            return perner.includes(searchTerm);
-          });
-          showSearchResults();
-        } else {
-          filteredData = [...allData];
-          hideSearchResults();
-        }
-
-        currentPage = 1;
-        displayPage(currentPage);
-      }
-
-      // Show/Hide search results
-      function showSearchResults() {
-        const searchResults = document.getElementById("searchResults");
-        const searchResultsText = document.getElementById("searchResultsText");
-        searchResultsText.textContent = `🔍 Ditemukan ${filteredData.length.toLocaleString()} hasil untuk "${currentSearchTerm}"`;
-        searchResults.style.display = "block";
-      }
-
-      function hideSearchResults() {
-        document.getElementById("searchResults").style.display = "none";
       }
 
       // Clear search
@@ -1957,16 +2268,8 @@ ${totalHariKoreksi} dari ${hariKerja} hari kerja`;
             result = "Terkirim";
           } else if (dbResult === "Gagal") {
             result = "Gagal";
-          } else if (blastingResults[perner] === "success") {
-            result = "Terkirim";
-          } else if (blastingResults[perner] === "failed") {
-            result = "Gagal";
-          } else if (
-            dbResult === null ||
-            dbResult === undefined ||
-            dbResult === ""
-          ) {
-            result = "";
+          } else {
+            result = "Pending";
           }
 
           return {
@@ -1992,13 +2295,18 @@ ${totalHariKoreksi} dari ${hariKerja} hari kerja`;
           .toISOString()
           .replace(/[:.]/g, "-")
           .slice(0, -5);
-        const filename = `format_blasting_enhanced_${timestamp}`;
+        const filename = `blasting_monitor_${timestamp}`;
 
         if (format === "csv") {
           exportCSV(dataToExport, filename);
         } else if (format === "excel") {
           exportExcel(dataToExport, filename);
         }
+
+        showNotification(
+          `📊 Data berhasil diekspor sebagai ${format.toUpperCase()}`,
+          "success"
+        );
       }
 
       // Export to CSV
@@ -2072,6 +2380,109 @@ ${totalHariKoreksi} dari ${hariKerja} hari kerja`;
           document.body.removeChild(link);
         }
       }
+
+      // Copy pesan directly without opening modal
+      async function copyPesanDirect(perner) {
+        console.log(`📋 Direct copy pesan for PERNER: ${perner}`);
+
+        // Find the row data
+        const rowData = allData.find((row) => row.PERNER === perner);
+
+        if (!rowData) {
+          showNotification(`❌ Data untuk ${perner} tidak ditemukan`, "error");
+          return;
+        }
+
+        // Generate enhanced message
+        const fullPesan = generatePesan(rowData);
+
+        if (!fullPesan) {
+          showNotification(`❌ Gagal generate pesan untuk ${perner}`, "error");
+          return;
+        }
+
+        try {
+          await navigator.clipboard.writeText(fullPesan);
+          showNotification(`✅ Pesan ${perner} berhasil dicopy!`, "success");
+        } catch (err) {
+          console.error("Error copying to clipboard:", err);
+
+          // Fallback for older browsers
+          const textArea = document.createElement("textarea");
+          textArea.value = fullPesan;
+          textArea.style.position = "fixed";
+          textArea.style.opacity = "0";
+          document.body.appendChild(textArea);
+          textArea.select();
+          document.execCommand("copy");
+          document.body.removeChild(textArea);
+
+          showNotification(`✅ Pesan ${perner} berhasil dicopy!`, "success");
+        }
+      }
+
+      // Keyboard navigation
+      document.addEventListener("keydown", function (e) {
+        if (e.target.tagName.toLowerCase() === "input") return;
+        if (totalPages === 0) return;
+
+        switch (e.key) {
+          case "ArrowLeft":
+            if (currentPage > 1) goToPage(currentPage - 1);
+            break;
+          case "ArrowRight":
+            if (currentPage < totalPages) goToPage(currentPage + 1);
+            break;
+          case "Home":
+            goToPage(1);
+            break;
+          case "End":
+            goToPage(totalPages);
+            break;
+          case "F5":
+            e.preventDefault();
+            refreshData();
+            break;
+        }
+      });
+
+      // Close modal on Escape key
+      document.addEventListener("keydown", function (event) {
+        if (event.key === "Escape") {
+          closePesanModal();
+        }
+      });
+
+      // Initialize when page loads
+      document.addEventListener("DOMContentLoaded", function () {
+        console.log("🚀 Enhanced Blasting Monitor initialized");
+        console.log(`📋 Using BASE_URL: ${BASE_URL}`);
+
+        // Get query from URL if exists
+        const urlQ = new URL(location.href).searchParams.get("q") || "";
+        const searchInput = document.getElementById("searchInput");
+        if (urlQ) searchInput.value = urlQ;
+
+        // Load initial data and start monitoring
+        loadData(urlQ).then(() => {
+          setupSearchListeners();
+          startAutoRefresh();
+        });
+      });
+
+      // Handle page visibility changes
+      document.addEventListener("visibilitychange", function () {
+        if (document.hidden) {
+          // Page is hidden, stop auto-refresh to save resources
+          stopAutoRefresh();
+          console.log("📴 Page hidden - auto-refresh paused");
+        } else {
+          // Page is visible again, restart auto-refresh
+          startAutoRefresh();
+          refreshData(); // Immediate refresh when page becomes visible
+          console.log("📱 Page visible - auto-refresh resumed");
+        }
+      });
 
       // ======================================================
       // TESTING FUNCTIONS
@@ -2167,114 +2578,62 @@ ${totalHariKoreksi} dari ${hariKerja} hari kerja`;
         return stats;
       }
 
-      // Copy pesan directly without opening modal
-      async function copyPesanDirect(perner) {
-        console.log(`📋 Direct copy pesan for PERNER: ${perner}`);
+      // Monitor statistics changes
+      function monitorStatisticsChanges() {
+        const newStats = calculateStatistics(allData);
 
-        // Find the row data
-        const rowData = allData.find((row) => row.PERNER === perner);
+        // Check for changes
+        const hasChanges =
+          newStats.terkirim !== currentStats.terkirim ||
+          newStats.gagal !== currentStats.gagal ||
+          newStats.pending !== currentStats.pending;
 
-        if (!rowData) {
-          showNotification(`❌ Data untuk ${perner} tidak ditemukan`, "error");
-          return;
-        }
+        if (hasChanges) {
+          console.log("📈 Statistics changed detected:", newStats);
 
-        // Generate enhanced message
-        const fullPesan = generatePesan(rowData);
+          // Show notification about changes
+          const terkirimDiff = newStats.terkirim - currentStats.terkirim;
+          const gagalDiff = newStats.gagal - currentStats.gagal;
 
-        if (!fullPesan) {
-          showNotification(`❌ Gagal generate pesan untuk ${perner}`, "error");
-          return;
-        }
+          if (terkirimDiff > 0) {
+            showNotification(
+              `✅ ${terkirimDiff} pesan baru terkirim!`,
+              "success"
+            );
+          }
+          if (gagalDiff > 0) {
+            showNotification(`❌ ${gagalDiff} pesan gagal dikirim`, "error");
+          }
 
-        try {
-          await navigator.clipboard.writeText(fullPesan);
-          showNotification(`✅ Pesan ${perner} berhasil dicopy!`, "success");
-        } catch (err) {
-          console.error("Error copying to clipboard:", err);
-
-          // Fallback for older browsers
-          const textArea = document.createElement("textarea");
-          textArea.value = fullPesan;
-          textArea.style.position = "fixed";
-          textArea.style.opacity = "0";
-          document.body.appendChild(textArea);
-          textArea.select();
-          document.execCommand("copy");
-          document.body.removeChild(textArea);
-
-          showNotification(`✅ Pesan ${perner} berhasil dicopy!`, "success");
+          updateStatisticsDisplay(newStats);
         }
       }
 
-      // Keyboard navigation
-      document.addEventListener("keydown", function (e) {
-        if (e.target.tagName.toLowerCase() === "input") return;
-        if (totalPages === 0) return;
-
-        switch (e.key) {
-          case "ArrowLeft":
-            if (currentPage > 1) goToPage(currentPage - 1);
-            break;
-          case "ArrowRight":
-            if (currentPage < totalPages) goToPage(currentPage + 1);
-            break;
-          case "Home":
-            goToPage(1);
-            break;
-          case "End":
-            goToPage(totalPages);
-            break;
-        }
-      });
-
-      // Close modal on Escape key
-      document.addEventListener("keydown", function (event) {
-        if (event.key === "Escape") {
-          closePesanModal();
-        }
-      });
-
-      // Initialize when page loads
-      document.addEventListener("DOMContentLoaded", function () {
-        console.log("🚀 Enhanced Format Blasting initialized");
-        console.log(`📋 Using BASE_URL: ${BASE_URL}`);
-
-        // === UBAH: ambil q dari URL kalau ada
-        const urlQ = new URL(location.href).searchParams.get("q") || "";
-        const searchInput = document.getElementById("searchInput");
-        if (urlQ) searchInput.value = urlQ;
-
-        // load awal berdasarkan q
-        loadData(urlQ).then(() => {
-          setupSearchListeners();
-        });
-      });
-
-      // Auto-refresh every 10 minutes
-      // setInterval(loadData, 10 * 60 * 1000);
-      // === UBAH: refresh pakai query aktif
-      setInterval(() => loadData(currentSearchTerm || ""), 10 * 60 * 1000);
-
       // ======================================================
-      // CONSOLE COMMANDS for Testing
+      // CONSOLE COMMANDS for Testing and Monitoring
       // ======================================================
 
       console.log(`
-      🚀 ENHANCED FORMAT BLASTING - READY!
-      ==================================
+      🚀 ENHANCED BLASTING MONITOR - READY!
+      =====================================
+
+      Real-time Features:
+      - Auto-refresh setiap 30 detik
+      - Statistik real-time (terkirim/gagal/pending)
+      - Progress bar visual
+      - Monitoring mode khusus (tanpa tombol aksi)
 
       Quick Test Commands:
       - testEnhancedMessage()           // Test first PERNER
       - testEnhancedMessage("69890002") // Test specific PERNER
       - validateDailyDetails()          // Check data completeness
+      - refreshData()                   // Manual refresh
       - viewFullPesan("69890002")       // Open modal for specific PERNER
 
-      Expected Results:
-      - Daily details: 31 days per PERNER
-      - Message format: Summary + 31 daily sections
-      - Enhanced modal with statistics
-      - Download capability for long messages
+      Keyboard Shortcuts:
+      - F5: Manual refresh
+      - Arrow keys: Navigate pages
+      - Escape: Close modal
 
       Auto-validation will run after data loads...
       `);
