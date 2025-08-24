@@ -22,6 +22,9 @@ const api = (path, opts = {}) => {
   return fetch(`${BASE_URL}${p}`, opts);
 };
 
+console.log("ENV host =", location.hostname);
+console.log("BASE_URL (sebelum)= ", window.BASE_URL);
+
 function debounce(func, wait) {
   let timeout;
   return function executedFunction(...args) {
