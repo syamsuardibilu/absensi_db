@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Debug Network Access</title>
+    <style>
+      body {
+        font-family: "Segoe UI", sans-serif;
+        padding: 20px;
+        background: #f5f7fa;
+      }
+      .debug-container {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        margin-bottom: 20px;
+      }
+      .status {
+        padding: 10px 15px;
+        border-radius: 4px;
+        margin: 10px 0;
+      }
+      .success {
+        background: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+      }
+      .error {
+        background: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+      }
+      .info {
+        background: #d1ecf1;
+        color: #0c5460;
+        border: 1px solid #bee5eb;
+      }
+      .warning {
+        background: #fff3cd;
+        color: #856404;
+        border: 1px solid #ffeaa7;
+      }
+      code {
+        background: #f8f9fa;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-family: "Courier New", monospace;
+      }
+      button {
+        background: #007bff;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 4px;
+        cursor: pointer;
+        margin: 5px;
+      }
+      button:hover {
+        background: #0056b3;
+      }
+      .test-result {
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        padding: 15px;
+        border-radius: 4px;
+        margin: 10px 0;
+        white-space: pre-wrap;
+        font-family: monospace;
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="debug-container">
+      <h2>🔍 Network Access Debugger</h2>
+      <div id="currentInfo" class="info">
+        <strong>Current Access Info:</strong><br />
+        Host: <code id="currentHost">-</code><br />
+        Protocol: <code id="currentProtocol">-</code><br />
+        Full URL: <code id="currentUrl">-</code><br />
+        Detected Base URL: <code id="detectedBaseUrl">-</code>
+      </div>
+    </div>
+
+    <div class="debug-container">
+      <h3>🧪 API Endpoint Tests</h3>
+      <button onclick="testEndpoint('/api/health')">Test Health API</button>
+      <button onclick="testEndpoint('/api/ping-db')">Test Database</button>
+      <button onclick="testEndpoint('/getRekapAbsensiWithDaily')">
+        Test Data API
+      </button>
+      <button onclick="testEndpoint('/getDataPegawai')">
+        Test Pegawai API
+      </button>
+
+      <div id="testResults"></div>
+    </div>
+
+    <div class="debug-container">
+      <h3>🔧 Base URL Configuration Test</h3>
+      <p>Test different base URL configurations:</p>
+
+      <button onclick="testWithBaseUrl('http://192.168.18.32:3000')">
+        Use LAN IP
+      </button>
+      <button onclick="testWithBaseUrl('http://localhost:3000')">
+        Use Localhost
+      </button>
+      <button onclick="testWithBaseUrl('')">Use Relative URLs</button>
+
+      <div id="baseUrlResults"></div>
+    </div>
+
+    <div class="debug-container">
+      <h3>📋 Network Information</h3>
+      <div id="networkInfo" class="info">Loading network info...</div>
+    </div>
+
+    <script>
+      // Current page info
+      function updateCurrentInfo() {
+        const host = window.location.hostname;
+        const protocol = window.location.protocol;
+        const port = window.location.port;
+        const fullUrl = window.location.href;
+
+        document.getElementById("currentHost").textContent = host;
+        document.getElementById("currentProtocol").textContent = protocol;
+        document.getElementById("currentUrl").textContent = fullUrl;
+
+        // Base URL detection logic (same as in blasting_monitor_stat.html)
+        const PROD_API = "https://absensi-db.onrender.com";
+        const LOCAL_API = "http://localhost:3000";
+
+        const isLocalHost = /^(localhost|127\.0\.0\.1)$/.test(host);
+        const isPrivateLAN =
+          /^(10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+)$/.test(
+            host
+          );
+
+        let detectedBaseUrl;
+        if (isLocalHost || isPrivateLAN) {
+          // For LAN access, construct base URL from current location
+          detectedBaseUrl = `${protocol}//${host}${port ? ":" + port : ""}`;
+        } else {
+          detectedBaseUrl = PROD_API;
+        }
+
+        document.getElementById("detectedBaseUrl").textContent =
+          detectedBaseUrl;
+
+        return detectedBaseUrl;
+      }
+
+      // Test specific endpoint
+      async function testEndpoint(endpoint) {
+        const baseUrl = updateCurrentInfo();
+        const fullUrl = baseUrl + endpoint;
+
+        const resultDiv = document.getElementById("testResults");
+        resultDiv.innerHTML += `\n🔄 Testing: ${fullUrl}`;
+
+        try {
+          const start = Date.now();
+          const response = await fetch(fullUrl);
+          const duration = Date.now() - start;
+
+          if (response.ok) {
+            const data = await response.text();
+            const preview =
+              data.length > 200 ? data.substring(0, 200) + "..." : data;
+
+            resultDiv.innerHTML += `\n✅ SUCCESS (${duration}ms): ${response.status}`;
+            resultDiv.innerHTML += `\n   Response preview: ${preview}`;
+
+            if (endpoint.includes("getRekapAbsensiWithDaily")) {
+              try {
+                const jsonData = JSON.parse(data);
+                resultDiv.innerHTML += `\n   📊 Data count: ${
+                  jsonData.length || "N/A"
+                } records`;
+              } catch (e) {
+                resultDiv.innerHTML += `\n   ⚠️  Not JSON data`;
+              }
+            }
+          } else {
+            resultDiv.innerHTML += `\n❌ FAILED: ${response.status} ${response.statusText}`;
+          }
+        } catch (error) {
+          resultDiv.innerHTML += `\n🚫 ERROR: ${error.message}`;
+        }
+
+        resultDiv.innerHTML += `\n${"=".repeat(50)}`;
+        resultDiv.scrollTop = resultDiv.scrollHeight;
+      }
+
+      // Test with different base URLs
+      async function testWithBaseUrl(customBaseUrl) {
+        const resultDiv = document.getElementById("baseUrlResults");
+        resultDiv.innerHTML += `\n🔄 Testing with Base URL: ${customBaseUrl}`;
+
+        const testUrl = customBaseUrl
+          ? customBaseUrl + "/getRekapAbsensiWithDaily"
+          : "/getRekapAbsensiWithDaily";
+
+        try {
+          const start = Date.now();
+          const response = await fetch(testUrl);
+          const duration = Date.now() - start;
+
+          if (response.ok) {
+            const data = await response.text();
+            try {
+              const jsonData = JSON.parse(data);
+              resultDiv.innerHTML += `\n✅ SUCCESS (${duration}ms): Found ${
+                jsonData.length || "N/A"
+              } records`;
+
+              if (jsonData.length > 0) {
+                const sample = jsonData[0];
+                resultDiv.innerHTML += `\n   📋 Sample PERNER: ${
+                  sample.PERNER || "N/A"
+                }`;
+                resultDiv.innerHTML += `\n   📋 Sample NAMA: ${
+                  sample.nama || "N/A"
+                }`;
+                resultDiv.innerHTML += `\n   📅 Daily details: ${
+                  sample.daily_details?.length || 0
+                } days`;
+              }
+            } catch (e) {
+              resultDiv.innerHTML += `\n✅ SUCCESS but not JSON: ${data.substring(
+                0,
+                100
+              )}...`;
+            }
+          } else {
+            resultDiv.innerHTML += `\n❌ FAILED: ${response.status} ${response.statusText}`;
+          }
+        } catch (error) {
+          resultDiv.innerHTML += `\n🚫 ERROR: ${error.message}`;
+        }
+
+        resultDiv.innerHTML += `\n${"=".repeat(50)}`;
+        resultDiv.scrollTop = resultDiv.scrollHeight;
+      }
+
+      // Network information
+      function displayNetworkInfo() {
+        const info = {
+          "User Agent": navigator.userAgent,
+          Language: navigator.language,
+          Online: navigator.onLine,
+          Connection: navigator.connection
+            ? `${navigator.connection.effectiveType} (${navigator.connection.downlink}Mbps)`
+            : "N/A",
+          Platform: navigator.platform,
+          "Current URL": window.location.href,
+          Referrer: document.referrer || "Direct access",
+        };
+
+        let infoHtml = "";
+        for (const [key, value] of Object.entries(info)) {
+          infoHtml += `<strong>${key}:</strong> ${value}<br>`;
+        }
+
+        document.getElementById("networkInfo").innerHTML = infoHtml;
+      }
+
+      // Initialize
+      document.addEventListener("DOMContentLoaded", function () {
+        updateCurrentInfo();
+        displayNetworkInfo();
+
+        // Auto-test critical endpoints
+        setTimeout(() => {
+          testEndpoint("/api/health");
+        }, 1000);
+
+        setTimeout(() => {
+          testEndpoint("/getRekapAbsensiWithDaily");
+        }, 2000);
+      });
+
+      // Add styles for test results
+      const style = document.createElement("style");
+      style.textContent = `
+            #testResults, #baseUrlResults {
+                background: #f8f9fa;
+                border: 1px solid #dee2e6;
+                padding: 15px;
+                border-radius: 4px;
+                margin: 10px 0;
+                white-space: pre-wrap;
+                font-family: 'Courier New', monospace;
+                font-size: 12px;
+                max-height: 300px;
+                overflow-y: auto;
+            }
+        `;
+      document.head.appendChild(style);
+    </script>
+  </body>
+</html>

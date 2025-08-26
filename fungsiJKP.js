@@ -363,12 +363,22 @@ function hitungJKPNormal(row) {
     jmup = jmr < jms ? jms : jmr;
     jpup = jpr > jps ? jps : jpr;
 
+    // KODE BARU (GANTI):
     const jmi = "12:00:00";
     const jsi = isJumat ? "13:00:00" : "12:30:00";
+    const waktuIstirahatMenit = isJumat ? 60 : 30;
 
-    if (jmup > jmi && jpup < jsi) diMenit = 0;
+    // Logika baru: cek apakah tidak melintasi waktu istirahat
+    const keduanyaSebelumIstirahat = jmup < jmi && jpup < jmi;
+    const keduanyaSetelahIstirahat = jmup > jsi && jpup > jsi;
+    const tidakDipotongIstirahat =
+      keduanyaSebelumIstirahat || keduanyaSetelahIstirahat;
 
-    durasi = Math.max(0, selisihDetik(jpup, jmup) / 3600 - diMenit / 60);
+    const durasiMentah = selisihDetik(jpup, jmup) / 3600;
+    const potonganIstirahat = tidakDipotongIstirahat
+      ? 0
+      : waktuIstirahatMenit / 60;
+    durasi = Math.max(0, durasiMentah - potonganIstirahat);
   } else {
     // Penanganan jam kosong atau tidak valid
     if (!jmr && !jpr) {
@@ -536,7 +546,7 @@ function hitungJKPShift(row) {
           jenis === "Shift2-Malam" &&
           jmr_c &&
           jmr_c !== "-" &&
-          jamDalamRentang(jmr_c, "00:00:00", "00:05:00")
+          jamDalamRentang(jmr_c, "00:00:00", "00:03:00")
         ) {
           // console.log(`🔧 ✅ CLEANSING SHIFT MALAM - IN: ${jmr_c} → 00:00:00`);
           jmr_c = "00:00:00";
@@ -547,7 +557,7 @@ function hitungJKPShift(row) {
           jenis === "Shift2-Siang" &&
           jpr_c &&
           jpr_c !== "-" &&
-          jamDalamRentang(jpr_c, "23:55:00", "23:59:59")
+          jamDalamRentang(jpr_c, "23:57:00", "23:59:59")
         ) {
           // console.log(`🔧 ✅ CLEANSING SHIFT SIANG - OUT: ${jpr_c} → 24:00:00`);
           jpr_c = "24:00:00";
@@ -1097,4 +1107,3 @@ module.exports = {
   hitungJKPShift,
   hitungJKPFinal,
 };
-

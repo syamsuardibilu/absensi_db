@@ -932,20 +932,21 @@
 
     <script>
       // BASE URL untuk API calls
-      const PROD_API = "https://absensi-db.onrender.com"; // API di Render
-      const LOCAL_API = "http://localhost:3000"; // Dev lokal
+      function detectBaseUrl() {
+        const host = location.hostname;
+        const port = location.port;
+        const protocol = location.protocol;
 
-      const host = location.hostname;
-      const isLocalHost = /^(localhost|127\.0\.0\.1)$/.test(host);
-      const isPrivateLAN =
-        /^(10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+)$/.test(
-          host
-        );
+        // 🎯 KEY FIX: Always use current host+port for API calls
+        const currentBaseUrl = `${protocol}//${host}${port ? ":" + port : ""}`;
 
-      const BASE_URL =
-        (window.BASE_URL && window.BASE_URL.trim()) ||
-        (isLocalHost || isPrivateLAN ? LOCAL_API : PROD_API);
+        console.log("🔗 Using BASE_URL:", currentBaseUrl);
+        return currentBaseUrl;
+      }
 
+      const BASE_URL = detectBaseUrl();
+
+      // api function tetap sama
       const api = (path, opts = {}) => {
         const p = path.startsWith("/") ? path : `/${path}`;
         return fetch(`${BASE_URL}${p}`, opts);

@@ -19,12 +19,13 @@ const BASE_URL =
 // Helper fetch
 const api = (path, opts = {}) => {
   const p = path.startsWith("/") ? path : `/${path}`;
-  // Same-origin fetch: use the page's own origin
-  return fetch(p, opts);
+  return fetch(`${BASE_URL}${p}`, opts);
 };
 
 console.log("ENV host =", location.hostname);
-console.log("Using same-origin for API:", location.origin);function debounce(func, wait) {
+console.log("BASE_URL (sebelum)= ", window.BASE_URL);
+
+function debounce(func, wait) {
   let timeout;
   return function executedFunction(...args) {
     const later = () => {

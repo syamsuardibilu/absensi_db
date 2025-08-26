@@ -548,216 +548,26 @@ app.post("/hapus-data-db", (req, res) => {
         "daily_in = NULL, daily_out = NULL, daily_in_cleansing = NULL, daily_out_cleansing = NULL, correction_in = NULL, correction_out = NULL";
       break;
     case "att_abs_daily":
-      kolom = `
-      att_daily = NULL, abs_daily = NULL,
-        status_ganda_att_abs = NULL,
-        status_ganda_ws_rule = NULL,
-        att_daily_new = NULL,
-        abs_daily_new = NULL,
-        att_sap_new = NULL,
-        abs_sap_new = NULL,
-        sppd_umum_new = NULL,
-        value_att_abs = NULL,
-        is_att_abs = NULL,
-        jenis_jam_kerja_shift_daily_new = NULL,
-        jenis_jam_kerja_shift_sap_new = NULL,
-        value_shift_daily_sap = NULL,
-        status_jam_kerja = NULL,
-        is_shift_daily_sap = NULL,
-        kategori_jam_kerja = NULL,
-        komponen_perhitungan_jkp = NULL,
-        status_absen = NULL,
-        status_in_out = NULL,
-        ket_in_out = NULL,
-        keterangan_kehadiran = NULL,
-        kategori_hit_jkp = NULL,
-        jam_kerja_pegawai = NULL,
-        jam_kerja_pegawai_cleansing = NULL,
-        jam_kerja_seharusnya = NULL,
-        persentase = NULL
-      `;
+      kolom = "att_daily = NULL, abs_daily = NULL";
       break;
     case "att_sap":
-      kolom = `
-      att_sap = NULL,
-      status_ganda_att_abs = NULL,
-        status_ganda_ws_rule = NULL,
-        att_daily_new = NULL,
-        abs_daily_new = NULL,
-        att_sap_new = NULL,
-        abs_sap_new = NULL,
-        sppd_umum_new = NULL,
-        value_att_abs = NULL,
-        is_att_abs = NULL,
-        jenis_jam_kerja_shift_daily_new = NULL,
-        jenis_jam_kerja_shift_sap_new = NULL,
-        value_shift_daily_sap = NULL,
-        status_jam_kerja = NULL,
-        is_shift_daily_sap = NULL,
-        kategori_jam_kerja = NULL,
-        komponen_perhitungan_jkp = NULL,
-        status_absen = NULL,
-        status_in_out = NULL,
-        ket_in_out = NULL,
-        keterangan_kehadiran = NULL,
-        kategori_hit_jkp = NULL,
-        jam_kerja_pegawai = NULL,
-        jam_kerja_pegawai_cleansing = NULL,
-        jam_kerja_seharusnya = NULL,
-        persentase = NULL
-      `;
+      kolom = "att_sap = NULL";
       break;
     case "abs_sap":
-      kolom = `
-      abs_sap = NULL,
-  status_ganda_att_abs = NULL,
-        status_ganda_ws_rule = NULL,
-        att_daily_new = NULL,
-        abs_daily_new = NULL,
-        att_sap_new = NULL,
-        abs_sap_new = NULL,
-        sppd_umum_new = NULL,
-        value_att_abs = NULL,
-        is_att_abs = NULL,
-        jenis_jam_kerja_shift_daily_new = NULL,
-        jenis_jam_kerja_shift_sap_new = NULL,
-        value_shift_daily_sap = NULL,
-        status_jam_kerja = NULL,
-        is_shift_daily_sap = NULL,
-        kategori_jam_kerja = NULL,
-        komponen_perhitungan_jkp = NULL,
-        status_absen = NULL,
-        status_in_out = NULL,
-        ket_in_out = NULL,
-        keterangan_kehadiran = NULL,
-        kategori_hit_jkp = NULL,
-        jam_kerja_pegawai = NULL,
-        jam_kerja_pegawai_cleansing = NULL,
-        jam_kerja_seharusnya = NULL,
-        persentase = NULL
-      `;
+      kolom = "abs_sap = NULL";
       break;
     case "sppd_umum":
-      kolom = `
-      sppd_umum = NULL,
-    status_ganda_att_abs = NULL,
-        status_ganda_ws_rule = NULL,
-        att_daily_new = NULL,
-        abs_daily_new = NULL,
-        att_sap_new = NULL,
-        abs_sap_new = NULL,
-        sppd_umum_new = NULL,
-        value_att_abs = NULL,
-        is_att_abs = NULL,
-        jenis_jam_kerja_shift_daily_new = NULL,
-        jenis_jam_kerja_shift_sap_new = NULL,
-        value_shift_daily_sap = NULL,
-        status_jam_kerja = NULL,
-        is_shift_daily_sap = NULL,
-        kategori_jam_kerja = NULL,
-        komponen_perhitungan_jkp = NULL,
-        status_absen = NULL,
-        status_in_out = NULL,
-        ket_in_out = NULL,
-        keterangan_kehadiran = NULL,
-        kategori_hit_jkp = NULL,
-        jam_kerja_pegawai = NULL,
-        jam_kerja_pegawai_cleansing = NULL,
-        jam_kerja_seharusnya = NULL,
-        persentase = NULL
-      `;
+      kolom = "sppd_umum = NULL";
       break;
     case "work_schedule":
-      kolom = `
-      ws_rule = NULL,
-    status_ganda_att_abs = NULL,
-        status_ganda_ws_rule = NULL,
-        att_daily_new = NULL,
-        abs_daily_new = NULL,
-        att_sap_new = NULL,
-        abs_sap_new = NULL,
-        sppd_umum_new = NULL,
-        value_att_abs = NULL,
-        is_att_abs = NULL,
-        jenis_jam_kerja_shift_daily_new = NULL,
-        jenis_jam_kerja_shift_sap_new = NULL,
-        value_shift_daily_sap = NULL,
-        status_jam_kerja = NULL,
-        is_shift_daily_sap = NULL,
-        kategori_jam_kerja = NULL,
-        komponen_perhitungan_jkp = NULL,
-        status_absen = NULL,
-        status_in_out = NULL,
-        ket_in_out = NULL,
-        keterangan_kehadiran = NULL,
-        kategori_hit_jkp = NULL,
-        jam_kerja_pegawai = NULL,
-        jam_kerja_pegawai_cleansing = NULL,
-        jam_kerja_seharusnya = NULL,
-        persentase = NULL
-      `;
+      kolom = "ws_rule = NULL";
       break;
     case "substitution_daily":
-      kolom = `
-      jenis_jam_kerja_shift_daily = NULL,
-    status_ganda_att_abs = NULL,
-        status_ganda_ws_rule = NULL,
-        att_daily_new = NULL,
-        abs_daily_new = NULL,
-        att_sap_new = NULL,
-        abs_sap_new = NULL,
-        sppd_umum_new = NULL,
-        value_att_abs = NULL,
-        is_att_abs = NULL,
-        jenis_jam_kerja_shift_daily_new = NULL,
-        jenis_jam_kerja_shift_sap_new = NULL,
-        value_shift_daily_sap = NULL,
-        status_jam_kerja = NULL,
-        is_shift_daily_sap = NULL,
-        kategori_jam_kerja = NULL,
-        komponen_perhitungan_jkp = NULL,
-        status_absen = NULL,
-        status_in_out = NULL,
-        ket_in_out = NULL,
-        keterangan_kehadiran = NULL,
-        kategori_hit_jkp = NULL,
-        jam_kerja_pegawai = NULL,
-        jam_kerja_pegawai_cleansing = NULL,
-        jam_kerja_seharusnya = NULL,
-        persentase = NULL
-      `;
+      kolom = "jenis_jam_kerja_shift_daily = NULL";
       break;
     case "substitution_sap":
-      kolom = `
-      jenis_jam_kerja_shift_sap = NULL,
-     status_ganda_att_abs = NULL,
-        status_ganda_ws_rule = NULL,
-        att_daily_new = NULL,
-        abs_daily_new = NULL,
-        att_sap_new = NULL,
-        abs_sap_new = NULL,
-        sppd_umum_new = NULL,
-        value_att_abs = NULL,
-        is_att_abs = NULL,
-        jenis_jam_kerja_shift_daily_new = NULL,
-        jenis_jam_kerja_shift_sap_new = NULL,
-        value_shift_daily_sap = NULL,
-        status_jam_kerja = NULL,
-        is_shift_daily_sap = NULL,
-        kategori_jam_kerja = NULL,
-        komponen_perhitungan_jkp = NULL,
-        status_absen = NULL,
-        status_in_out = NULL,
-        ket_in_out = NULL,
-        keterangan_kehadiran = NULL,
-        kategori_hit_jkp = NULL,
-        jam_kerja_pegawai = NULL,
-        jam_kerja_pegawai_cleansing = NULL,
-        jam_kerja_seharusnya = NULL,
-        persentase = NULL
-      `;
+      kolom = "jenis_jam_kerja_shift_sap = NULL";
       break;
-
     default:
       return res.status(400).json({ message: "❌ Jenis data tidak dikenal." });
   }
@@ -4858,55 +4668,43 @@ app.post("/generate-rekap-absensi", (req, res) => {
                   WHEN LOWER(o.jenis_hari_realisasi) = 'hari kerja' THEN 1 
                 END
               ) AS HARI_KERJA_REALISASI,
-             COUNT(
-                CASE 
-                  WHEN LOWER(TRIM(o.jenis_hari_realisasi)) = 'bukan hari kerja' 
-                  THEN 1 
-                END
-              ) AS HARI_LIBUR_REALISASI,
+              COUNT(CASE WHEN o.jenis_hari_realisasi LIKE '%BUKAN HARI KERJA%' THEN 1 END) as HARI_LIBUR_REALISASI,
               
-           -- DATA KOREKSI (exclusion: hari wajib kerja & value_att_abs kosong)
-                COUNT(CASE WHEN
-                  COALESCE(LOWER(TRIM(o.correction_in)),  '') = 'tanpa koreksi' AND
-                  COALESCE(LOWER(TRIM(o.correction_out)), '') = 'tanpa koreksi' AND
-                  COALESCE(LOWER(TRIM(o.jenis_hari_realisasi)), '') <> 'bukan hari kerja' AND
-                  (o.value_att_abs IS NULL OR TRIM(o.value_att_abs) = '' OR LOWER(TRIM(o.value_att_abs)) = 'null')
-                THEN 1 END) AS TOTAL_HARI_TANPA_KOREKSI,
+              -- DATA KOREKSI (dengan exclusion logic)
+              COUNT(CASE WHEN 
+                (o.correction_in = 'tanpa koreksi' AND o.correction_out = 'tanpa koreksi') 
+                AND o.jenis_hari_realisasi NOT LIKE '%Bukan hari kerja%' 
+                AND (o.value_att_abs IS NULL OR o.value_att_abs = '')
+                THEN 1 END) as TOTAL_HARI_TANPA_KOREKSI,
+              COUNT(CASE WHEN 
+                (o.correction_in = 'koreksi' OR o.correction_out = 'koreksi') 
+                AND o.jenis_hari_realisasi NOT LIKE '%Bukan hari kerja%' 
+                AND (o.value_att_abs IS NULL OR o.value_att_abs = '')
+                THEN 1 END) as TOTAL_HARI_KOREKSI,
+             COUNT(CASE WHEN 
+                COALESCE(LOWER(TRIM(o.correction_in)), '') = 'koreksi'
+                AND COALESCE(LOWER(TRIM(o.correction_out)), '') = 'tanpa koreksi'
+                AND COALESCE(LOWER(TRIM(o.jenis_hari_realisasi)), '') <> 'bukan hari kerja'
+                AND (o.value_att_abs IS NULL 
+                    OR TRIM(o.value_att_abs) = '' 
+                    OR LOWER(TRIM(o.value_att_abs)) = 'null')
+              THEN 1 END) AS KOREKSI_IN,
 
-                -- Total hari koreksi = IN saja + OUT saja + IN&OUT (eksklusif, tanpa dobel)
-                COUNT(CASE WHEN
-                  (
-                    (COALESCE(LOWER(TRIM(o.correction_in)),  '') = 'koreksi' AND COALESCE(LOWER(TRIM(o.correction_out)), '') = 'tanpa koreksi') OR
-                    (COALESCE(LOWER(TRIM(o.correction_in)),  '') = 'tanpa koreksi' AND COALESCE(LOWER(TRIM(o.correction_out)), '') = 'koreksi') OR
-                    (COALESCE(LOWER(TRIM(o.correction_in)),  '') = 'koreksi' AND COALESCE(LOWER(TRIM(o.correction_out)), '') = 'koreksi')
-                  ) AND
-                  COALESCE(LOWER(TRIM(o.jenis_hari_realisasi)), '') <> 'bukan hari kerja' AND
-                  (o.value_att_abs IS NULL OR TRIM(o.value_att_abs) = '' OR LOWER(TRIM(o.value_att_abs)) = 'null')
-                THEN 1 END) AS TOTAL_HARI_KOREKSI,
+              COUNT(CASE WHEN 
+                COALESCE(LOWER(TRIM(o.correction_out)), '') = 'koreksi'
+                AND COALESCE(LOWER(TRIM(o.correction_in)), '') = 'tanpa koreksi'
+                AND COALESCE(LOWER(TRIM(o.jenis_hari_realisasi)), '') <> 'bukan hari kerja'
+                AND (o.value_att_abs IS NULL 
+                    OR TRIM(o.value_att_abs) = '' 
+                    OR LOWER(TRIM(o.value_att_abs)) = 'null')
+              THEN 1 END) AS KOREKSI_OUT,
 
-                -- KOREKSI_IN: IN = 'koreksi' & OUT = 'tanpa koreksi'
-                COUNT(CASE WHEN
-                  COALESCE(LOWER(TRIM(o.correction_in)),  '') = 'koreksi' AND
-                  COALESCE(LOWER(TRIM(o.correction_out)), '') = 'tanpa koreksi' AND
-                  COALESCE(LOWER(TRIM(o.jenis_hari_realisasi)), '') <> 'bukan hari kerja' AND
-                  (o.value_att_abs IS NULL OR TRIM(o.value_att_abs) = '' OR LOWER(TRIM(o.value_att_abs)) = 'null')
-                THEN 1 END) AS KOREKSI_IN,
-
-                -- KOREKSI_OUT: OUT = 'koreksi' & IN = 'tanpa koreksi'
-                COUNT(CASE WHEN
-                  COALESCE(LOWER(TRIM(o.correction_out)), '') = 'koreksi' AND
-                  COALESCE(LOWER(TRIM(o.correction_in)),  '') = 'tanpa koreksi' AND
-                  COALESCE(LOWER(TRIM(o.jenis_hari_realisasi)), '') <> 'bukan hari kerja' AND
-                  (o.value_att_abs IS NULL OR TRIM(o.value_att_abs) = '' OR LOWER(TRIM(o.value_att_abs)) = 'null')
-                THEN 1 END) AS KOREKSI_OUT,
-
-                -- KOREKSI_IN_OUT: keduanya 'koreksi'
-                COUNT(CASE WHEN
+              COUNT(CASE WHEN
                   COALESCE(LOWER(TRIM(o.correction_in)),  '') = 'koreksi' AND
                   COALESCE(LOWER(TRIM(o.correction_out)), '') = 'koreksi' AND
                   COALESCE(LOWER(TRIM(o.jenis_hari_realisasi)), '') <> 'bukan hari kerja' AND
                   (o.value_att_abs IS NULL OR TRIM(o.value_att_abs) = '' OR LOWER(TRIM(o.value_att_abs)) = 'null')
-                THEN 1 END) AS KOREKSI_IN_OUT,
+                THEN 1 END) AS KOREKSI_IN_OUT
 
               
               -- POLA JAM KERJA NORMAL
