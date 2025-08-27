@@ -47,7 +47,7 @@ const os = require("os");
 
 const NODE_ENV = process.env.NODE_ENV || "development";
 const HOST = process.env.HOST || "0.0.0.0";
-const PORT = Number(process.env.PORT || 3000);
+const PORT = Number(process.env.PORT || 8080);
 
 // Cari IP LAN (IPv4 non-internal)
 function getLANIP() {
@@ -3711,7 +3711,7 @@ app.post("/update-status-absen-cleansing", (req, res) => {
         // 🔺 PRIORITAS BARU:
         // Jika WAJIB KERJA dan ada ATT/ABS khusus → SPPD/TL/Cuti/Ijin
         if (isFilled(value_att_abs)) {
-          status_absen = "SPPD/Tugas Luar/Cuti/Ijin";
+          status_absen = "-";
         } else {
           // Tidak ada ATT/ABS khusus → cek kelengkapan absensi cleansing
           const adaIn = daily_in_cleansing !== null;
@@ -5419,7 +5419,7 @@ app.get("/getRekapAbsensi", (req, res) => {
       periodeTahun = tanggalSample.getFullYear();
     }
 
-    console.log(`📅 Periode absensi: ${periodeBulan} ${periodeTahun}`);
+    // console.log(`📅 Periode absensi: ${periodeBulan} ${periodeTahun}`);
 
     // Step 2: Build enhanced search query
     let whereClause = "";
@@ -6543,7 +6543,7 @@ app.post("/generateMissingDataPegawai", (req, res) => {
         nip: `99999${perner.slice(-4)}`, // Generate dummy NIP
         nama: `Pegawai ${perner}`, // Generate dummy nama
         bidang: "Belum Diisi", // Default bidang
-        no_telp: "081355265063", // Default phone
+        no_telp: "085259048398", // Default phone
       };
     });
 
@@ -6716,7 +6716,7 @@ app.post("/autoPopulatePegawai", (req, res) => {
 
 app.get("/getRekapAbsensiWithDaily", (req, res) => {
   const startTime = Date.now();
-  console.log("🚀 Fetching rekap_absensi with daily details...");
+  // console.log("🚀 Fetching rekap_absensi with daily details...");
 
   // Util: format YYYY-MM-DD tanpa risiko offset timezone
   const fmtDate = (d) => {
@@ -6775,7 +6775,7 @@ app.get("/getRekapAbsensiWithDaily", (req, res) => {
       endDate = new Date(periodeTahun, tanggalSample.getMonth() + 2, 0);
     }
 
-    console.log(`📅 Periode absensi: ${periodeBulan} ${periodeTahun}`);
+    // console.log(`📅 Periode absensi: ${periodeBulan} ${periodeTahun}`);
 
     // === Query param pencarian (lebih ketat) ===
     const q = (req.query.q || "").trim();
@@ -6880,9 +6880,9 @@ app.get("/getRekapAbsensiWithDaily", (req, res) => {
       }
 
       const duration = Date.now() - startTime;
-      console.log(
-        `✅ Data with daily details fetched: ${results.length} records in ${duration}ms`
-      );
+      // console.log(
+      //   `✅ Data with daily details fetched: ${results.length} records in ${duration}ms`
+      // );
 
       // Step 3: Group data by PERNER (summary + daily_details array)
       const groupedData = {};
@@ -6975,15 +6975,15 @@ app.get("/getRekapAbsensiWithDaily", (req, res) => {
           (sum, item) => sum + item.daily_details.length,
           0
         );
-        console.log(`📊 Grouping Statistics:`);
-        console.log(`   - Total PERNER: ${finalResults.length}`);
-        console.log(`   - Total daily records: ${totalDailyRecords}`);
-        console.log(
-          `   - Sample daily details count: ${sampleData.daily_details.length}`
-        );
-        console.log(
-          `   - Sample PERNER: ${sampleData.PERNER} (${sampleData.nama})`
-        );
+        // console.log(`📊 Grouping Statistics:`);
+        // console.log(`   - Total PERNER: ${finalResults.length}`);
+        // console.log(`   - Total daily records: ${totalDailyRecords}`);
+        // console.log(
+        //   `   - Sample daily details count: ${sampleData.daily_details.length}`
+        // );
+        // console.log(
+        //   `   - Sample PERNER: ${sampleData.PERNER} (${sampleData.nama})`
+        // );
       }
 
       res.json(finalResults);
@@ -8660,6 +8660,575 @@ app.post("/fix-missing-data-pegawai", (req, res) => {
       });
     });
   });
+});
+
+// Add this endpoint to your existing server.js file
+
+// ======================================================
+// BULK UPLOAD DATA PEGAWAI ENDPOINT
+// ======================================================
+
+// Bulk upload endpoint for file-based data pegawai upload
+app.post("/api/data_pegawai/bulk_upload", (req, res) => {
+  const startTime = Date.now();
+  console.log("📁 Starting bulk upload data pegawai from file...");
+
+  const { data, filename, total_records } = req.body;
+
+  // Input validation
+  if (!data || !Array.isArray(data) || data.length === 0) {
+    console.warn("⚠️ Invalid or empty data received");
+    return res.status(400).json({
+      success: false,
+      message: "❌ Data tidak valid atau kosong",
+      error: "No data provided",
+    });
+  }
+
+  if (data.length > 5000) {
+    console.warn(`⚠️ Too many records: ${data.length}`);
+    return res.status(400).json({
+      success: false,
+      message: "❌ Terlalu banyak data. Maksimal 5000 records per upload",
+      error: "Record limit exceeded",
+    });
+  }
+
+  console.log(
+    `📊 Processing ${data.length} records from file: ${filename || "unknown"}`
+  );
+
+  // Server-side validation
+  const validatedData = [];
+  const errors = [];
+  const pernerSet = new Set();
+  const nipSet = new Set();
+
+  // Get column mappings (handle different case variations)
+  const getFieldValue = (row, field) => {
+    const keys = Object.keys(row);
+    const matchingKey = keys.find(
+      (key) =>
+        key.toLowerCase().includes(field.toLowerCase()) ||
+        field.toLowerCase().includes(key.toLowerCase())
+    );
+    return matchingKey ? String(row[matchingKey] || "").trim() : "";
+  };
+
+  // Validate each record
+  data.forEach((row, index) => {
+    const rowNum = index + 1;
+    const errors_for_row = [];
+
+    // Extract and clean data using flexible field matching
+    const perner = getFieldValue(row, "perner");
+    const nip = getFieldValue(row, "nip");
+    const nama = getFieldValue(row, "nama");
+    const bidang = getFieldValue(row, "bidang");
+    const no_telp =
+      getFieldValue(row, "no_telp") ||
+      getFieldValue(row, "phone") ||
+      getFieldValue(row, "telp");
+
+    // Required field validation
+    if (!perner) errors_for_row.push("PERNER kosong");
+    if (!nip) errors_for_row.push("NIP kosong");
+    if (!nama) errors_for_row.push("Nama kosong");
+    if (!bidang) errors_for_row.push("Bidang kosong");
+    if (!no_telp) errors_for_row.push("No. Telp kosong");
+
+    // Length validation
+    if (perner && perner.length > 50) {
+      errors_for_row.push("PERNER terlalu panjang (max 50)");
+    }
+    if (nip && nip.length > 50) {
+      errors_for_row.push("NIP terlalu panjang (max 50)");
+    }
+    if (nama && nama.length > 100) {
+      errors_for_row.push("Nama terlalu panjang (max 100)");
+    }
+    if (bidang && bidang.length > 100) {
+      errors_for_row.push("Bidang terlalu panjang (max 100)");
+    }
+    if (no_telp && no_telp.length > 20) {
+      errors_for_row.push("No. Telp terlalu panjang (max 20)");
+    }
+
+    // Duplicate validation within file
+    if (perner) {
+      if (pernerSet.has(perner)) {
+        errors_for_row.push(`PERNER "${perner}" duplikat dalam file`);
+      } else {
+        pernerSet.add(perner);
+      }
+    }
+
+    if (nip) {
+      if (nipSet.has(nip)) {
+        errors_for_row.push(`NIP "${nip}" duplikat dalam file`);
+      } else {
+        nipSet.add(nip);
+      }
+    }
+
+    // Phone number basic validation (Indonesian format)
+    if (no_telp && no_telp.length > 0) {
+      const cleanPhone = no_telp.replace(/[\s\-\(\)]/g, "");
+      if (!/^(08|62|0)[0-9]{8,15}$/.test(cleanPhone)) {
+        errors_for_row.push(
+          "Format no. telp tidak valid (contoh: 081234567890)"
+        );
+      }
+    }
+
+    // If there are errors for this row, add to errors list
+    if (errors_for_row.length > 0) {
+      errors.push({
+        row: rowNum,
+        perner: perner || "N/A",
+        message: errors_for_row.join(", "),
+      });
+    } else {
+      // Add to validated data if no errors
+      validatedData.push({
+        perner,
+        nip,
+        nama,
+        bidang,
+        no_telp,
+      });
+    }
+  });
+
+  console.log(
+    `📋 Validation complete: ${validatedData.length} valid, ${errors.length} errors`
+  );
+
+  // If there are validation errors, return them
+  if (errors.length > 0) {
+    const duration = Date.now() - startTime;
+    console.warn(
+      `⚠️ Validation failed with ${errors.length} errors in ${duration}ms`
+    );
+
+    return res.status(400).json({
+      success: false,
+      message: `❌ Validasi gagal. ${errors.length} baris mengandung error`,
+      data: {
+        total_records: data.length,
+        valid_records: validatedData.length,
+        invalid_records: errors.length,
+        errors: errors.slice(0, 50), // Limit errors shown to 50
+        validation_duration_ms: duration,
+      },
+    });
+  }
+
+  // Proceed with database insertion if validation passes
+  console.log(
+    `💾 Starting database insertion for ${validatedData.length} records...`
+  );
+
+  // Check for existing PERNER values in database
+  const pernerList = validatedData.map((item) => item.perner);
+  const pernerCheckSQL = `
+    SELECT perner FROM data_pegawai 
+    WHERE perner IN (${pernerList.map(() => "?").join(",")})
+  `;
+
+  conn.query(pernerCheckSQL, pernerList, (checkErr, existingRecords) => {
+    if (checkErr) {
+      console.error("❌ Error checking existing PERNER:", checkErr);
+      return res.status(500).json({
+        success: false,
+        message: "❌ Gagal mengecek data yang sudah ada",
+        error: checkErr.message,
+      });
+    }
+
+    const existingPerner = new Set(
+      existingRecords.map((record) => record.perner)
+    );
+    console.log(`🔍 Found ${existingPerner.size} existing PERNER in database`);
+
+    // Separate new inserts and updates
+    const newInserts = [];
+    const updates = [];
+
+    validatedData.forEach((item) => {
+      if (existingPerner.has(item.perner)) {
+        updates.push(item);
+      } else {
+        newInserts.push(item);
+      }
+    });
+
+    console.log(
+      `📊 Operations: ${newInserts.length} new inserts, ${updates.length} updates`
+    );
+
+    // Begin transaction
+    conn.beginTransaction((transErr) => {
+      if (transErr) {
+        console.error("❌ Transaction begin error:", transErr);
+        return res.status(500).json({
+          success: false,
+          message: "❌ Gagal memulai transaksi database",
+          error: transErr.message,
+        });
+      }
+
+      const operations = [];
+      let successfulInserts = 0;
+      let updatedRecords = 0;
+      let failedInserts = 0;
+      const operationErrors = [];
+
+      // Handle new inserts
+      if (newInserts.length > 0) {
+        const insertSQL = `
+          INSERT INTO data_pegawai (perner, nip, nama, bidang, no_telp) 
+          VALUES ${newInserts.map(() => "(?, ?, ?, ?, ?)").join(", ")}
+        `;
+
+        const insertParams = [];
+        newInserts.forEach((item) => {
+          insertParams.push(
+            item.perner,
+            item.nip,
+            item.nama,
+            item.bidang,
+            item.no_telp
+          );
+        });
+
+        operations.push(
+          new Promise((resolve, reject) => {
+            conn.query(insertSQL, insertParams, (insertErr, insertResult) => {
+              if (insertErr) {
+                console.error("❌ Bulk insert error:", insertErr);
+                operationErrors.push(
+                  `Bulk insert failed: ${insertErr.message}`
+                );
+                failedInserts += newInserts.length;
+                resolve();
+              } else {
+                successfulInserts = insertResult.affectedRows;
+                console.log(`✅ Inserted ${successfulInserts} new records`);
+                resolve();
+              }
+            });
+          })
+        );
+      }
+
+      // Handle updates (one by one for detailed error tracking)
+      updates.forEach((item, index) => {
+        const updateSQL = `
+          UPDATE data_pegawai 
+          SET nip = ?, nama = ?, bidang = ?, no_telp = ?
+          WHERE perner = ?
+        `;
+
+        operations.push(
+          new Promise((resolve) => {
+            conn.query(
+              updateSQL,
+              [item.nip, item.nama, item.bidang, item.no_telp, item.perner],
+              (updateErr, updateResult) => {
+                if (updateErr) {
+                  console.error(
+                    `❌ Update error for PERNER ${item.perner}:`,
+                    updateErr
+                  );
+                  operationErrors.push(
+                    `Update failed for PERNER ${item.perner}: ${updateErr.message}`
+                  );
+                  failedInserts++;
+                } else if (updateResult.affectedRows > 0) {
+                  updatedRecords++;
+                }
+                resolve();
+              }
+            );
+          })
+        );
+      });
+
+      // Execute all operations
+      Promise.all(operations)
+        .then(() => {
+          // Commit transaction if mostly successful
+          const totalOperations = newInserts.length + updates.length;
+          const successfulOperations = successfulInserts + updatedRecords;
+          const shouldCommit = successfulOperations / totalOperations > 0.5; // Commit if >50% success
+
+          if (shouldCommit && operationErrors.length < totalOperations * 0.5) {
+            conn.commit((commitErr) => {
+              if (commitErr) {
+                console.error("❌ Transaction commit error:", commitErr);
+                conn.rollback(() => {});
+                return res.status(500).json({
+                  success: false,
+                  message: "❌ Gagal menyimpan perubahan ke database",
+                  error: commitErr.message,
+                });
+              }
+
+              const endTime = Date.now();
+              const duration = endTime - startTime;
+
+              console.log(
+                `🎉 Bulk upload completed successfully in ${duration}ms`
+              );
+              console.log(
+                `📊 Results: ${successfulInserts} inserted, ${updatedRecords} updated, ${failedInserts} failed`
+              );
+
+              res.json({
+                success: true,
+                message: `✅ Upload berhasil! ${successfulOperations} dari ${totalOperations} records berhasil diproses`,
+                data: {
+                  filename: filename || "uploaded_file",
+                  total_records: data.length,
+                  successful_inserts: successfulInserts,
+                  updated_records: updatedRecords,
+                  failed_inserts: failedInserts,
+                  operation_errors: operationErrors.slice(0, 20), // Limit to 20 errors
+                  processing_duration_ms: duration,
+                  success_rate: Math.round(
+                    (successfulOperations / totalOperations) * 100
+                  ),
+                  method: "bulk_upload_with_transaction",
+                },
+                timestamp: new Date().toISOString(),
+              });
+            });
+          } else {
+            // Rollback if too many errors
+            conn.rollback(() => {
+              console.warn(
+                `⚠️ Transaction rolled back due to too many errors: ${operationErrors.length}`
+              );
+
+              res.status(400).json({
+                success: false,
+                message: `❌ Upload dibatalkan karena terlalu banyak error (${operationErrors.length})`,
+                data: {
+                  total_records: data.length,
+                  successful_inserts: 0,
+                  updated_records: 0,
+                  failed_inserts: totalOperations,
+                  errors: operationErrors.slice(0, 50),
+                  processing_duration_ms: Date.now() - startTime,
+                },
+              });
+            });
+          }
+        })
+        .catch((err) => {
+          console.error("❌ Operations execution error:", err);
+          conn.rollback(() => {});
+          res.status(500).json({
+            success: false,
+            message: "❌ Error saat menjalankan operasi database",
+            error: err.message,
+          });
+        });
+    });
+  });
+});
+
+// ======================================================
+// HELPER ENDPOINT: Validate Upload Data (Preview)
+// ======================================================
+
+// Optional endpoint for previewing data before actual upload
+app.post("/api/data_pegawai/validate_upload", (req, res) => {
+  const startTime = Date.now();
+  console.log("🔍 Validating upload data preview...");
+
+  const { data, filename } = req.body;
+
+  if (!data || !Array.isArray(data) || data.length === 0) {
+    return res.status(400).json({
+      success: false,
+      message: "❌ Data tidak valid atau kosong",
+    });
+  }
+
+  // Quick validation without database operations
+  const errors = [];
+  const warnings = [];
+  const pernerSet = new Set();
+  const nipSet = new Set();
+
+  // Sample first few records for preview
+  const previewData = [];
+  const maxPreview = 10;
+
+  data.slice(0, maxPreview).forEach((row, index) => {
+    const rowNum = index + 1;
+
+    // Get field values flexibly
+    const getFieldValue = (row, field) => {
+      const keys = Object.keys(row);
+      const matchingKey = keys.find((key) =>
+        key.toLowerCase().includes(field.toLowerCase())
+      );
+      return matchingKey ? String(row[matchingKey] || "").trim() : "";
+    };
+
+    const perner = getFieldValue(row, "perner");
+    const nip = getFieldValue(row, "nip");
+    const nama = getFieldValue(row, "nama");
+    const bidang = getFieldValue(row, "bidang");
+    const no_telp = getFieldValue(row, "no_telp");
+
+    // Basic validation
+    const rowErrors = [];
+    if (!perner) rowErrors.push("PERNER kosong");
+    if (!nip) rowErrors.push("NIP kosong");
+    if (!nama) rowErrors.push("Nama kosong");
+    if (!bidang) rowErrors.push("Bidang kosong");
+    if (!no_telp) rowErrors.push("No. Telp kosong");
+
+    // Check duplicates in sample
+    if (perner && pernerSet.has(perner)) {
+      rowErrors.push(`PERNER duplikat`);
+    } else if (perner) {
+      pernerSet.add(perner);
+    }
+
+    if (nip && nipSet.has(nip)) {
+      rowErrors.push(`NIP duplikat`);
+    } else if (nip) {
+      nipSet.add(nip);
+    }
+
+    previewData.push({
+      row: rowNum,
+      perner,
+      nip,
+      nama,
+      bidang,
+      no_telp,
+      errors: rowErrors,
+      valid: rowErrors.length === 0,
+    });
+
+    if (rowErrors.length > 0) {
+      errors.push({
+        row: rowNum,
+        message: rowErrors.join(", "),
+      });
+    }
+  });
+
+  // Add warnings for large datasets
+  if (data.length > 1000) {
+    warnings.push(
+      `Dataset besar: ${data.length} records. Proses upload mungkin memakan waktu lama.`
+    );
+  }
+
+  if (data.length > 5000) {
+    warnings.push(
+      `Terlalu banyak data: ${data.length} records. Maksimal 5000 records per upload.`
+    );
+  }
+
+  const duration = Date.now() - startTime;
+  const validRecords = previewData.filter((item) => item.valid).length;
+
+  console.log(`🔍 Validation preview completed in ${duration}ms`);
+
+  res.json({
+    success: true,
+    message: `🔍 Preview validasi selesai untuk ${Math.min(
+      data.length,
+      maxPreview
+    )} records pertama`,
+    data: {
+      filename: filename || "uploaded_file",
+      total_records: data.length,
+      preview_records: previewData.length,
+      valid_in_preview: validRecords,
+      invalid_in_preview: previewData.length - validRecords,
+      preview_data: previewData,
+      errors: errors.slice(0, 20),
+      warnings: warnings,
+      estimated_processing_time: Math.round(data.length / 100) + "s", // Rough estimate
+      validation_duration_ms: duration,
+    },
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// ======================================================
+// HELPER ENDPOINT: Download Template File
+// ======================================================
+
+// Optional endpoint to download template Excel/CSV
+app.get("/api/data_pegawai/download_template", (req, res) => {
+  const { format = "csv" } = req.query;
+
+  console.log(`📁 Generating template file in ${format} format...`);
+
+  const templateData = [
+    {
+      perner: "P001",
+      nip: "123456",
+      nama: "John Doe",
+      bidang: "IT",
+      no_telp: "081234567890",
+    },
+    {
+      perner: "P002",
+      nip: "123457",
+      nama: "Jane Smith",
+      bidang: "HR",
+      no_telp: "081234567891",
+    },
+  ];
+
+  const timestamp = new Date().toISOString().slice(0, 10);
+
+  if (format.toLowerCase() === "csv") {
+    // Generate CSV template
+    const headers = ["perner", "nip", "nama", "bidang", "no_telp"];
+    let csvContent = headers.join(",") + "\n";
+
+    templateData.forEach((row) => {
+      const values = headers.map((header) => row[header] || "");
+      csvContent += values.join(",") + "\n";
+    });
+
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="template_data_pegawai_${timestamp}.csv"`
+    );
+    res.send(csvContent);
+  } else {
+    // For Excel format, return JSON with instructions
+    res.json({
+      success: true,
+      message:
+        "📁 Template Excel belum tersedia. Gunakan format CSV atau buat manual dengan kolom berikut:",
+      template_structure: {
+        required_columns: ["perner", "nip", "nama", "bidang", "no_telp"],
+        sample_data: templateData,
+        notes: [
+          "Kolom perner: Wajib, unik, maksimal 50 karakter",
+          "Kolom nip: Wajib, unik, maksimal 50 karakter",
+          "Kolom nama: Wajib, maksimal 100 karakter",
+          "Kolom bidang: Wajib, maksimal 100 karakter",
+          "Kolom no_telp: Wajib, maksimal 20 karakter, format Indonesia (08xxx)",
+        ],
+      },
+    });
+  }
 });
 
 app.listen(PORT, HOST, () => {

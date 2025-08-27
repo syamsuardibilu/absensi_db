@@ -935,7 +935,7 @@
     <script>
       // BASE URL untuk API calls
       const PROD_API = "https://absensi-db.onrender.com"; // API di Render
-      const LOCAL_API = "http://localhost:3000"; // Dev lokal
+      const LOCAL_API = "http://localhost:8080"; // Dev lokal
 
       const host = location.hostname;
       const isLocalHost = /^(localhost|127\.0\.0\.1)$/.test(host);
@@ -1121,13 +1121,15 @@ ${totalHariKoreksi} dari ${hariKerja} hari kerja`;
         // Tambahan pesan penting di bawah detail harian
         pesanTemplate += `
 
---------------------------------------------------
+-----------------------
 Catatan Penting:
+- Pengiriman informasi absensi akan dilakukan secara rutin selama masa transisi
 - Bagi pegawai yang melaksanakan SPPD namun belum tercatat karena proses di Bagian Umum masih tertunda, agar sementara melakukan input “Tugas di Luar Kantor” pada PLN Click dan memastikan persetujuan atasan telah diperoleh.
 - Pegawai dengan status piket dan/atau lembur tetap wajib absen pada jam kerja normal, kemudian melanjutkan absen pada jam kerja piket/lembur.
 - Pegawai dengan pola kerja shift (pagi/siang/malam/Off) wajib mengajukan jadwal shift melalui PLN Click dan melakukan absen sesuai jadwal yang disetujui.
-- Seluruh pengajuan, koreksi, dan persetujuan (approval) pada PLN Click paling lambat 31 Agustus 2025.
-- *Mulai 01 September 2025*, pengajuan shift/cuti/izin/tugas luar, koreksi clock-in/clock-out, serta proses persetujuan wajib diselesaikan paling lambat *7 (tujuh)* hari kalender sejak tanggal yang akan diajukan/dikoreksi.
+- Seluruh pengajuan, koreksi, dan persetujuan (approval) pada PLN Click untuk bulan Agustus paling lambat 31 Agustus 2025.
+- *Mulai 01 September 2025*, pengajuan shift/cuti/izin/tugas luar, koreksi clock-in/clock-out, serta proses persetujuan wajib diselesaikan paling lambat *7 (tujuh)* hari kalender sejak tanggal yang akan diajukan/dikoreksi (Misal pengajuan/koreksi tanggal 1 maksimal dilakukan tanggal 8).
+
 
 Demikian disampaikan.
 
@@ -1136,7 +1138,7 @@ Apabila ada pertanyaan agar mengajukan pada kontak khusus pelayanan SDM UID Bali
 Terima Kasih
 
 
-_Mohon tidak membalas pesan ini agar tidak mengganggu proses pengiriman pesan ke pegawai lainnya_
+_Mohon *tidak membalas* pesan ini karena tidak dapat menerima balasan sampai selesai pengiriman massal, mohon gunakan nomor WA di atas jika ada pertanyaan_
       `;
 
         return pesanTemplate;
@@ -1626,7 +1628,7 @@ _Mohon tidak membalas pesan ini agar tidak mengganggu proses pengiriman pesan ke
           }
 
           // Phone number from data_pegawai
-          const phoneNumber = row.no_telp || "081355265063";
+          const phoneNumber = row.no_telp || "085259048398";
           const waLink = generateWALink(phoneNumber);
 
           // Generate enhanced pesan dengan daily details
@@ -2000,7 +2002,7 @@ _Mohon tidak membalas pesan ini agar tidak mengganggu proses pengiriman pesan ke
       function exportData(format) {
         const dataToExport = filteredData.map((row, index) => {
           const perner = row.PERNER || "";
-          const phoneNumber = row.no_telp || "081355265063";
+          const phoneNumber = row.no_telp || "085259048398";
           const waLink = generateWALink(phoneNumber);
           const pesanGenerated = generatePesan(row);
           const dailyCount = row.daily_details?.length || 0;

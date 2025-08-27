@@ -935,7 +935,7 @@
     <script>
       // BASE URL untuk API calls
       const PROD_API = "https://absensi-db.onrender.com"; // API di Render
-      const LOCAL_API = "http://localhost:3000"; // Dev lokal
+      const LOCAL_API = "http://localhost:8080"; // Dev lokal
 
       const host = location.hostname;
       const isLocalHost = /^(localhost|127\.0\.0\.1)$/.test(host);
@@ -952,11 +952,12 @@
         const p = path.startsWith("/") ? path : `/${path}`;
         return fetch(`${BASE_URL}${p}`, opts);
       };
+
       // Global Variables
       let allData = [];
       let filteredData = [];
       let currentPage = 1;
-      const recordsPerPage = 50;
+      //   const recordsPerPage = 50;
       let totalPages = 0;
       let totalRecords = 0;
       let currentSearchTerm = "";
@@ -1021,7 +1022,13 @@
 
       // 📝 Helper function: Format keterangan absen
       function formatKetAbsen(value_att_abs) {
-        return value_att_abs || "-";
+        if (!value_att_abs) return "-";
+        // Ambil setelah "=>", jika ada
+        const idx = value_att_abs.indexOf("=>");
+        if (idx !== -1) {
+          return value_att_abs.substring(idx + 2).trim();
+        }
+        return value_att_abs.trim();
       }
 
       // ======================================================
@@ -1111,6 +1118,29 @@ ${totalHariKoreksi} dari ${hariKerja} hari kerja`;
           pesanTemplate += "\n\n(Detail harian tidak tersedia)";
         }
 
+        // Tambahan pesan penting di bawah detail harian
+        pesanTemplate += `
+
+-----------------------
+Catatan Penting:
+- Pengiriman informasi absensi akan dilakukan secara rutin selama masa transisi
+- Bagi pegawai yang melaksanakan SPPD namun belum tercatat karena proses di Bagian Umum masih tertunda, agar sementara melakukan input “Tugas di Luar Kantor” pada PLN Click dan memastikan persetujuan atasan telah diperoleh.
+- Pegawai dengan status piket dan/atau lembur tetap wajib absen pada jam kerja normal, kemudian melanjutkan absen pada jam kerja piket/lembur.
+- Pegawai dengan pola kerja shift (pagi/siang/malam/Off) wajib mengajukan jadwal shift melalui PLN Click dan melakukan absen sesuai jadwal yang disetujui.
+- Seluruh pengajuan, koreksi, dan persetujuan (approval) pada PLN Click untuk bulan Agustus paling lambat 31 Agustus 2025.
+- *Mulai 01 September 2025*, pengajuan shift/cuti/izin/tugas luar, koreksi clock-in/clock-out, serta proses persetujuan wajib diselesaikan paling lambat *7 (tujuh)* hari kalender sejak tanggal yang akan diajukan/dikoreksi (Misal pengajuan/koreksi tanggal 1 maksimal dilakukan tanggal 8).
+
+
+Demikian disampaikan.
+
+Apabila ada pertanyaan agar mengajukan pada kontak khusus pelayanan SDM UID Bali di : 081524577930 (Pelayanan HC Denpasar).
+
+Terima Kasih
+
+
+_Mohon *tidak membalas* pesan ini karena tidak dapat menerima balasan sampai selesai pengiriman massal, gunakan nomor WA di atas jika ada pertanyaan_
+      `;
+
         return pesanTemplate;
       }
 
@@ -1179,6 +1209,8 @@ ${totalHariKoreksi} dari ${hariKerja} hari kerja`;
           allData = data;
           filteredData = [...data]; // sekarang filteredData = hasil dari server
           totalRecords = data.length;
+          recordsPerPage = totalRecords;
+
           totalPages = Math.ceil(totalRecords / recordsPerPage);
 
           // Inisialisasi status blasting
@@ -1596,7 +1628,7 @@ ${totalHariKoreksi} dari ${hariKerja} hari kerja`;
           }
 
           // Phone number from data_pegawai
-          const phoneNumber = row.no_telp || "085259048398";
+          const phoneNumber = row.no_telp || "081355265063";
           const waLink = generateWALink(phoneNumber);
 
           // Generate enhanced pesan dengan daily details
@@ -1970,7 +2002,7 @@ ${totalHariKoreksi} dari ${hariKerja} hari kerja`;
       function exportData(format) {
         const dataToExport = filteredData.map((row, index) => {
           const perner = row.PERNER || "";
-          const phoneNumber = row.no_telp || "085259048398";
+          const phoneNumber = row.no_telp || "081355265063";
           const waLink = generateWALink(phoneNumber);
           const pesanGenerated = generatePesan(row);
           const dailyCount = row.daily_details?.length || 0;

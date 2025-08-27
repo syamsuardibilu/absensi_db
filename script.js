@@ -1,7 +1,7 @@
 // === API endpoints ===
 const PROD_API = "https://absensi-db.onrender.com"; // Render (Produksi)
-const LOCAL_API = "http://localhost:3000"; // Local dev
-const LAN_API = `http://${location.hostname}:3000`; // Akses via IP LAN
+const LOCAL_API = "http://localhost:8080"; // Local dev
+const LAN_API = `http://${location.hostname}:8080`; // Akses via IP LAN
 
 // Deteksi host
 const host = location.hostname;
@@ -24,7 +24,8 @@ const api = (path, opts = {}) => {
 };
 
 console.log("ENV host =", location.hostname);
-console.log("Using same-origin for API:", location.origin);function debounce(func, wait) {
+console.log("Using same-origin for API:", location.origin);
+function debounce(func, wait) {
   let timeout;
   return function executedFunction(...args) {
     const later = () => {

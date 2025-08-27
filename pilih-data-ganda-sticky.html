@@ -727,7 +727,7 @@
 
     <script>
       const PROD_API = "https://absensi-db.onrender.com"; // API di Render
-      const LOCAL_API = "http://localhost:3000"; // Dev lokal
+      const LOCAL_API = "http://localhost:8080"; // Dev lokal
 
       const host = location.hostname;
       const isLocalHost = /^(localhost|127\.0\.0\.1)$/.test(host);
@@ -1233,9 +1233,6 @@
         );
         fetchData();
       });
-
-      // Auto-refresh data every 30 seconds (optional)
-      // setInterval(fetchData, 30000);
     </script>
 
     <script src="script.js?v=20250825"></script>
