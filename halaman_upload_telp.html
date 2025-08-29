@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Upload Data Pegawai - File Upload</title>
+    <title>Upload Data Pegawai - Paste Data</title>
     <style>
       * {
         margin: 0;
@@ -19,7 +19,7 @@
       }
 
       .upload-container {
-        max-width: 900px;
+        max-width: 1000px;
         margin: 0 auto;
       }
 
@@ -112,52 +112,72 @@
         overflow-x: auto;
       }
 
-      .upload-area {
-        border: 2px dashed #cbd5e0;
+      .paste-area {
+        border: 2px solid #cbd5e0;
         border-radius: 12px;
-        padding: 40px;
-        text-align: center;
-        transition: all 0.3s ease;
-        cursor: pointer;
+        padding: 15px;
         margin-bottom: 25px;
         background: #fafafa;
+        transition: all 0.3s ease;
         position: relative;
       }
 
-      .upload-area:hover {
+      .paste-area:focus-within {
         border-color: #667eea;
         background: #f0f8ff;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
       }
 
-      .upload-area.dragover {
-        border-color: #667eea;
-        background: #e6f3ff;
-        transform: scale(1.02);
-      }
-
-      .upload-icon {
-        font-size: 48px;
-        color: #cbd5e0;
-        margin-bottom: 15px;
-      }
-
-      .upload-text {
-        font-size: 18px;
-        color: #4a5568;
+      .paste-label {
+        display: block;
+        font-weight: 600;
+        color: #2d3748;
         margin-bottom: 10px;
-        font-weight: 500;
-      }
-
-      .upload-hint {
         font-size: 14px;
-        color: #718096;
       }
 
-      .file-input {
-        display: none;
+      .paste-textarea {
+        width: 100%;
+        min-height: 300px;
+        border: none;
+        background: transparent;
+        font-family: "Courier New", monospace;
+        font-size: 13px;
+        color: #2d3748;
+        resize: vertical;
+        outline: none;
+        line-height: 1.5;
       }
 
-      .file-info {
+      .paste-textarea::placeholder {
+        color: #a0aec0;
+        font-style: italic;
+      }
+
+      .format-options {
+        display: flex;
+        gap: 15px;
+        margin-bottom: 15px;
+        align-items: center;
+      }
+
+      .format-option {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+
+      .format-option input[type="radio"] {
+        margin: 0;
+      }
+
+      .format-option label {
+        font-size: 14px;
+        color: #4a5568;
+        cursor: pointer;
+      }
+
+      .data-info {
         background: #fff;
         border: 1px solid #e2e8f0;
         border-radius: 8px;
@@ -166,69 +186,29 @@
         display: none;
       }
 
-      .file-info.show {
+      .data-info.show {
         display: block;
       }
 
-      .file-details {
+      .data-summary {
         display: flex;
         align-items: center;
         gap: 15px;
         margin-bottom: 15px;
+        flex-wrap: wrap;
       }
 
-      .file-icon {
-        width: 40px;
-        height: 40px;
-        background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
-        border-radius: 8px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: white;
-        font-size: 18px;
-      }
-
-      .file-meta {
-        flex: 1;
-      }
-
-      .file-name {
-        font-weight: 600;
-        color: #2d3748;
-        margin-bottom: 4px;
-      }
-
-      .file-size {
-        font-size: 12px;
-        color: #718096;
-      }
-
-      .upload-progress {
-        width: 100%;
-        height: 8px;
-        background: #e2e8f0;
-        border-radius: 4px;
-        overflow: hidden;
-        margin-bottom: 10px;
-        display: none;
-      }
-
-      .upload-progress.show {
-        display: block;
-      }
-
-      .progress-bar {
-        height: 100%;
-        background: linear-gradient(90deg, #667eea, #764ba2);
-        width: 0%;
-        transition: width 0.3s ease;
-      }
-
-      .progress-text {
+      .summary-item {
+        background: #f7fafc;
+        padding: 8px 12px;
+        border-radius: 6px;
         font-size: 12px;
         color: #4a5568;
-        text-align: center;
+      }
+
+      .summary-value {
+        font-weight: 600;
+        color: #2d3748;
       }
 
       .validation-info {
@@ -313,6 +293,11 @@
         color: white;
       }
 
+      .btn-info {
+        background: linear-gradient(135deg, #3182ce 0%, #2c5282 100%);
+        color: white;
+      }
+
       .processing {
         display: none;
         text-align: center;
@@ -363,11 +348,11 @@
         gap: 15px;
       }
 
-      .summary-item {
+      .summary-item-large {
         text-align: center;
       }
 
-      .summary-value {
+      .summary-value-large {
         font-size: 24px;
         font-weight: 700;
         color: #2d3748;
@@ -409,6 +394,106 @@
         margin-top: 4px;
       }
 
+      .sample-toggle {
+        background: #f7fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        padding: 10px 15px;
+        margin-bottom: 15px;
+        cursor: pointer;
+        user-select: none;
+        transition: all 0.2s ease;
+      }
+
+      .sample-toggle:hover {
+        background: #edf2f7;
+      }
+
+      .sample-toggle.active {
+        background: #e6f3ff;
+        border-color: #667eea;
+      }
+
+      .sample-content {
+        display: none;
+        margin-top: 10px;
+        padding-top: 10px;
+        border-top: 1px solid #e2e8f0;
+      }
+
+      .sample-content.show {
+        display: block;
+      }
+
+      .copy-sample {
+        font-size: 12px;
+        color: #667eea;
+        text-decoration: underline;
+        cursor: pointer;
+        margin-left: 10px;
+      }
+
+      .duplicate-handling {
+        margin: 20px 0;
+        transition: all 0.3s ease;
+      }
+
+      .duplicate-options {
+        display: grid;
+        gap: 15px;
+        margin-top: 15px;
+      }
+
+      .duplicate-option {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        padding: 15px;
+        background: #f8f9fa;
+        border: 2px solid #e2e8f0;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      .duplicate-option:hover {
+        background: #f1f5f9;
+        border-color: #cbd5e0;
+      }
+
+      .duplicate-option input[type="radio"] {
+        margin: 0;
+        margin-top: 2px;
+      }
+
+      .duplicate-option input[type="radio"]:checked ~ label {
+        color: #2d3748;
+      }
+
+      .duplicate-option:has(input:checked) {
+        background: #e6f3ff;
+        border-color: #667eea;
+      }
+
+      .duplicate-option label {
+        cursor: pointer;
+        flex: 1;
+        margin: 0;
+      }
+
+      .duplicate-option label strong {
+        display: block;
+        color: #2d3748;
+        margin-bottom: 4px;
+        font-size: 14px;
+      }
+
+      .option-description {
+        color: #4a5568;
+        font-size: 12px;
+        line-height: 1.4;
+      }
+
       @media (max-width: 768px) {
         body {
           padding: 10px;
@@ -429,6 +514,11 @@
         .header h1 {
           font-size: 1.8rem;
         }
+
+        .format-options {
+          flex-direction: column;
+          align-items: flex-start;
+        }
       }
     </style>
   </head>
@@ -436,57 +526,100 @@
     <div class="upload-container">
       <div class="header">
         <h1>📊 Upload Data Pegawai</h1>
-        <p>Import data pegawai dari file Excel atau CSV</p>
+        <p>Import data pegawai dengan copy-paste dari Excel atau CSV</p>
       </div>
 
       <!-- Upload Section -->
       <div class="upload-section">
-        <div class="section-header">📁 Upload File</div>
+        <div class="section-header">📝 Paste Data</div>
         <div class="section-content">
           <div class="instructions">
-            <h3>Format File yang Didukung:</h3>
+            <h3>Cara Menggunakan:</h3>
             <ul>
-              <li>Excel (.xlsx, .xls)</li>
-              <li>CSV (.csv) dengan encoding UTF-8</li>
-              <li>Maksimal ukuran file: 10MB</li>
+              <li>Copy data dari Excel atau CSV (termasuk header)</li>
+              <li>Paste ke kotak teks di bawah</li>
+              <li>Pilih format data (Tab-separated atau Comma-separated)</li>
               <li>Maksimal 5000 records per upload</li>
             </ul>
 
             <h3>Format Kolom yang Diperlukan:</h3>
             <div class="format-example">
               Kolom harus mengandung (urutan bebas): - perner (wajib) - nip
-              (wajib) - nama (wajib) - bidang (wajib) - no_telp (wajib) Contoh:
-              perner | nip | nama | bidang | no_telp P001 | 123456 | John Doe |
-              IT | 081234567890 P002 | 123457 | Jane Smith | HR | 081234567891
+              (wajib) - nama (wajib) - bidang (wajib) - no_telp (opsional,
+              sistem akan membersihkan format otomatis) Sistem akan otomatis
+              membersihkan nomor telepon: ✓ +6281355265063 → 081355265063 ✓
+              6281355265063 → 081355265063 ✓ 81355265063 → 081355265063 ✓
+              +62-812-3456-7890 → 081234567890 ✓ (0812) 345 6789 → 081234567890
+              ✓ 0812-345-6789 → 081234567890 ✗ Format tidak valid → - (tanda
+              strip) ✗ Kosong → - (tanda strip)
             </div>
-          </div>
 
-          <div class="upload-area" id="uploadArea">
-            <div class="upload-icon">📁</div>
-            <div class="upload-text">
-              Klik untuk memilih file atau drag & drop
-            </div>
-            <div class="upload-hint">Excel (.xlsx, .xls) atau CSV (.csv)</div>
-            <input
-              type="file"
-              id="fileInput"
-              class="file-input"
-              accept=".xlsx,.xls,.csv"
-            />
-          </div>
-
-          <div class="file-info" id="fileInfo">
-            <div class="file-details">
-              <div class="file-icon">📄</div>
-              <div class="file-meta">
-                <div class="file-name" id="fileName"></div>
-                <div class="file-size" id="fileSize"></div>
+            <div class="sample-toggle" onclick="toggleSample()">
+              <strong>🔽 Contoh Data (Klik untuk melihat)</strong>
+              <span class="copy-sample" onclick="copySampleData(event)"
+                >📋 Copy contoh</span
+              >
+              <div class="sample-content" id="sampleContent">
+                <div class="format-example">
+                  perner nip nama bidang no_telp P001 123456 John Doe IT
+                  +6281355265063 P002 123457 Jane Smith HR 6281355265064 P003
+                  123458 Bob Johnson Finance 81355265065 P004 123459 Alice Brown
+                  Marketing 0812-345-6789
+                </div>
               </div>
             </div>
-            <div class="upload-progress" id="uploadProgress">
-              <div class="progress-bar" id="progressBar"></div>
+          </div>
+
+          <div class="format-options">
+            <label><strong>Format Data:</strong></label>
+            <div class="format-option">
+              <input
+                type="radio"
+                id="formatTab"
+                name="dataFormat"
+                value="tab"
+                checked
+              />
+              <label for="formatTab">Tab-separated (dari Excel)</label>
             </div>
-            <div class="progress-text" id="progressText"></div>
+            <div class="format-option">
+              <input
+                type="radio"
+                id="formatComma"
+                name="dataFormat"
+                value="comma"
+              />
+              <label for="formatComma">Comma-separated (CSV)</label>
+            </div>
+          </div>
+
+          <div class="paste-area">
+            <label class="paste-label" for="dataTextarea"
+              >Paste data di sini:</label
+            >
+            <textarea
+              id="dataTextarea"
+              class="paste-textarea"
+              placeholder="Paste data dari Excel atau CSV di sini...
+
+Contoh format (Tab-separated dari Excel):
+perner	nip	nama	bidang	no_telp
+P001	123456	John Doe	IT	081234567890
+P002	123457	Jane Smith	HR	081234567891
+
+Atau format CSV (Comma-separated):
+perner,nip,nama,bidang,no_telp
+P001,123456,John Doe,IT,081234567890
+P002,123457,Jane Smith,HR,081234567891"
+              oninput="handleDataInput()"
+              onpaste="handleDataPaste()"
+            ></textarea>
+          </div>
+
+          <div class="data-info" id="dataInfo">
+            <div class="data-summary" id="dataSummary">
+              <!-- Summary akan diisi oleh JavaScript -->
+            </div>
           </div>
 
           <div class="validation-info" id="validationInfo">
@@ -495,17 +628,101 @@
 
           <div class="processing" id="processing">
             <div class="spinner"></div>
-            <span id="processingText">Memproses file...</span>
+            <span id="processingText">Memproses data...</span>
+          </div>
+
+          <div
+            class="duplicate-handling"
+            id="duplicateHandling"
+            style="display: none"
+          >
+            <div
+              class="instructions"
+              style="background: #fff3cd; border-left-color: #f39c12"
+            >
+              <h3>Penanganan Data Duplikat:</h3>
+              <div class="duplicate-options">
+                <div class="duplicate-option">
+                  <input
+                    type="radio"
+                    id="overwrite"
+                    name="duplicateAction"
+                    value="overwrite"
+                    checked
+                  />
+                  <label for="overwrite">
+                    <strong>Timpa data yang sudah ada</strong>
+                    <div class="option-description">
+                      Update semua field untuk PERNER yang sudah ada di database
+                    </div>
+                  </label>
+                </div>
+                <div class="duplicate-option">
+                  <input
+                    type="radio"
+                    id="skip"
+                    name="duplicateAction"
+                    value="skip"
+                  />
+                  <label for="skip">
+                    <strong>Abaikan data duplikat</strong>
+                    <div class="option-description">
+                      Lewati PERNER yang sudah ada, hanya insert data baru
+                    </div>
+                  </label>
+                </div>
+                <div class="duplicate-option">
+                  <input
+                    type="radio"
+                    id="merge"
+                    name="duplicateAction"
+                    value="merge"
+                  />
+                  <label for="merge">
+                    <strong>Gabung data (merge)</strong>
+                    <div class="option-description">
+                      Update hanya field yang tidak kosong dari data baru
+                    </div>
+                  </label>
+                </div>
+                <div class="duplicate-option">
+                  <input
+                    type="radio"
+                    id="backup"
+                    name="duplicateAction"
+                    value="backup"
+                  />
+                  <label for="backup">
+                    <strong>Timpa dengan backup</strong>
+                    <div class="option-description">
+                      Backup data lama ke tabel history sebelum update
+                    </div>
+                  </label>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div class="button-group">
-            <button class="btn btn-primary" id="selectFileBtn">
-              📁 Pilih File
+            <button
+              class="btn btn-info"
+              id="parseBtn"
+              disabled
+              onclick="parseData()"
+            >
+              🔍 Parse & Validate
             </button>
-            <button class="btn btn-secondary" id="uploadBtn" disabled>
-              ⬆️ Upload & Process
+            <button
+              class="btn btn-secondary"
+              id="uploadBtn"
+              disabled
+              onclick="processUpload()"
+            >
+              ⬆️ Upload ke Database
             </button>
-            <button class="btn btn-danger" id="clearBtn">🗑️ Clear</button>
+            <button class="btn btn-danger" id="clearBtn" onclick="clearAll()">
+              🗑️ Clear
+            </button>
           </div>
         </div>
       </div>
@@ -527,11 +744,10 @@
       </div>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script>
-      // Base URL configuration (sama seperti file lain)
+      // Base URL configuration
       const PROD_API = "https://absensi-db.onrender.com";
-      const LOCAL_API = "http://localhost:3000";
+      const LOCAL_API = "http://localhost:8080";
 
       const host = location.hostname;
       const isLocalHost = /^(localhost|127\.0\.0\.1)$/.test(host);
@@ -547,214 +763,191 @@
       console.log("Using BASE_URL:", BASE_URL);
 
       // DOM Elements
-      const uploadArea = document.getElementById("uploadArea");
-      const fileInput = document.getElementById("fileInput");
-      const fileInfo = document.getElementById("fileInfo");
-      const fileName = document.getElementById("fileName");
-      const fileSize = document.getElementById("fileSize");
-      const uploadProgress = document.getElementById("uploadProgress");
-      const progressBar = document.getElementById("progressBar");
-      const progressText = document.getElementById("progressText");
+      const dataTextarea = document.getElementById("dataTextarea");
+      const dataInfo = document.getElementById("dataInfo");
+      const dataSummary = document.getElementById("dataSummary");
       const validationInfo = document.getElementById("validationInfo");
       const validationText = document.getElementById("validationText");
       const processing = document.getElementById("processing");
       const processingText = document.getElementById("processingText");
-      const selectFileBtn = document.getElementById("selectFileBtn");
+      const parseBtn = document.getElementById("parseBtn");
       const uploadBtn = document.getElementById("uploadBtn");
       const clearBtn = document.getElementById("clearBtn");
       const resultsSection = document.getElementById("resultsSection");
       const summaryGrid = document.getElementById("summaryGrid");
       const errorList = document.getElementById("errorList");
+      const duplicateHandling = document.getElementById("duplicateHandling");
 
       // Global variables
-      let selectedFile = null;
+      let rawData = "";
       let parsedData = [];
       let validationErrors = [];
 
-      // Event listeners
-      selectFileBtn.addEventListener("click", () => fileInput.click());
-      fileInput.addEventListener("change", handleFileSelect);
-      uploadBtn.addEventListener("click", processUpload);
-      clearBtn.addEventListener("click", clearAll);
+      function toggleSample() {
+        const sampleContent = document.getElementById("sampleContent");
+        const toggle = document.querySelector(".sample-toggle");
 
-      // Drag & Drop handlers
-      uploadArea.addEventListener("dragover", handleDragOver);
-      uploadArea.addEventListener("dragleave", handleDragLeave);
-      uploadArea.addEventListener("drop", handleDrop);
-      uploadArea.addEventListener("click", () => fileInput.click());
-
-      function handleDragOver(e) {
-        e.preventDefault();
-        uploadArea.classList.add("dragover");
-      }
-
-      function handleDragLeave(e) {
-        e.preventDefault();
-        uploadArea.classList.remove("dragover");
-      }
-
-      function handleDrop(e) {
-        e.preventDefault();
-        uploadArea.classList.remove("dragover");
-        const files = e.dataTransfer.files;
-        if (files.length > 0) {
-          handleFile(files[0]);
+        if (sampleContent.classList.contains("show")) {
+          sampleContent.classList.remove("show");
+          toggle.classList.remove("active");
+          toggle.querySelector("strong").textContent =
+            "🔽 Contoh Data (Klik untuk melihat)";
+        } else {
+          sampleContent.classList.add("show");
+          toggle.classList.add("active");
+          toggle.querySelector("strong").textContent =
+            "🔼 Contoh Data (Klik untuk sembunyikan)";
         }
       }
 
-      function handleFileSelect(e) {
-        const file = e.target.files[0];
-        if (file) {
-          handleFile(file);
+      function copySampleData(event) {
+        event.stopPropagation();
+        const sampleData = `perner	nip	nama	bidang	no_telp
+P001	123456	John Doe	IT	+6281355265063
+P002	123457	Jane Smith	HR	6281355265064
+P003	123458	Bob Johnson	Finance	81355265065
+P004	123459	Alice Brown	Marketing	0812-345-6789`;
+
+        navigator.clipboard.writeText(sampleData).then(() => {
+          const copyBtn = event.target;
+          const originalText = copyBtn.textContent;
+          copyBtn.textContent = "✅ Copied!";
+          copyBtn.style.color = "#38a169";
+          setTimeout(() => {
+            copyBtn.textContent = originalText;
+            copyBtn.style.color = "#667eea";
+          }, 2000);
+        });
+      }
+
+      function handleDataInput() {
+        rawData = dataTextarea.value.trim();
+
+        if (rawData.length > 0) {
+          parseBtn.disabled = false;
+
+          // Quick analysis
+          const lines = rawData.split("\n").filter((line) => line.trim());
+          const chars = rawData.length;
+          const hasTabSeparator = rawData.includes("\t");
+          const hasCommaSeparator = rawData.includes(",");
+
+          let suggestedFormat = "tab";
+          if (!hasTabSeparator && hasCommaSeparator) {
+            suggestedFormat = "comma";
+          }
+
+          // Auto-select format
+          if (suggestedFormat === "comma") {
+            document.getElementById("formatComma").checked = true;
+          } else {
+            document.getElementById("formatTab").checked = true;
+          }
+
+          dataSummary.innerHTML = `
+                    <div class="summary-item">
+                        <span class="summary-value">${lines.length}</span> baris
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-value">${chars.toLocaleString()}</span> karakter
+                    </div>
+                    <div class="summary-item">
+                        Format terdeteksi: <span class="summary-value">${
+                          suggestedFormat === "tab"
+                            ? "Tab-separated"
+                            : "Comma-separated"
+                        }</span>
+                    </div>
+                `;
+          dataInfo.classList.add("show");
+        } else {
+          parseBtn.disabled = true;
+          dataInfo.classList.remove("show");
+          hideValidation();
         }
       }
 
-      function handleFile(file) {
-        // Validate file type
-        const allowedTypes = [
-          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", // .xlsx
-          "application/vnd.ms-excel", // .xls
-          "text/csv", // .csv
-        ];
+      function handleDataPaste() {
+        // Small delay to let paste complete
+        setTimeout(handleDataInput, 100);
+      }
 
-        const fileExtension = file.name.toLowerCase().split(".").pop();
-        const allowedExtensions = ["xlsx", "xls", "csv"];
-
-        if (
-          !allowedTypes.includes(file.type) &&
-          !allowedExtensions.includes(fileExtension)
-        ) {
-          showValidation(
-            "error",
-            "Format file tidak didukung. Gunakan Excel (.xlsx, .xls) atau CSV (.csv)"
-          );
+      function parseData() {
+        if (!rawData) {
+          showValidation("error", "Tidak ada data untuk diparse.");
           return;
         }
 
-        // Validate file size (10MB max)
-        const maxSize = 10 * 1024 * 1024; // 10MB
-        if (file.size > maxSize) {
-          showValidation("error", "Ukuran file terlalu besar. Maksimal 10MB.");
-          return;
-        }
-
-        selectedFile = file;
-        showFileInfo(file);
-        parseFile(file);
-      }
-
-      function showFileInfo(file) {
-        fileName.textContent = file.name;
-        fileSize.textContent = formatFileSize(file.size);
-        fileInfo.classList.add("show");
-      }
-
-      function formatFileSize(bytes) {
-        if (bytes === 0) return "0 Bytes";
-        const k = 1024;
-        const sizes = ["Bytes", "KB", "MB", "GB"];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
-      }
-
-      function parseFile(file) {
         processing.classList.add("show");
-        processingText.textContent = "Membaca file...";
+        processingText.textContent = "Parsing data...";
 
-        const reader = new FileReader();
-        reader.onload = function (e) {
+        setTimeout(() => {
           try {
-            let data;
-            const fileExtension = file.name.toLowerCase().split(".").pop();
+            const format = document.querySelector(
+              'input[name="dataFormat"]:checked'
+            ).value;
+            const separator = format === "tab" ? "\t" : ",";
 
-            if (fileExtension === "csv") {
-              data = parseCSV(e.target.result);
-            } else {
-              data = parseExcel(e.target.result);
+            const lines = rawData.split("\n").filter((line) => line.trim());
+
+            if (lines.length < 2) {
+              throw new Error(
+                "Data harus memiliki minimal 2 baris (header + data)"
+              );
             }
 
-            if (data && data.length > 0) {
-              processingText.textContent = "Memvalidasi data...";
-              setTimeout(() => validateData(data), 100);
-            } else {
-              processing.classList.remove("show");
-              showValidation("error", "File kosong atau tidak dapat dibaca.");
+            // Parse headers
+            const headers = lines[0]
+              .split(separator)
+              .map((h) => h.trim().toLowerCase());
+
+            if (headers.length < 4) {
+              throw new Error("Header harus memiliki minimal 4 kolom");
             }
+
+            console.log("Headers detected:", headers);
+
+            // Parse data rows
+            const data = [];
+            for (let i = 1; i < lines.length; i++) {
+              const values = lines[i].split(separator).map((v) => v.trim());
+
+              if (
+                values.length >= headers.length ||
+                values.some((v) => v !== "")
+              ) {
+                const row = {};
+                headers.forEach((header, index) => {
+                  row[header] = values[index] || "";
+                });
+                data.push(row);
+              }
+            }
+
+            console.log("Parsed data:", data.length, "records");
+
+            if (data.length === 0) {
+              throw new Error("Tidak ada data yang dapat diparse");
+            }
+
+            if (data.length > 5000) {
+              throw new Error(
+                `Terlalu banyak data: ${data.length} records. Maksimal 5000 records.`
+              );
+            }
+
+            processingText.textContent = "Validating data...";
+            setTimeout(() => validateData(data), 100);
           } catch (error) {
             processing.classList.remove("show");
-            showValidation("error", `Error membaca file: ${error.message}`);
+            showValidation("error", `Error parsing data: ${error.message}`);
           }
-        };
-
-        if (file.name.toLowerCase().endsWith(".csv")) {
-          reader.readAsText(file);
-        } else {
-          reader.readAsArrayBuffer(file);
-        }
-      }
-
-      function parseCSV(content) {
-        const lines = content.split("\n").filter((line) => line.trim());
-        if (lines.length < 2) return [];
-
-        const headers = lines[0].split(",").map((h) => h.trim().toLowerCase());
-        const data = [];
-
-        for (let i = 1; i < lines.length; i++) {
-          const values = lines[i].split(",").map((v) => v.trim());
-          if (values.length >= headers.length) {
-            const row = {};
-            headers.forEach((header, index) => {
-              row[header] = values[index] || "";
-            });
-            data.push(row);
-          }
-        }
-
-        return data;
-      }
-
-      function parseExcel(arrayBuffer) {
-        const workbook = XLSX.read(arrayBuffer, { type: "array" });
-        const firstSheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[firstSheetName];
-        const data = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-
-        if (data.length < 2) return [];
-
-        const headers = data[0].map((h) =>
-          String(h || "")
-            .trim()
-            .toLowerCase()
-        );
-        const parsedData = [];
-
-        for (let i = 1; i < data.length; i++) {
-          if (data[i].some((cell) => cell !== undefined && cell !== "")) {
-            const row = {};
-            headers.forEach((header, index) => {
-              row[header] = String(data[i][index] || "").trim();
-            });
-            parsedData.push(row);
-          }
-        }
-
-        return parsedData;
+        }, 100);
       }
 
       function validateData(data) {
         validationErrors = [];
-        const requiredFields = ["perner", "nip", "nama", "bidang", "no_telp"];
-
-        // Check max records
-        if (data.length > 5000) {
-          validationErrors.push(
-            `Terlalu banyak data: ${data.length} records. Maksimal 5000 records.`
-          );
-          processing.classList.remove("show");
-          showValidation("error", validationErrors.join("<br>"));
-          return;
-        }
+        const requiredFields = ["perner", "nip", "nama", "bidang"];
 
         // Check headers
         const headers = Object.keys(data[0] || {});
@@ -776,55 +969,136 @@
         data.forEach((row, index) => {
           const rowNum = index + 1;
 
-          // Check required fields
+          // Get field values flexibly
+          const getFieldValue = (row, field) => {
+            const keys = Object.keys(row);
+            const matchingKey = keys.find((key) =>
+              key.toLowerCase().includes(field.toLowerCase())
+            );
+            return matchingKey ? String(row[matchingKey] || "").trim() : "";
+          };
+
+          const perner = getFieldValue(row, "perner");
+          const nip = getFieldValue(row, "nip");
+          const nama = getFieldValue(row, "nama");
+          const bidang = getFieldValue(row, "bidang");
+          let no_telp =
+            getFieldValue(row, "no_telp") ||
+            getFieldValue(row, "phone") ||
+            getFieldValue(row, "telp");
+
+          // Check required fields (except no_telp which gets default)
           requiredFields.forEach((field) => {
-            const value = row[field] || "";
+            const value = getFieldValue(row, field);
             if (!value.trim()) {
               validationErrors.push(`Baris ${rowNum}: ${field} kosong`);
             }
           });
 
-          // Check duplicates
-          if (row.perner) {
-            if (pernerSet.has(row.perner)) {
-              validationErrors.push(
-                `Baris ${rowNum}: PERNER ${row.perner} duplikat`
+          // Handle phone number with enhanced tolerance for various formats
+          if (no_telp.trim()) {
+            let cleanPhone = no_telp.trim();
+
+            // Remove all symbols first: -, +, (, ), spaces, dots, etc
+            cleanPhone = cleanPhone.replace(/[^\d]/g, "");
+
+            // Now handle different Indonesian phone number formats
+            if (cleanPhone.length >= 10) {
+              // Handle +6281355265063 -> 6281355265063 (already cleaned above)
+              if (cleanPhone.startsWith("62")) {
+                // 6281355265063 -> 081355265063
+                cleanPhone = "0" + cleanPhone.substring(2);
+              }
+              // Handle 81355265063 -> 081355265063
+              else if (cleanPhone.startsWith("8") && cleanPhone.length >= 10) {
+                cleanPhone = "0" + cleanPhone;
+              }
+              // 081355265063 is already correct format
+
+              // Final validation: must be 08xxxxxxxxx format and reasonable length
+              if (
+                cleanPhone.startsWith("08") &&
+                cleanPhone.length >= 10 &&
+                cleanPhone.length <= 15
+              ) {
+                // Update the row data
+                const phoneKey = Object.keys(row).find(
+                  (key) =>
+                    key.toLowerCase().includes("telp") ||
+                    key.toLowerCase().includes("phone")
+                );
+                if (phoneKey) {
+                  row[phoneKey] = cleanPhone;
+                }
+              } else {
+                // Set dash for invalid format after all attempts
+                const phoneKey = Object.keys(row).find(
+                  (key) =>
+                    key.toLowerCase().includes("telp") ||
+                    key.toLowerCase().includes("phone")
+                );
+                if (phoneKey) {
+                  row[phoneKey] = "-";
+                }
+              }
+            } else {
+              // Too short, set dash
+              const phoneKey = Object.keys(row).find(
+                (key) =>
+                  key.toLowerCase().includes("telp") ||
+                  key.toLowerCase().includes("phone")
               );
+              if (phoneKey) {
+                row[phoneKey] = "-";
+              }
             }
-            pernerSet.add(row.perner);
+          } else {
+            // Set dash for empty
+            const phoneKey =
+              Object.keys(row).find(
+                (key) =>
+                  key.toLowerCase().includes("telp") ||
+                  key.toLowerCase().includes("phone")
+              ) || "no_telp";
+            row[phoneKey] = "-";
           }
 
-          if (row.nip) {
-            if (nipSet.has(row.nip)) {
-              validationErrors.push(`Baris ${rowNum}: NIP ${row.nip} duplikat`);
+          // Check duplicates
+          if (perner) {
+            if (pernerSet.has(perner)) {
+              validationErrors.push(
+                `Baris ${rowNum}: PERNER ${perner} duplikat`
+              );
             }
-            nipSet.add(row.nip);
+            pernerSet.add(perner);
+          }
+
+          if (nip) {
+            if (nipSet.has(nip)) {
+              validationErrors.push(`Baris ${rowNum}: NIP ${nip} duplikat`);
+            }
+            nipSet.add(nip);
           }
 
           // Check field lengths
-          if (row.perner && row.perner.length > 50) {
+          if (perner && perner.length > 50) {
             validationErrors.push(
               `Baris ${rowNum}: PERNER terlalu panjang (max 50)`
             );
           }
-          if (row.nip && row.nip.length > 50) {
+          if (nip && nip.length > 50) {
             validationErrors.push(
               `Baris ${rowNum}: NIP terlalu panjang (max 50)`
             );
           }
-          if (row.nama && row.nama.length > 100) {
+          if (nama && nama.length > 100) {
             validationErrors.push(
               `Baris ${rowNum}: Nama terlalu panjang (max 100)`
             );
           }
-          if (row.bidang && row.bidang.length > 100) {
+          if (bidang && bidang.length > 100) {
             validationErrors.push(
               `Baris ${rowNum}: Bidang terlalu panjang (max 100)`
-            );
-          }
-          if (row.no_telp && row.no_telp.length > 20) {
-            validationErrors.push(
-              `Baris ${rowNum}: No. Telp terlalu panjang (max 20)`
             );
           }
         });
@@ -847,32 +1121,30 @@
             "success",
             `✅ Data valid! ${data.length} records siap untuk diupload.`
           );
+          duplicateHandling.style.display = "block"; // Show duplicate handling options
           uploadBtn.disabled = false;
         }
       }
 
       async function processUpload() {
         if (
-          !selectedFile ||
-          validationErrors.length > 0 ||
-          parsedData.length === 0
+          !parsedData ||
+          parsedData.length === 0 ||
+          validationErrors.length > 0
         ) {
           showValidation("error", "Tidak ada data valid untuk diupload.");
           return;
         }
 
+        // Get selected duplicate handling option
+        const duplicateAction = document.querySelector(
+          'input[name="duplicateAction"]:checked'
+        ).value;
+
         processing.classList.add("show");
         processingText.textContent = "Mengupload ke database...";
-        uploadProgress.classList.add("show");
 
         try {
-          // Simulate upload progress
-          for (let i = 0; i <= 100; i += 10) {
-            progressBar.style.width = i + "%";
-            progressText.textContent = `Uploading... ${i}%`;
-            await new Promise((resolve) => setTimeout(resolve, 100));
-          }
-
           const response = await fetch(
             `${BASE_URL}/api/data_pegawai/bulk_upload`,
             {
@@ -882,8 +1154,9 @@
               },
               body: JSON.stringify({
                 data: parsedData,
-                filename: selectedFile.name,
+                filename: "pasted_data.txt",
                 total_records: parsedData.length,
+                duplicate_action: duplicateAction, // Add duplicate handling option
               }),
             }
           );
@@ -891,7 +1164,6 @@
           const result = await response.json();
 
           processing.classList.remove("show");
-          uploadProgress.classList.remove("show");
 
           if (result.success) {
             showResults(result);
@@ -904,7 +1176,6 @@
           }
         } catch (error) {
           processing.classList.remove("show");
-          uploadProgress.classList.remove("show");
           showValidation("error", `❌ Error saat upload: ${error.message}`);
         }
       }
@@ -913,30 +1184,32 @@
         const data = result.data;
 
         summaryGrid.innerHTML = `
-                <div class="summary-item">
-                    <div class="summary-value">${data.total_records || 0}</div>
+                <div class="summary-item-large">
+                    <div class="summary-value-large">${
+                      data.total_records || 0
+                    }</div>
                     <div class="summary-label">Total Records</div>
                 </div>
-                <div class="summary-item">
-                    <div class="summary-value" style="color: #38a169;">${
+                <div class="summary-item-large">
+                    <div class="summary-value-large" style="color: #38a169;">${
                       data.successful_inserts || 0
                     }</div>
                     <div class="summary-label">Berhasil</div>
                 </div>
-                <div class="summary-item">
-                    <div class="summary-value" style="color: #e53e3e;">${
+                <div class="summary-item-large">
+                    <div class="summary-value-large" style="color: #e53e3e;">${
                       data.failed_inserts || 0
                     }</div>
                     <div class="summary-label">Gagal</div>
                 </div>
-                <div class="summary-item">
-                    <div class="summary-value" style="color: #667eea;">${
+                <div class="summary-item-large">
+                    <div class="summary-value-large" style="color: #667eea;">${
                       data.updated_records || 0
                     }</div>
                     <div class="summary-label">Diupdate</div>
                 </div>
-                <div class="summary-item">
-                    <div class="summary-value">${Math.round(
+                <div class="summary-item-large">
+                    <div class="summary-value-large">${Math.round(
                       (data.successful_inserts / data.total_records) * 100
                     )}%</div>
                     <div class="summary-label">Success Rate</div>
@@ -969,25 +1242,29 @@
         validationText.innerHTML = message;
       }
 
+      function hideValidation() {
+        validationInfo.classList.remove("show");
+      }
+
       function clearAll() {
-        selectedFile = null;
+        rawData = "";
         parsedData = [];
         validationErrors = [];
 
-        fileInfo.classList.remove("show");
-        uploadProgress.classList.remove("show");
+        dataTextarea.value = "";
+        dataInfo.classList.remove("show");
         validationInfo.classList.remove("show");
         processing.classList.remove("show");
         resultsSection.classList.remove("show");
+        duplicateHandling.style.display = "none"; // Hide duplicate handling options
 
-        fileInput.value = "";
+        parseBtn.disabled = true;
         uploadBtn.disabled = true;
-        progressBar.style.width = "0%";
       }
 
       // Initialize
       document.addEventListener("DOMContentLoaded", () => {
-        console.log("Upload Data Pegawai page initialized");
+        console.log("Upload Data Pegawai (Paste Version) page initialized");
         console.log("Using BASE_URL:", BASE_URL);
       });
     </script>

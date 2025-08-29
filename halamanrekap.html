@@ -3,7 +3,11 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Upload Data Pegawai - File Upload</title>
+    <title>Dashboard Rekap Absensi Karyawan</title>
+
+    <!-- SheetJS Library untuk Export Excel XLSX -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
     <style>
       * {
         margin: 0;
@@ -18,8 +22,8 @@
         padding: 20px;
       }
 
-      .upload-container {
-        max-width: 900px;
+      .dashboard-container {
+        max-width: 1400px;
         margin: 0 auto;
       }
 
@@ -30,508 +34,617 @@
         border-radius: 16px;
         box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
         margin-bottom: 30px;
-        text-align: center;
       }
 
       .header h1 {
         color: #2c3e50;
         font-size: 2.5rem;
         font-weight: 700;
+        text-align: center;
         margin-bottom: 10px;
       }
 
       .header p {
         color: #7f8c8d;
+        text-align: center;
         font-size: 1.1rem;
       }
 
-      .upload-section {
+      .controls {
         background: rgba(255, 255, 255, 0.95);
         backdrop-filter: blur(10px);
+        padding: 25px;
         border-radius: 16px;
         box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
         margin-bottom: 25px;
-        overflow: hidden;
-      }
-
-      .section-header {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        padding: 20px 30px;
-        font-weight: 600;
-        font-size: 1.1rem;
-      }
-
-      .section-content {
-        padding: 30px;
-      }
-
-      .instructions {
-        background: #e6f3ff;
-        border-left: 4px solid #667eea;
-        padding: 20px;
-        margin-bottom: 25px;
-        border-radius: 6px;
-      }
-
-      .instructions h3 {
-        color: #2d3748;
-        margin-bottom: 15px;
-        font-size: 16px;
-      }
-
-      .instructions ul {
-        list-style: none;
-        padding-left: 0;
-      }
-
-      .instructions li {
-        margin-bottom: 8px;
-        padding-left: 20px;
-        position: relative;
-        font-size: 14px;
-        color: #4a5568;
-      }
-
-      .instructions li::before {
-        content: "•";
-        color: #667eea;
-        font-weight: bold;
-        position: absolute;
-        left: 0;
-      }
-
-      .format-example {
-        background: #f8f9fa;
-        border: 1px solid #e2e8f0;
-        padding: 15px;
-        border-radius: 6px;
-        font-family: "Courier New", monospace;
-        font-size: 13px;
-        margin: 15px 0;
-        overflow-x: auto;
-      }
-
-      .upload-area {
-        border: 2px dashed #cbd5e0;
-        border-radius: 12px;
-        padding: 40px;
-        text-align: center;
-        transition: all 0.3s ease;
-        cursor: pointer;
-        margin-bottom: 25px;
-        background: #fafafa;
-        position: relative;
-      }
-
-      .upload-area:hover {
-        border-color: #667eea;
-        background: #f0f8ff;
-      }
-
-      .upload-area.dragover {
-        border-color: #667eea;
-        background: #e6f3ff;
-        transform: scale(1.02);
-      }
-
-      .upload-icon {
-        font-size: 48px;
-        color: #cbd5e0;
-        margin-bottom: 15px;
-      }
-
-      .upload-text {
-        font-size: 18px;
-        color: #4a5568;
-        margin-bottom: 10px;
-        font-weight: 500;
-      }
-
-      .upload-hint {
-        font-size: 14px;
-        color: #718096;
-      }
-
-      .file-input {
-        display: none;
-      }
-
-      .file-info {
-        background: #fff;
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        padding: 15px;
-        margin: 15px 0;
-        display: none;
-      }
-
-      .file-info.show {
-        display: block;
-      }
-
-      .file-details {
-        display: flex;
-        align-items: center;
-        gap: 15px;
-        margin-bottom: 15px;
-      }
-
-      .file-icon {
-        width: 40px;
-        height: 40px;
-        background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
-        border-radius: 8px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: white;
-        font-size: 18px;
-      }
-
-      .file-meta {
-        flex: 1;
-      }
-
-      .file-name {
-        font-weight: 600;
-        color: #2d3748;
-        margin-bottom: 4px;
-      }
-
-      .file-size {
-        font-size: 12px;
-        color: #718096;
-      }
-
-      .upload-progress {
-        width: 100%;
-        height: 8px;
-        background: #e2e8f0;
-        border-radius: 4px;
-        overflow: hidden;
-        margin-bottom: 10px;
-        display: none;
-      }
-
-      .upload-progress.show {
-        display: block;
-      }
-
-      .progress-bar {
-        height: 100%;
-        background: linear-gradient(90deg, #667eea, #764ba2);
-        width: 0%;
-        transition: width 0.3s ease;
-      }
-
-      .progress-text {
-        font-size: 12px;
-        color: #4a5568;
-        text-align: center;
-      }
-
-      .validation-info {
-        background: #fff3cd;
-        border: 1px solid #ffeaa7;
-        padding: 15px;
-        border-radius: 6px;
-        margin: 15px 0;
-        font-size: 14px;
-        display: none;
-      }
-
-      .validation-info.show {
-        display: block;
-      }
-
-      .validation-info.success {
-        background: #d4edda;
-        border-color: #c3e6cb;
-        color: #155724;
-      }
-
-      .validation-info.error {
-        background: #f8d7da;
-        border-color: #f5c6cb;
-        color: #721c24;
-      }
-
-      .validation-info.warning {
-        background: #fff3cd;
-        border-color: #ffeaa7;
-        color: #856404;
-      }
-
-      .button-group {
         display: flex;
         gap: 15px;
-        justify-content: center;
-        margin-top: 25px;
+        align-items: center;
         flex-wrap: wrap;
       }
 
       .btn {
         padding: 12px 24px;
         border: none;
-        border-radius: 8px;
+        border-radius: 10px;
+        font-weight: 600;
         cursor: pointer;
+        transition: all 0.3s ease;
         font-size: 14px;
-        font-weight: 500;
-        transition: all 0.2s ease;
         display: flex;
         align-items: center;
         gap: 8px;
-        min-width: 140px;
-        justify-content: center;
-      }
-
-      .btn:hover:not(:disabled) {
-        transform: translateY(-1px);
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-      }
-
-      .btn:disabled {
-        opacity: 0.6;
-        cursor: not-allowed;
-        transform: none;
-        box-shadow: none;
       }
 
       .btn-primary {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+      }
+
+      .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
       }
 
       .btn-secondary {
-        background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+        background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
         color: white;
+        box-shadow: 0 4px 15px rgba(17, 153, 142, 0.4);
       }
 
-      .btn-danger {
-        background: linear-gradient(135deg, #e53e3e 0%, #c53030 100%);
-        color: white;
+      .btn-secondary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(17, 153, 142, 0.6);
       }
 
-      .processing {
+      .btn-download {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        color: white;
+        box-shadow: 0 4px 15px rgba(240, 147, 251, 0.4);
+      }
+
+      .btn-download:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(240, 147, 251, 0.6);
+      }
+
+      .btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none !important;
+      }
+
+      .search-box {
+        flex: 1;
+        min-width: 250px;
+      }
+
+      .search-box input {
+        width: 100%;
+        padding: 12px 16px;
+        border: 2px solid #e1e8ed;
+        border-radius: 10px;
+        font-size: 14px;
+        background: rgba(255, 255, 255, 0.9);
+        transition: all 0.3s ease;
+      }
+
+      .search-box input:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+      }
+
+      .stats {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        padding: 20px;
+        border-radius: 16px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        margin-bottom: 25px;
+        display: none;
+      }
+
+      .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+      }
+
+      .stat-card {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        color: white;
+        padding: 20px;
+        border-radius: 12px;
+        text-align: center;
+      }
+
+      .stat-card h3 {
+        font-size: 0.9rem;
+        margin-bottom: 8px;
+        opacity: 0.9;
+      }
+
+      .stat-card p {
+        font-size: 1.5rem;
+        font-weight: 700;
+      }
+
+      .table-container {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border-radius: 16px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+        overflow: hidden;
+        position: relative;
+      }
+
+      .table-scroll-wrapper {
+        overflow-x: auto;
+        overflow-y: auto;
+        max-height: 600px;
+        position: relative;
+        scrollbar-width: thin;
+        scrollbar-color: #667eea #f1f1f1;
+
+        /* Offset untuk sticky multi-row header */
+        --header-row-1: 0px;
+        --header-row-2: 40px;
+      }
+
+      .table-scroll-wrapper::-webkit-scrollbar {
+        height: 12px;
+        width: 12px;
+      }
+
+      .table-scroll-wrapper::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 6px;
+      }
+
+      .table-scroll-wrapper::-webkit-scrollbar-thumb {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 6px;
+      }
+
+      .table-scroll-wrapper::-webkit-scrollbar-thumb:hover {
+        background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%);
+      }
+
+      /* Scroll indicator */
+      .scroll-indicator {
+        position: absolute;
+        top: 10px;
+        right: 20px;
+        background: rgba(102, 126, 234, 0.9);
+        color: white;
+        padding: 8px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+        z-index: 150;
+        animation: fadeInOut 3s ease-in-out;
+      }
+
+      @keyframes fadeInOut {
+        0%,
+        100% {
+          opacity: 0;
+        }
+        50% {
+          opacity: 1;
+        }
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 11px;
+        min-width: 2600px; /* Increased min-width untuk kolom NIP + ABSEN_TIDAK_LENGKAP */
+      }
+
+      th,
+      td {
+        border: 1px solid #e1e8ed;
+        padding: 12px 8px;
+        text-align: center;
+        /* white-space: nowrap; */
+      }
+
+      /* Sticky header */
+      thead th {
+        position: sticky;
+        z-index: 100;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: #fff;
+        font-weight: 600;
+        font-size: 10px;
+      }
+
+      /* Main header row (grup utama) */
+      thead tr.main-header th {
+        top: var(--header-row-1);
+        z-index: 102;
+        background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        font-size: 9px;
+        padding: 8px 4px;
+      }
+
+      /* Sub header row (detail kolom) */
+      thead tr.sub-header th {
+        top: calc(var(--header-row-1) + var(--header-row-2));
+        z-index: 101;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      }
+
+      tbody tr:nth-child(even) {
+        background: rgba(102, 126, 234, 0.05);
+      }
+
+      tbody tr:hover {
+        background: rgba(102, 126, 234, 0.15);
+        transform: scale(1.001);
+        transition: all 0.2s ease;
+      }
+
+      /* PERNER, NIP, dan NAMA yang sticky kiri */
+      .sticky-left-1 {
+        position: sticky;
+        left: 0;
+        z-index: 90;
+        background: rgba(102, 126, 234, 0.2);
+        font-weight: 700;
+        min-width: 100px;
+        max-width: 100px;
+      }
+
+      .sticky-left-2 {
+        position: sticky;
+        left: 100px; /* Tepat setelah PERNER (100px) */
+        z-index: 90;
+        background: rgba(102, 126, 234, 0.18);
+        font-weight: 600;
+        min-width: 100px;
+        max-width: 100px;
+      }
+
+      .sticky-left-3 {
+        position: sticky;
+        left: 200px; /* Tepat setelah PERNER + NIP (200px) */
+        z-index: 90;
+        background: rgba(102, 126, 234, 0.15);
+        font-weight: 600;
+        min-width: 180px;
+        max-width: 180px;
+        white-space: normal; /* TAMBAHKAN: Allow text wrapping */
+        word-wrap: break-word; /* TAMBAHKAN: Break long words */
+        line-height: 1.3; /* TAMBAHKAN: Increase line height */
+      }
+
+      /* BIDANG/UNIT tidak sticky - normal column */
+      .bidang-unit {
+        font-weight: 600;
+        background: rgba(102, 126, 234, 0.05);
+        min-width: 120px;
+      }
+
+      .percentage {
+        font-weight: 600;
+      }
+
+      .percentage.high {
+        color: #27ae60;
+        background: rgba(39, 174, 96, 0.1);
+        border-radius: 6px;
+      }
+
+      .percentage.medium {
+        color: #f39c12;
+        background: rgba(243, 156, 18, 0.1);
+        border-radius: 6px;
+      }
+
+      .percentage.low {
+        color: #e74c3c;
+        background: rgba(231, 76, 60, 0.1);
+        border-radius: 6px;
+      }
+
+      .loading {
         display: none;
         text-align: center;
-        padding: 20px;
+        padding: 40px;
         color: #667eea;
+        font-size: 1.2rem;
+        font-weight: 600;
       }
 
-      .processing.show {
-        display: block;
-      }
-
-      .spinner {
-        display: inline-block;
-        width: 20px;
-        height: 20px;
-        border: 2px solid #e2e8f0;
+      .loading-spinner {
+        width: 40px;
+        height: 40px;
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #667eea;
         border-radius: 50%;
-        border-top-color: #667eea;
-        animation: spin 1s ease-in-out infinite;
-        margin-right: 10px;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 15px;
       }
 
       @keyframes spin {
-        to {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
           transform: rotate(360deg);
         }
       }
 
-      .results-section {
-        display: none;
-        margin-top: 20px;
-      }
-
-      .results-section.show {
-        display: block;
-      }
-
-      .results-summary {
-        background: #f8f9fa;
-        border-radius: 8px;
-        padding: 20px;
+      .alert {
+        padding: 15px;
+        border-radius: 10px;
         margin-bottom: 20px;
-      }
-
-      .summary-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-        gap: 15px;
-      }
-
-      .summary-item {
-        text-align: center;
-      }
-
-      .summary-value {
-        font-size: 24px;
-        font-weight: 700;
-        color: #2d3748;
-        margin-bottom: 5px;
-      }
-
-      .summary-label {
-        font-size: 12px;
-        color: #718096;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-      }
-
-      .error-list {
-        background: #fff;
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        max-height: 300px;
-        overflow-y: auto;
-      }
-
-      .error-item {
-        padding: 10px 15px;
-        border-bottom: 1px solid #f1f5f9;
-        font-size: 13px;
-      }
-
-      .error-item:last-child {
-        border-bottom: none;
-      }
-
-      .error-row {
-        color: #e53e3e;
         font-weight: 600;
       }
 
-      .error-message {
-        color: #4a5568;
-        margin-top: 4px;
+      .alert-success {
+        background: rgba(39, 174, 96, 0.1);
+        color: #27ae60;
+        border: 2px solid rgba(39, 174, 96, 0.2);
+      }
+
+      .alert-error {
+        background: rgba(231, 76, 60, 0.1);
+        color: #e74c3c;
+        border: 2px solid rgba(231, 76, 60, 0.2);
+      }
+
+      .alert-info {
+        background: rgba(52, 152, 219, 0.1);
+        color: #3498db;
+        border: 2px solid rgba(52, 152, 219, 0.2);
+      }
+
+      .pagination {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 20px;
+        padding: 20px;
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        margin-top: 15px;
+        border-radius: 12px;
+        flex-wrap: wrap;
+      }
+
+      .pagination-info {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        font-size: 13px;
+        color: #2c3e50;
+        min-width: 200px;
+      }
+
+      .pagination-info .primary-info {
+        font-weight: 600;
+        font-size: 14px;
+      }
+
+      .pagination-info .secondary-info {
+        font-size: 12px;
+        color: #7f8c8d;
+      }
+
+      .pagination-controls {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        flex-wrap: wrap;
+      }
+
+      .pagination-navigation {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .pagination button {
+        padding: 8px 16px;
+        border: 2px solid #e1e8ed;
+        background: white;
+        color: #2c3e50;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-size: 13px;
+        min-width: 40px;
+      }
+
+      .pagination button:hover:not(:disabled) {
+        background: #667eea;
+        color: white;
+        border-color: #667eea;
+      }
+
+      .pagination button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .pagination .active {
+        background: #667eea;
+        color: white;
+        border-color: #667eea;
+      }
+
+      .page-input-group {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        color: #2c3e50;
+      }
+
+      .page-input {
+        width: 60px;
+        padding: 6px 8px;
+        border: 2px solid #e1e8ed;
+        border-radius: 6px;
+        text-align: center;
+        font-size: 13px;
+        background: white;
+      }
+
+      .page-input:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+      }
+
+      .items-per-page-group {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        color: #2c3e50;
+      }
+
+      .items-per-page-select {
+        padding: 6px 8px;
+        border: 2px solid #e1e8ed;
+        border-radius: 6px;
+        background: white;
+        font-size: 13px;
+        cursor: pointer;
+      }
+
+      .items-per-page-select:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+      }
+
+      .no-data {
+        text-align: center;
+        padding: 60px 20px;
+        color: #7f8c8d;
+        font-size: 1.2rem;
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 12px;
       }
 
       @media (max-width: 768px) {
-        body {
-          padding: 10px;
-        }
-
-        .section-content {
-          padding: 20px;
-        }
-
-        .button-group {
+        .controls {
           flex-direction: column;
+          align-items: stretch;
         }
 
-        .btn {
+        .search-box {
           min-width: auto;
         }
 
         .header h1 {
           font-size: 1.8rem;
         }
+
+        .stats-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .pagination {
+          flex-direction: column;
+          gap: 15px;
+        }
+
+        .pagination-controls {
+          flex-direction: column;
+          gap: 10px;
+          width: 100%;
+        }
+
+        .pagination-navigation {
+          justify-content: center;
+          flex-wrap: wrap;
+        }
+
+        .page-input-group,
+        .items-per-page-group {
+          justify-content: center;
+        }
       }
     </style>
   </head>
   <body>
-    <div class="upload-container">
+    <div class="dashboard-container">
+      <!-- Header -->
       <div class="header">
-        <h1>📊 Upload Data Pegawai</h1>
-        <p>Import data pegawai dari file Excel atau CSV</p>
+        <h1>📊 Dashboard Rekap Absensi</h1>
+        <p>Sistem Monitoring dan Analisis Kehadiran Karyawan</p>
       </div>
 
-      <!-- Upload Section -->
-      <div class="upload-section">
-        <div class="section-header">📁 Upload File</div>
-        <div class="section-content">
-          <div class="instructions">
-            <h3>Format File yang Didukung:</h3>
-            <ul>
-              <li>Excel (.xlsx, .xls)</li>
-              <li>CSV (.csv) dengan encoding UTF-8</li>
-              <li>Maksimal ukuran file: 10MB</li>
-              <li>Maksimal 5000 records per upload</li>
-            </ul>
+      <!-- Controls -->
+      <div class="controls">
+        <button id="generateBtn" class="btn btn-primary">
+          <span>⚡</span> Generate Rekap Absensi
+        </button>
+        <button id="refreshBtn" class="btn btn-secondary">
+          <span>🔄</span> Refresh Data
+        </button>
+        <button id="downloadBtn" class="btn btn-download" disabled>
+          <span>📊</span> Download Excel (.xlsx)
+        </button>
+        <div class="search-box">
+          <input
+            type="text"
+            id="searchInput"
+            placeholder="🔍 Cari berdasarkan PERNER, NIP, Nama, atau Bidang..."
+          />
+        </div>
+      </div>
 
-            <h3>Format Kolom yang Diperlukan:</h3>
-            <div class="format-example">
-              Kolom harus mengandung (urutan bebas): - perner (wajib) - nip
-              (wajib) - nama (wajib) - bidang (wajib) - no_telp (wajib) Contoh:
-              perner | nip | nama | bidang | no_telp P001 | 123456 | John Doe |
-              IT | 081234567890 P002 | 123457 | Jane Smith | HR | 081234567891
-            </div>
-          </div>
+      <!-- Alert Messages -->
+      <div id="alertContainer"></div>
 
-          <div class="upload-area" id="uploadArea">
-            <div class="upload-icon">📁</div>
-            <div class="upload-text">
-              Klik untuk memilih file atau drag & drop
-            </div>
-            <div class="upload-hint">Excel (.xlsx, .xls) atau CSV (.csv)</div>
-            <input
-              type="file"
-              id="fileInput"
-              class="file-input"
-              accept=".xlsx,.xls,.csv"
-            />
-          </div>
+      <!-- Statistics -->
+      <div id="statsContainer" class="stats">
+        <div class="stats-grid" id="statsGrid">
+          <!-- Stats akan di-generate oleh JavaScript -->
+        </div>
+      </div>
 
-          <div class="file-info" id="fileInfo">
-            <div class="file-details">
-              <div class="file-icon">📄</div>
-              <div class="file-meta">
-                <div class="file-name" id="fileName"></div>
-                <div class="file-size" id="fileSize"></div>
-              </div>
-            </div>
-            <div class="upload-progress" id="uploadProgress">
-              <div class="progress-bar" id="progressBar"></div>
-            </div>
-            <div class="progress-text" id="progressText"></div>
-          </div>
+      <!-- Loading -->
+      <div id="loadingContainer" class="loading">
+        <div class="loading-spinner"></div>
+        <div>Memproses data...</div>
+      </div>
 
-          <div class="validation-info" id="validationInfo">
-            <div id="validationText"></div>
-          </div>
-
-          <div class="processing" id="processing">
-            <div class="spinner"></div>
-            <span id="processingText">Memproses file...</span>
-          </div>
-
-          <div class="button-group">
-            <button class="btn btn-primary" id="selectFileBtn">
-              📁 Pilih File
-            </button>
-            <button class="btn btn-secondary" id="uploadBtn" disabled>
-              ⬆️ Upload & Process
-            </button>
-            <button class="btn btn-danger" id="clearBtn">🗑️ Clear</button>
+      <!-- Table -->
+      <div class="table-container" id="tableContainer">
+        <div
+          class="scroll-indicator"
+          id="scrollIndicator"
+          style="display: none"
+        >
+          ← Scroll untuk melihat kolom lainnya →
+        </div>
+        <div class="table-scroll-wrapper" id="tableScrollWrapper">
+          <div class="no-data" id="noDataMessage">
+            📋 Belum ada data rekap. Klik tombol "Generate Rekap Absensi" untuk
+            memulai.
           </div>
         </div>
       </div>
 
-      <!-- Results Section -->
-      <div class="upload-section results-section" id="resultsSection">
-        <div class="section-header">📊 Hasil Upload</div>
-        <div class="section-content">
-          <div class="results-summary" id="resultsSummary">
-            <div class="summary-grid" id="summaryGrid">
-              <!-- Summary akan diisi oleh JavaScript -->
-            </div>
-          </div>
-
-          <div class="error-list" id="errorList" style="display: none">
-            <!-- Error list akan diisi oleh JavaScript -->
-          </div>
-        </div>
+      <!-- Pagination -->
+      <div id="paginationContainer" class="pagination" style="display: none">
+        <!-- Pagination akan di-generate oleh JavaScript -->
       </div>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script>
-      // Base URL configuration (sama seperti file lain)
-      const PROD_API = "https://absensi-db.onrender.com";
-      const LOCAL_API = "http://localhost:3000";
+      const PROD_API = "https://absensi-db.onrender.com"; // API di Render
+      const LOCAL_API = "http://localhost:8080"; // Dev lokal
 
       const host = location.hostname;
       const isLocalHost = /^(localhost|127\.0\.0\.1)$/.test(host);
@@ -544,452 +657,1000 @@
         (window.BASE_URL && window.BASE_URL.trim()) ||
         (isLocalHost || isPrivateLAN ? LOCAL_API : PROD_API);
 
-      console.log("Using BASE_URL:", BASE_URL);
-
-      // DOM Elements
-      const uploadArea = document.getElementById("uploadArea");
-      const fileInput = document.getElementById("fileInput");
-      const fileInfo = document.getElementById("fileInfo");
-      const fileName = document.getElementById("fileName");
-      const fileSize = document.getElementById("fileSize");
-      const uploadProgress = document.getElementById("uploadProgress");
-      const progressBar = document.getElementById("progressBar");
-      const progressText = document.getElementById("progressText");
-      const validationInfo = document.getElementById("validationInfo");
-      const validationText = document.getElementById("validationText");
-      const processing = document.getElementById("processing");
-      const processingText = document.getElementById("processingText");
-      const selectFileBtn = document.getElementById("selectFileBtn");
-      const uploadBtn = document.getElementById("uploadBtn");
-      const clearBtn = document.getElementById("clearBtn");
-      const resultsSection = document.getElementById("resultsSection");
-      const summaryGrid = document.getElementById("summaryGrid");
-      const errorList = document.getElementById("errorList");
+      const api = (path, opts = {}) => {
+        const p = path.startsWith("/") ? path : `/${path}`;
+        return fetch(`${BASE_URL}${p}`, opts);
+      };
 
       // Global variables
-      let selectedFile = null;
-      let parsedData = [];
-      let validationErrors = [];
+      let currentPage = 1;
+      let itemsPerPage = 50;
+      let totalPages = 1;
+      let searchQuery = "";
+      let currentData = []; // Store current data for export
 
-      // Event listeners
-      selectFileBtn.addEventListener("click", () => fileInput.click());
-      fileInput.addEventListener("change", handleFileSelect);
-      uploadBtn.addEventListener("click", processUpload);
-      clearBtn.addEventListener("click", clearAll);
+      // DOM Elements
+      const generateBtn = document.getElementById("generateBtn");
+      const refreshBtn = document.getElementById("refreshBtn");
+      const downloadBtn = document.getElementById("downloadBtn");
+      const searchInput = document.getElementById("searchInput");
+      const alertContainer = document.getElementById("alertContainer");
+      const statsContainer = document.getElementById("statsContainer");
+      const loadingContainer = document.getElementById("loadingContainer");
+      const tableContainer = document.getElementById("tableContainer");
+      const tableScrollWrapper = document.getElementById("tableScrollWrapper");
+      const scrollIndicator = document.getElementById("scrollIndicator");
+      const paginationContainer = document.getElementById(
+        "paginationContainer"
+      );
+      const noDataMessage = document.getElementById("noDataMessage");
 
-      // Drag & Drop handlers
-      uploadArea.addEventListener("dragover", handleDragOver);
-      uploadArea.addEventListener("dragleave", handleDragLeave);
-      uploadArea.addEventListener("drop", handleDrop);
-      uploadArea.addEventListener("click", () => fileInput.click());
+      // Event Listeners
+      generateBtn.addEventListener("click", generateRekap);
+      refreshBtn.addEventListener("click", loadRekapData);
+      downloadBtn.addEventListener("click", downloadExcel);
+      searchInput.addEventListener("input", debounce(handleSearch, 500));
 
-      function handleDragOver(e) {
-        e.preventDefault();
-        uploadArea.classList.add("dragover");
-      }
-
-      function handleDragLeave(e) {
-        e.preventDefault();
-        uploadArea.classList.remove("dragover");
-      }
-
-      function handleDrop(e) {
-        e.preventDefault();
-        uploadArea.classList.remove("dragover");
-        const files = e.dataTransfer.files;
-        if (files.length > 0) {
-          handleFile(files[0]);
-        }
-      }
-
-      function handleFileSelect(e) {
-        const file = e.target.files[0];
-        if (file) {
-          handleFile(file);
-        }
-      }
-
-      function handleFile(file) {
-        // Validate file type
-        const allowedTypes = [
-          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", // .xlsx
-          "application/vnd.ms-excel", // .xls
-          "text/csv", // .csv
-        ];
-
-        const fileExtension = file.name.toLowerCase().split(".").pop();
-        const allowedExtensions = ["xlsx", "xls", "csv"];
-
-        if (
-          !allowedTypes.includes(file.type) &&
-          !allowedExtensions.includes(fileExtension)
-        ) {
-          showValidation(
-            "error",
-            "Format file tidak didukung. Gunakan Excel (.xlsx, .xls) atau CSV (.csv)"
-          );
-          return;
-        }
-
-        // Validate file size (10MB max)
-        const maxSize = 10 * 1024 * 1024; // 10MB
-        if (file.size > maxSize) {
-          showValidation("error", "Ukuran file terlalu besar. Maksimal 10MB.");
-          return;
-        }
-
-        selectedFile = file;
-        showFileInfo(file);
-        parseFile(file);
-      }
-
-      function showFileInfo(file) {
-        fileName.textContent = file.name;
-        fileSize.textContent = formatFileSize(file.size);
-        fileInfo.classList.add("show");
-      }
-
-      function formatFileSize(bytes) {
-        if (bytes === 0) return "0 Bytes";
-        const k = 1024;
-        const sizes = ["Bytes", "KB", "MB", "GB"];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
-      }
-
-      function parseFile(file) {
-        processing.classList.add("show");
-        processingText.textContent = "Membaca file...";
-
-        const reader = new FileReader();
-        reader.onload = function (e) {
-          try {
-            let data;
-            const fileExtension = file.name.toLowerCase().split(".").pop();
-
-            if (fileExtension === "csv") {
-              data = parseCSV(e.target.result);
-            } else {
-              data = parseExcel(e.target.result);
-            }
-
-            if (data && data.length > 0) {
-              processingText.textContent = "Memvalidasi data...";
-              setTimeout(() => validateData(data), 100);
-            } else {
-              processing.classList.remove("show");
-              showValidation("error", "File kosong atau tidak dapat dibaca.");
-            }
-          } catch (error) {
-            processing.classList.remove("show");
-            showValidation("error", `Error membaca file: ${error.message}`);
+      // Download Excel Function (.xlsx format with merged headers)
+      async function downloadExcel() {
+        try {
+          if (!currentData || currentData.length === 0) {
+            showAlert(
+              "⚠ Tidak ada data untuk diunduh. Generate rekap terlebih dahulu.",
+              "error"
+            );
+            return;
           }
-        };
 
-        if (file.name.toLowerCase().endsWith(".csv")) {
-          reader.readAsText(file);
-        } else {
-          reader.readAsArrayBuffer(file);
-        }
-      }
+          showLoading(true);
+          showAlert("📊 Mengunduh data dalam format Excel (.xlsx)...", "info");
 
-      function parseCSV(content) {
-        const lines = content.split("\n").filter((line) => line.trim());
-        if (lines.length < 2) return [];
-
-        const headers = lines[0].split(",").map((h) => h.trim().toLowerCase());
-        const data = [];
-
-        for (let i = 1; i < lines.length; i++) {
-          const values = lines[i].split(",").map((v) => v.trim());
-          if (values.length >= headers.length) {
-            const row = {};
-            headers.forEach((header, index) => {
-              row[header] = values[index] || "";
-            });
-            data.push(row);
-          }
-        }
-
-        return data;
-      }
-
-      function parseExcel(arrayBuffer) {
-        const workbook = XLSX.read(arrayBuffer, { type: "array" });
-        const firstSheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[firstSheetName];
-        const data = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-
-        if (data.length < 2) return [];
-
-        const headers = data[0].map((h) =>
-          String(h || "")
-            .trim()
-            .toLowerCase()
-        );
-        const parsedData = [];
-
-        for (let i = 1; i < data.length; i++) {
-          if (data[i].some((cell) => cell !== undefined && cell !== "")) {
-            const row = {};
-            headers.forEach((header, index) => {
-              row[header] = String(data[i][index] || "").trim();
-            });
-            parsedData.push(row);
-          }
-        }
-
-        return parsedData;
-      }
-
-      function validateData(data) {
-        validationErrors = [];
-        const requiredFields = ["perner", "nip", "nama", "bidang", "no_telp"];
-
-        // Check max records
-        if (data.length > 5000) {
-          validationErrors.push(
-            `Terlalu banyak data: ${data.length} records. Maksimal 5000 records.`
-          );
-          processing.classList.remove("show");
-          showValidation("error", validationErrors.join("<br>"));
-          return;
-        }
-
-        // Check headers
-        const headers = Object.keys(data[0] || {});
-        const missingHeaders = requiredFields.filter(
-          (field) =>
-            !headers.some((header) => header.toLowerCase().includes(field))
-        );
-
-        if (missingHeaders.length > 0) {
-          validationErrors.push(
-            `Kolom yang hilang: ${missingHeaders.join(", ")}`
-          );
-        }
-
-        // Validate each row
-        const pernerSet = new Set();
-        const nipSet = new Set();
-
-        data.forEach((row, index) => {
-          const rowNum = index + 1;
-
-          // Check required fields
-          requiredFields.forEach((field) => {
-            const value = row[field] || "";
-            if (!value.trim()) {
-              validationErrors.push(`Baris ${rowNum}: ${field} kosong`);
-            }
+          // Get all data (not just current page) for export
+          const searchParams = new URLSearchParams({
+            limit: 10000,
+            offset: 0,
+            search: searchQuery,
+            search_fields: "PERNER,NAMA,NIP,BIDANG_UNIT",
           });
 
-          // Check duplicates
-          if (row.perner) {
-            if (pernerSet.has(row.perner)) {
-              validationErrors.push(
-                `Baris ${rowNum}: PERNER ${row.perner} duplikat`
-              );
-            }
-            pernerSet.add(row.perner);
-          }
-
-          if (row.nip) {
-            if (nipSet.has(row.nip)) {
-              validationErrors.push(`Baris ${rowNum}: NIP ${row.nip} duplikat`);
-            }
-            nipSet.add(row.nip);
-          }
-
-          // Check field lengths
-          if (row.perner && row.perner.length > 50) {
-            validationErrors.push(
-              `Baris ${rowNum}: PERNER terlalu panjang (max 50)`
-            );
-          }
-          if (row.nip && row.nip.length > 50) {
-            validationErrors.push(
-              `Baris ${rowNum}: NIP terlalu panjang (max 50)`
-            );
-          }
-          if (row.nama && row.nama.length > 100) {
-            validationErrors.push(
-              `Baris ${rowNum}: Nama terlalu panjang (max 100)`
-            );
-          }
-          if (row.bidang && row.bidang.length > 100) {
-            validationErrors.push(
-              `Baris ${rowNum}: Bidang terlalu panjang (max 100)`
-            );
-          }
-          if (row.no_telp && row.no_telp.length > 20) {
-            validationErrors.push(
-              `Baris ${rowNum}: No. Telp terlalu panjang (max 20)`
-            );
-          }
-        });
-
-        processing.classList.remove("show");
-
-        if (validationErrors.length > 0) {
-          const errorCount = validationErrors.length;
-          const maxShow = 10;
-          let errorMessage = `Ditemukan ${errorCount} error:<br>`;
-          errorMessage += validationErrors.slice(0, maxShow).join("<br>");
-          if (errorCount > maxShow) {
-            errorMessage += `<br>... dan ${errorCount - maxShow} error lainnya`;
-          }
-          showValidation("error", errorMessage);
-          uploadBtn.disabled = true;
-        } else {
-          parsedData = data;
-          showValidation(
-            "success",
-            `✅ Data valid! ${data.length} records siap untuk diupload.`
+          const allDataResponse = await fetch(
+            `${BASE_URL}/get-rekap-absensi?${searchParams.toString()}`
           );
-          uploadBtn.disabled = false;
+          const allDataResult = await allDataResponse.json();
+
+          if (!allDataResult.success) {
+            throw new Error("Gagal mengambil data lengkap");
+          }
+
+          const data = allDataResult.data;
+          console.log(`📊 Exporting ${data.length} records to Excel (.xlsx)`);
+
+          // Create workbook
+          const wb = XLSX.utils.book_new();
+
+          // Create worksheet data manually with merged headers
+          const ws = {};
+
+          // Set worksheet range
+          const totalRows = data.length + 2; // +2 for header rows
+          const totalCols = 34; // Total columns (tambah kolom NIP + ABSEN_TIDAK_LENGKAP)
+          ws["!ref"] = XLSX.utils.encode_range({
+            s: { c: 0, r: 0 },
+            e: { c: totalCols - 1, r: totalRows - 1 },
+          });
+
+          // Row 1: Main headers (merged) - UPDATE sesuai struktur baru
+          const mainHeaders = [
+            { value: "PERNER", col: 0 },
+            { value: "NIP", col: 1 },
+            { value: "NAMA", col: 2 },
+            { value: "BIDANG/UNIT", col: 3 },
+            { value: "JUMLAH HARI REGULER", col: 4, span: 3 },
+            { value: "JUMLAH HARI REALISASI", col: 7, span: 3 },
+            { value: "DATA KOREKSI", col: 10, span: 5 },
+            { value: "POLA JAM KERJA NORMAL", col: 15, span: 4 },
+            { value: "POLA JAM KERJA SHIFT", col: 19, span: 5 },
+            { value: "KETERANGAN ABSEN MASUK DAN PULANG", col: 24, span: 5 }, // Update span menjadi 6
+            { value: "PENGAJUAN KETIDAKHADIRAN", col: 29, span: 2 }, // Update col menjadi 30
+            { value: "PEROLEHAN DURASI JAM KERJA", col: 31, span: 3 }, // Update col menjadi 32
+          ];
+
+          // Row 2: Sub headers - UPDATE sesuai struktur baru
+          const subHeaders = [
+            "PERNER",
+            "NIP",
+            "NAMA",
+            "BIDANG/UNIT",
+            // JUMLAH HARI REGULER
+            "TOTAL HARI",
+            "HARI KERJA",
+            "HARI LIBUR",
+            // JUMLAH HARI REALISASI
+            "TOTAL HARI",
+            "HARI KERJA",
+            "HARI LIBUR",
+            // DATA KOREKSI
+            "TOTAL TANPA KOREKSI",
+            "TOTAL HARI KOREKSI",
+            "KOREKSI IN",
+            "KOREKSI OUT",
+            "KOREKSI IN & OUT",
+            // POLA JAM KERJA NORMAL
+            "TOTAL JAM KERJA NORMAL",
+            "PIKET",
+            "PDKB",
+            "REGULER",
+            // POLA JAM KERJA SHIFT
+            "TOTAL JAM KERJA SHIFT",
+            "SHIFT PAGI",
+            "SHIFT SIANG",
+            "SHIFT MALAM",
+            "SHIFT OFF",
+            // KETERANGAN ABSEN MASUK DAN PULANG
+            "TOTAL ABSEN LENGKAP",
+            "TOTAL ABSEN TIDAK LENGKAP",
+            "IN & OUT KOSONG",
+            "IN KOSONG",
+            "OUT KOSONG",
+            // PENGAJUAN KETIDAKHADIRAN
+            "SPPD/TUGAS LUAR DLL",
+            "CUTI/IJIN",
+            // PEROLEHAN DURASI JAM KERJA
+            "JAM REALISASI",
+            "JAM SEHARUSNYA",
+            "PERSENTASE JKP (%)",
+          ];
+
+          // Create main headers (row 0)
+          mainHeaders.forEach((header) => {
+            const cellRef = XLSX.utils.encode_cell({ r: 0, c: header.col });
+            ws[cellRef] = {
+              v: header.value,
+              t: "s",
+              s: {
+                font: { bold: true, color: { rgb: "FFFFFF" }, size: 11 },
+                fill: { fgColor: { rgb: "2196F3" } },
+                alignment: { horizontal: "center", vertical: "center" },
+                border: {
+                  top: { style: "thin", color: { rgb: "FFFFFF" } },
+                  bottom: { style: "thin", color: { rgb: "FFFFFF" } },
+                  left: { style: "thin", color: { rgb: "FFFFFF" } },
+                  right: { style: "thin", color: { rgb: "FFFFFF" } },
+                },
+              },
+            };
+          });
+
+          // Create sub headers (row 1)
+          subHeaders.forEach((header, index) => {
+            const cellRef = XLSX.utils.encode_cell({ r: 1, c: index });
+            ws[cellRef] = {
+              v: header,
+              t: "s",
+              s: {
+                font: { bold: true, color: { rgb: "FFFFFF" }, size: 10 },
+                fill: { fgColor: { rgb: "11998E" } },
+                alignment: { horizontal: "center", vertical: "center" },
+                border: {
+                  top: { style: "thin", color: { rgb: "FFFFFF" } },
+                  bottom: { style: "thin", color: { rgb: "FFFFFF" } },
+                  left: { style: "thin", color: { rgb: "FFFFFF" } },
+                  right: { style: "thin", color: { rgb: "FFFFFF" } },
+                },
+              },
+            };
+          });
+
+          // Add data rows (starting from row 2) - UPDATE mapping sesuai struktur baru
+          data.forEach((row, rowIndex) => {
+            const dataRow = [
+              row.PERNER,
+              row.NIP || "-",
+              row.NAMA || "-",
+              row.BIDANG_UNIT || "-",
+              // JUMLAH HARI REGULER
+              parseInt(row.TOTAL_HARI_REGULER || 0),
+              parseInt(row.HARI_KERJA_REGULER || 0),
+              parseInt(row.HARI_LIBUR_REGULER || 0),
+              // JUMLAH HARI REALISASI
+              parseInt(row.TOTAL_HARI_REALISASI || 0),
+              parseInt(row.HARI_KERJA_REALISASI || 0),
+              parseInt(row.HARI_LIBUR_REALISASI || 0),
+              // DATA KOREKSI
+              parseInt(row.TOTAL_HARI_TANPA_KOREKSI || 0),
+              parseInt(row.TOTAL_HARI_KOREKSI || 0),
+              parseInt(row.KOREKSI_IN || 0),
+              parseInt(row.KOREKSI_OUT || 0),
+              parseInt(row.KOREKSI_IN_OUT || 0),
+              // POLA JAM KERJA NORMAL
+              parseInt(row.TOTAL_JAM_KERJA_NORMAL || 0),
+              parseInt(row.PIKET || 0),
+              parseInt(row.PDKB || 0),
+              parseInt(row.REGULER || 0),
+              // POLA JAM KERJA SHIFT
+              parseInt(row.TOTAL_JAM_KERJA_SHIFT || 0),
+              parseInt(row.SHIFT_PAGI || 0),
+              parseInt(row.SHIFT_SIANG || 0),
+              parseInt(row.SHIFT_MALAM || 0),
+              parseInt(row.SHIFT_OFF || 0),
+              // KETERANGAN ABSEN MASUK DAN PULANG
+              parseInt(row.ABSEN_LENGKAP || 0),
+              parseInt(row.ABSEN_TIDAK_LENGKAP || 0),
+              parseInt(row.IN_OUT_KOSONG || 0),
+              parseInt(row.IN_KOSONG || 0),
+              parseInt(row.OUT_KOSONG || 0),
+              // PENGAJUAN KETIDAKHADIRAN
+              parseInt(row.SPPD_TUGAS_LUAR_DLL || 0),
+              parseInt(row.CUTI_IJIN || 0),
+              // PEROLEHAN DURASI JAM KERJA
+              parseFloat(row.JAM_REALISASI || 0),
+              parseFloat(row.JAM_SEHARUSNYA || 0),
+              parseFloat(row.PERSENTASE_JKP || 0),
+            ];
+
+            dataRow.forEach((cellValue, colIndex) => {
+              const cellRef = XLSX.utils.encode_cell({
+                r: rowIndex + 2,
+                c: colIndex,
+              });
+              let cellStyle = {
+                alignment: { horizontal: "center", vertical: "center" },
+                border: {
+                  top: { style: "thin", color: { rgb: "CCCCCC" } },
+                  bottom: { style: "thin", color: { rgb: "CCCCCC" } },
+                  left: { style: "thin", color: { rgb: "CCCCCC" } },
+                  right: { style: "thin", color: { rgb: "CCCCCC" } },
+                },
+              };
+
+              // Special formatting for specific columns
+              if (colIndex === 0 || colIndex === 1 || colIndex === 2) {
+                // PERNER, NIP, NAMA columns (sticky)
+                cellStyle.font = { bold: true };
+                cellStyle.fill = { fgColor: { rgb: "E3F2FD" } };
+              } else if (colIndex === 3) {
+                // BIDANG/UNIT column (non-sticky)
+                cellStyle.font = { bold: true };
+                cellStyle.fill = { fgColor: { rgb: "F5F5F5" } };
+              } else if (colIndex >= 32 && colIndex <= 33) {
+                // JAM REALISASI & JAM SEHARUSNYA
+                cellStyle.numFmt = "#,##0.00";
+              } else if (colIndex === 34) {
+                // PERSENTASE JKP
+                cellStyle.numFmt = "#,##0.00";
+
+                // Color coding for percentage
+                const value = parseFloat(cellValue);
+                if (value >= 90) {
+                  cellStyle.fill = { fgColor: { rgb: "E8F5E8" } };
+                  cellStyle.font = { color: { rgb: "2E7D32" } };
+                } else if (value >= 70) {
+                  cellStyle.fill = { fgColor: { rgb: "FFF3E0" } };
+                  cellStyle.font = { color: { rgb: "F57C00" } };
+                } else {
+                  cellStyle.fill = { fgColor: { rgb: "FFEBEE" } };
+                  cellStyle.font = { color: { rgb: "C62828" } };
+                }
+              }
+
+              ws[cellRef] = {
+                v: cellValue,
+                t: typeof cellValue === "number" ? "n" : "s",
+                s: cellStyle,
+              };
+            });
+          });
+
+          // Set merge ranges for main headers - UPDATE sesuai struktur baru
+          const merges = [
+            { s: { r: 0, c: 0 }, e: { r: 1, c: 0 } }, // PERNER (span 2 rows)
+            { s: { r: 0, c: 1 }, e: { r: 1, c: 1 } }, // NIP (span 2 rows)
+            { s: { r: 0, c: 2 }, e: { r: 1, c: 2 } }, // NAMA (span 2 rows)
+            { s: { r: 0, c: 3 }, e: { r: 1, c: 3 } }, // BIDANG/UNIT (span 2 rows)
+            { s: { r: 0, c: 4 }, e: { r: 0, c: 6 } }, // JUMLAH HARI REGULER
+            { s: { r: 0, c: 7 }, e: { r: 0, c: 9 } }, // JUMLAH HARI REALISASI
+            { s: { r: 0, c: 10 }, e: { r: 0, c: 14 } }, // DATA KOREKSI
+            { s: { r: 0, c: 15 }, e: { r: 0, c: 18 } }, // POLA JAM KERJA NORMAL
+            { s: { r: 0, c: 19 }, e: { r: 0, c: 23 } }, // POLA JAM KERJA SHIFT
+            { s: { r: 0, c: 24 }, e: { r: 0, c: 28 } }, // KETERANGAN ABSEN (5 kolom)
+            { s: { r: 0, c: 29 }, e: { r: 0, c: 30 } }, // PENGAJUAN KETIDAKHADIRAN
+            { s: { r: 0, c: 31 }, e: { r: 0, c: 33 } }, // PEROLEHAN DURASI JAM KERJA
+          ];
+          ws["!merges"] = merges;
+
+          // Set column widths for better readability
+          const colWidths = [
+            { wch: 12 }, // PERNER
+            { wch: 15 }, // NIP
+            { wch: 20 }, // NAMA
+            { wch: 15 }, // BIDANG/UNIT
+            { wch: 10 }, // TOTAL HARI REGULER
+            { wch: 10 }, // HARI KERJA REGULER
+            { wch: 10 }, // HARI LIBUR REGULER
+            { wch: 10 }, // TOTAL HARI REALISASI
+            { wch: 10 }, // HARI KERJA REALISASI
+            { wch: 10 }, // HARI LIBUR REALISASI
+            { wch: 12 }, // TOTAL TANPA KOREKSI
+            { wch: 12 }, // TOTAL HARI KOREKSI
+            { wch: 10 }, // KOREKSI IN
+            { wch: 10 }, // KOREKSI OUT
+            { wch: 12 }, // KOREKSI IN & OUT
+            { wch: 15 }, // TOTAL JAM KERJA NORMAL
+            { wch: 8 }, // PIKET
+            { wch: 8 }, // PDKB
+            { wch: 10 }, // REGULER
+            { wch: 15 }, // TOTAL JAM KERJA SHIFT
+            { wch: 10 }, // SHIFT PAGI
+            { wch: 10 }, // SHIFT SIANG
+            { wch: 10 }, // SHIFT MALAM
+            { wch: 10 }, // SHIFT OFF
+            { wch: 12 }, // TOTAL ABSEN LENGKAP
+            { wch: 15 }, // TOTAL ABSEN TIDAK LENGKAP
+            { wch: 12 }, // IN & OUT KOSONG
+            { wch: 10 }, // IN KOSONG
+            { wch: 10 }, // OUT KOSONG
+            { wch: 15 }, // SPPD/TUGAS LUAR DLL
+            { wch: 10 }, // CUTI/IJIN
+            { wch: 12 }, // JAM REALISASI
+            { wch: 12 }, // JAM SEHARUSNYA
+            { wch: 12 }, // PERSENTASE JKP
+          ];
+          ws["!cols"] = colWidths;
+
+          // Set row heights for headers
+          ws["!rows"] = [
+            { hpt: 25 }, // Row 0 height
+            { hpt: 20 }, // Row 1 height
+          ];
+
+          // Add worksheet to workbook
+          XLSX.utils.book_append_sheet(wb, ws, "Rekap Absensi");
+
+          // Generate filename
+          const timestamp = new Date().toISOString().split("T")[0];
+          const filename = `Rekap_Absensi_${timestamp}${
+            searchQuery ? "_Filtered" : ""
+          }.xlsx`;
+
+          // Write and download file
+          XLSX.writeFile(wb, filename);
+
+          showAlert(
+            `✅ File "${filename}" berhasil diunduh! (${data.length} records)`,
+            "success"
+          );
+        } catch (error) {
+          console.error("Download error:", error);
+          let errorMessage = "⚠ Gagal mengunduh file: ";
+
+          if (error.message.includes("XLSX is not defined")) {
+            errorMessage +=
+              "Library Excel tidak tersedia. Refresh halaman dan coba lagi.";
+          } else {
+            errorMessage += error.message;
+          }
+
+          showAlert(errorMessage, "error");
+        } finally {
+          showLoading(false);
         }
       }
 
-      async function processUpload() {
-        if (
-          !selectedFile ||
-          validationErrors.length > 0 ||
-          parsedData.length === 0
-        ) {
-          showValidation("error", "Tidak ada data valid untuk diupload.");
+      // Generate Rekap Function
+      async function generateRekap() {
+        try {
+          showLoading(true);
+          showAlert("🔄 Memulai proses generate rekap absensi...", "info");
+
+          generateBtn.disabled = true;
+          refreshBtn.disabled = true;
+
+          console.log("🚀 Generate rekap started...");
+          console.log("🔗 POST URL:", `${BASE_URL}/generate-rekap-absensi`);
+
+          const response = await fetch(`${BASE_URL}/generate-rekap-absensi`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            mode: "cors",
+          });
+
+          console.log("📡 Response status:", response.status);
+          console.log("📡 Response headers:", [...response.headers.entries()]);
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error("⚠ Server response error:", errorText);
+            throw new Error(
+              `HTTP Error: ${response.status} - ${
+                response.statusText
+              }\nResponse: ${errorText.substring(0, 200)}`
+            );
+          }
+
+          const contentType = response.headers.get("content-type");
+          console.log("📄 Content-Type:", contentType);
+
+          if (!contentType || !contentType.includes("application/json")) {
+            const text = await response.text();
+            console.error("⚠ Non-JSON response:", text);
+            throw new Error(
+              `Server mengembalikan response non-JSON: ${text.substring(
+                0,
+                200
+              )}...`
+            );
+          }
+
+          const result = await response.json();
+          console.log("✅ Generate result:", result);
+
+          if (result.success) {
+            showAlert(`✅ ${result.message}`, "success");
+            if (result.stats) {
+              displayStats(result.stats);
+            }
+            await loadRekapData();
+          } else {
+            showAlert(`⚠ ${result.message || "Generate rekap gagal"}`, "error");
+          }
+        } catch (error) {
+          console.error("⚠ Generate rekap error:", error);
+
+          // Better error messages
+          let errorMessage = "⚠ Terjadi kesalahan: ";
+          if (
+            error.message.includes("Failed to fetch") ||
+            error.message.includes("NetworkError")
+          ) {
+            errorMessage += `Server tidak dapat diakses. Pastikan server sudah berjalan di ${BASE_URL}.`;
+          } else if (error.message.includes("404")) {
+            errorMessage +=
+              "Endpoint tidak ditemukan. Periksa apakah server sudah running dengan benar.";
+          } else if (error.message.includes("405")) {
+            errorMessage +=
+              "Method tidak diizinkan. Periksa server routing dan CORS configuration.";
+          } else if (error.message.includes("500")) {
+            errorMessage +=
+              "Kesalahan server internal. Periksa database connection dan console server.";
+          } else {
+            errorMessage += error.message;
+          }
+
+          showAlert(errorMessage, "error");
+        } finally {
+          showLoading(false);
+          generateBtn.disabled = false;
+          refreshBtn.disabled = false;
+        }
+      }
+
+      // Load Rekap Data Function
+      async function loadRekapData() {
+        try {
+          showLoading(true);
+
+          const offset = (currentPage - 1) * itemsPerPage;
+
+          // Enhanced search with multiple fields including NIP
+          const searchParams = new URLSearchParams({
+            limit: itemsPerPage,
+            offset: offset,
+            search: searchQuery,
+            search_fields: "PERNER,NAMA,NIP,BIDANG_UNIT",
+          });
+
+          const url = `${BASE_URL}/get-rekap-absensi?${searchParams.toString()}`;
+
+          console.log("🔗 API Request URL:", url);
+          console.log("🔍 Search Query:", searchQuery);
+          console.log("🎯 Search Fields: PERNER, NAMA, NIP, BIDANG_UNIT");
+
+          const response = await fetch(url);
+          const result = await response.json();
+
+          if (result.success) {
+            displayRekapData(result.data);
+            displayPagination(result.pagination);
+
+            if (result.data.length > 0) {
+              noDataMessage.style.display = "none";
+              statsContainer.style.display = "block";
+              downloadBtn.disabled = false;
+            } else {
+              noDataMessage.style.display = "block";
+              downloadBtn.disabled = true;
+              noDataMessage.innerHTML = searchQuery
+                ? `🔍 Tidak ada data yang sesuai dengan pencarian "${searchQuery}".`
+                : '📋 Belum ada data rekap. Klik tombol "Generate Rekap Absensi" untuk memulai.';
+            }
+          } else {
+            showAlert(`⚠ ${result.message}`, "error");
+          }
+        } catch (error) {
+          console.error("Error loading data:", error);
+          showAlert("⚠ Terjadi kesalahan saat memuat data.", "error");
+        } finally {
+          showLoading(false);
+        }
+      }
+
+      // Display Rekap Data in Table - UPDATE struktur tabel
+      function displayRekapData(data) {
+        if (!data || data.length === 0) {
+          tableScrollWrapper.innerHTML = `<div class="no-data">📋 Tidak ada data untuk ditampilkan.</div>`;
+          downloadBtn.disabled = true;
           return;
         }
 
-        processing.classList.add("show");
-        processingText.textContent = "Mengupload ke database...";
-        uploadProgress.classList.add("show");
+        // Store current data for export
+        currentData = data;
+        downloadBtn.disabled = false;
 
-        try {
-          // Simulate upload progress
-          for (let i = 0; i <= 100; i += 10) {
-            progressBar.style.width = i + "%";
-            progressText.textContent = `Uploading... ${i}%`;
-            await new Promise((resolve) => setTimeout(resolve, 100));
-          }
-
-          const response = await fetch(
-            `${BASE_URL}/api/data_pegawai/bulk_upload`,
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                data: parsedData,
-                filename: selectedFile.name,
-                total_records: parsedData.length,
-              }),
-            }
-          );
-
-          const result = await response.json();
-
-          processing.classList.remove("show");
-          uploadProgress.classList.remove("show");
-
-          if (result.success) {
-            showResults(result);
-            showValidation(
-              "success",
-              `✅ Upload berhasil! ${result.data.successful_inserts} records berhasil disimpan.`
-            );
-          } else {
-            showValidation("error", `❌ Upload gagal: ${result.message}`);
-          }
-        } catch (error) {
-          processing.classList.remove("show");
-          uploadProgress.classList.remove("show");
-          showValidation("error", `❌ Error saat upload: ${error.message}`);
-        }
-      }
-
-      function showResults(result) {
-        const data = result.data;
-
-        summaryGrid.innerHTML = `
-                <div class="summary-item">
-                    <div class="summary-value">${data.total_records || 0}</div>
-                    <div class="summary-label">Total Records</div>
-                </div>
-                <div class="summary-item">
-                    <div class="summary-value" style="color: #38a169;">${
-                      data.successful_inserts || 0
-                    }</div>
-                    <div class="summary-label">Berhasil</div>
-                </div>
-                <div class="summary-item">
-                    <div class="summary-value" style="color: #e53e3e;">${
-                      data.failed_inserts || 0
-                    }</div>
-                    <div class="summary-label">Gagal</div>
-                </div>
-                <div class="summary-item">
-                    <div class="summary-value" style="color: #667eea;">${
-                      data.updated_records || 0
-                    }</div>
-                    <div class="summary-label">Diupdate</div>
-                </div>
-                <div class="summary-item">
-                    <div class="summary-value">${Math.round(
-                      (data.successful_inserts / data.total_records) * 100
-                    )}%</div>
-                    <div class="summary-label">Success Rate</div>
-                </div>
-            `;
-
-        if (data.errors && data.errors.length > 0) {
-          errorList.style.display = "block";
-          errorList.innerHTML = data.errors
-            .map(
-              (error) => `
-                    <div class="error-item">
-                        <div class="error-row">Row ${
-                          error.row || "Unknown"
-                        }</div>
-                        <div class="error-message">${
-                          error.message || error
-                        }</div>
-                    </div>
+        const table = `
+          <table>
+            <thead>
+              <tr class="main-header">
+                <th rowspan="2" class="sticky-left-1">PERNER</th>
+                <th rowspan="2" class="sticky-left-2">NIP</th>
+                <th rowspan="2" class="sticky-left-3">NAMA</th>
+                <th rowspan="2">BIDANG/UNIT</th>
+                <th colspan="3">JUMLAH HARI REGULER</th>
+                <th colspan="3">JUMLAH HARI REALISASI</th>
+                <th colspan="5">DATA KOREKSI</th>
+                <th colspan="4">POLA JAM KERJA NORMAL</th>
+                <th colspan="5">POLA JAM KERJA SHIFT</th>
+                <th colspan="5">KETERANGAN ABSEN MASUK DAN PULANG</th>
+                <th colspan="2">PENGAJUAN KETIDAKHADIRAN</th>
+                <th colspan="3">PEROLEHAN DURASI JAM KERJA</th>
+              </tr>
+              <tr class="sub-header">
+                <th>TOTAL HARI</th>
+                <th>HARI KERJA</th>
+                <th>HARI LIBUR</th>
+                <th>TOTAL HARI</th>
+                <th>HARI KERJA</th>
+                <th>HARI LIBUR</th>
+                <th>TOTAL TANPA KOREKSI</th>
+                <th>TOTAL HARI KOREKSI</th>
+                <th>KOREKSI IN</th>
+                <th>KOREKSI OUT</th>
+                <th>KOREKSI IN & OUT</th>
+                <th>TOTAL JAM KERJA NORMAL</th>
+                <th>PIKET</th>
+                <th>PDKB</th>
+                <th>REGULER</th>
+                <th>TOTAL JAM KERJA SHIFT</th>
+                <th>SHIFT PAGI</th>
+                <th>SHIFT SIANG</th>
+                <th>SHIFT MALAM</th>
+                <th>SHIFT OFF</th>
+                <th>TOTAL ABSEN LENGKAP</th>
+                <th>TOTAL ABSEN TIDAK LENGKAP</th>
+                <th>IN & OUT KOSONG</th>
+                <th>IN KOSONG</th>
+                <th>OUT KOSONG</th>
+                <th>SPPD/TUGAS LUAR DLL</th>
+                <th>CUTI/IJIN</th>
+                <th>JAM REALISASI</th>
+                <th>JAM SEHARUSNYA</th>
+                <th>PERSENTASE JKP (%)</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${data
+                .map(
+                  (row) => `
+                  <tr>
+                    <td class="sticky-left-1">${row.PERNER}</td>
+                    <td class="sticky-left-2">${row.NIP || "-"}</td>
+                    <td class="sticky-left-3">${row.NAMA || "-"}</td>
+                    <td class="bidang-unit">${row.BIDANG_UNIT || "-"}</td>
+                    <td>${row.TOTAL_HARI_REGULER || 0}</td>
+                    <td>${row.HARI_KERJA_REGULER || 0}</td>
+                    <td>${row.HARI_LIBUR_REGULER || 0}</td>
+                    <td>${row.TOTAL_HARI_REALISASI || 0}</td>
+                    <td>${row.HARI_KERJA_REALISASI || 0}</td>
+                    <td>${row.HARI_LIBUR_REALISASI || 0}</td>
+                    <td>${row.TOTAL_HARI_TANPA_KOREKSI || 0}</td>
+                    <td>${row.TOTAL_HARI_KOREKSI || 0}</td>
+                    <td>${row.KOREKSI_IN || 0}</td>
+                    <td>${row.KOREKSI_OUT || 0}</td>
+                    <td>${row.KOREKSI_IN_OUT || 0}</td>
+                    <td>${row.TOTAL_JAM_KERJA_NORMAL || 0}</td>
+                    <td>${row.PIKET || 0}</td>
+                    <td>${row.PDKB || 0}</td>
+                    <td>${row.REGULER || 0}</td>
+                    <td>${row.TOTAL_JAM_KERJA_SHIFT || 0}</td>
+                    <td>${row.SHIFT_PAGI || 0}</td>
+                    <td>${row.SHIFT_SIANG || 0}</td>
+                    <td>${row.SHIFT_MALAM || 0}</td>
+                    <td>${row.SHIFT_OFF || 0}</td>
+                    <td>${row.ABSEN_LENGKAP || 0}</td>
+                    <td>${row.ABSEN_TIDAK_LENGKAP || 0}</td>
+                    <td>${row.IN_OUT_KOSONG || 0}</td>
+                    <td>${row.IN_KOSONG || 0}</td>
+                    <td>${row.OUT_KOSONG || 0}</td>
+                    <td>${row.SPPD_TUGAS_LUAR_DLL || 0}</td>
+                    <td>${row.CUTI_IJIN || 0}</td>
+                    <td>${parseFloat(row.JAM_REALISASI || 0).toFixed(2)}</td>
+                    <td>${parseFloat(row.JAM_SEHARUSNYA || 0).toFixed(2)}</td>
+                    <td class="percentage ${getPercentageClass(
+                      row.PERSENTASE_JKP
+                    )}">${parseFloat(row.PERSENTASE_JKP || 0).toFixed(2)}</td>
+                  </tr>
                 `
-            )
-            .join("");
+                )
+                .join("")}
+            </tbody>
+          </table>
+        `;
+
+        tableScrollWrapper.innerHTML = table;
+
+        // Calculate header heights for sticky positioning
+        const mainHeaderRow = tableScrollWrapper.querySelector(
+          "thead tr.main-header"
+        );
+        const subHeaderRow = tableScrollWrapper.querySelector(
+          "thead tr.sub-header"
+        );
+
+        if (mainHeaderRow && subHeaderRow) {
+          const h1 = Math.ceil(mainHeaderRow.getBoundingClientRect().height);
+          const h2 = Math.ceil(subHeaderRow.getBoundingClientRect().height);
+          tableScrollWrapper.style.setProperty("--header-row-1", `${0}px`);
+          tableScrollWrapper.style.setProperty("--header-row-2", `${h1}px`);
         }
 
-        resultsSection.classList.add("show");
+        // Show scroll indicator for wide tables
+        showScrollIndicator();
+
+        // Add scroll event listener to hide indicator after user scrolls
+        tableScrollWrapper.addEventListener("scroll", () => {
+          scrollIndicator.style.display = "none";
+        });
       }
 
-      function showValidation(type, message) {
-        validationInfo.className = `validation-info show ${type}`;
-        validationText.innerHTML = message;
+      // Get percentage class for styling
+      function getPercentageClass(percentage) {
+        const pct = parseFloat(percentage);
+        if (pct >= 90) return "high";
+        if (pct >= 70) return "medium";
+        return "low";
       }
 
-      function clearAll() {
-        selectedFile = null;
-        parsedData = [];
-        validationErrors = [];
+      // Display Statistics
+      function displayStats(stats) {
+        const statsGrid = document.getElementById("statsGrid");
+        statsGrid.innerHTML = `
+          <div class="stat-card">
+            <h3>Total Pegawai</h3>
+            <p>${stats.total_pegawai || 0}</p>
+          </div>
+          <div class="stat-card">
+            <h3>Rata-rata JKP</h3>
+            <p>${stats.avg_persentase || 0}%</p>
+          </div>
+          <div class="stat-card">
+            <h3>Total Jam Realisasi</h3>
+            <p>${parseFloat(stats.total_jam_realisasi || 0).toFixed(1)}</p>
+          </div>
+          <div class="stat-card">
+            <h3>Total Jam Seharusnya</h3>
+            <p>${parseFloat(stats.total_jam_seharusnya || 0).toFixed(1)}</p>
+          </div>
+        `;
+        statsContainer.style.display = "block";
+      }
 
-        fileInfo.classList.remove("show");
-        uploadProgress.classList.remove("show");
-        validationInfo.classList.remove("show");
-        processing.classList.remove("show");
-        resultsSection.classList.remove("show");
+      // Display Pagination
+      function displayPagination(pagination) {
+        if (!pagination) {
+          paginationContainer.style.display = "none";
+          return;
+        }
 
-        fileInput.value = "";
-        uploadBtn.disabled = true;
-        progressBar.style.width = "0%";
+        totalPages = pagination.totalPages;
+        currentPage = Math.floor(pagination.offset / pagination.limit) + 1;
+
+        // Calculate display information
+        const startIndex = pagination.offset + 1;
+        const endIndex = Math.min(
+          pagination.offset + pagination.limit,
+          pagination.total
+        );
+        const totalRecords = pagination.total;
+
+        let paginationHTML = `
+          <!-- Informasi Data -->
+          <div class="pagination-info">
+            <div class="primary-info">
+              Menampilkan ${startIndex} - ${endIndex} dari ${totalRecords} data
+            </div>
+            <div class="secondary-info">
+              Halaman ${currentPage} dari ${totalPages} halaman
+              ${
+                searchQuery
+                  ? ` | Pencarian: "${searchQuery}" (PERNER, NIP, Nama, Bidang)`
+                  : ""
+              }
+            </div>
+          </div>
+
+          <div class="pagination-controls">
+            <!-- Items per page -->
+            <div class="items-per-page-group">
+              <span>Tampilkan:</span>
+              <select class="items-per-page-select" onchange="changeItemsPerPage(this.value)">
+                <option value="25" ${
+                  itemsPerPage === 25 ? "selected" : ""
+                }>25</option>
+                <option value="50" ${
+                  itemsPerPage === 50 ? "selected" : ""
+                }>50</option>
+                <option value="100" ${
+                  itemsPerPage === 100 ? "selected" : ""
+                }>100</option>
+                <option value="200" ${
+                  itemsPerPage === 200 ? "selected" : ""
+                }>200</option>
+              </select>
+              <span>per halaman</span>
+            </div>
+
+            <!-- Navigation Controls -->
+            <div class="pagination-navigation">
+              <button onclick="goToPage(1)" ${
+                currentPage === 1 ? "disabled" : ""
+              } title="Halaman Pertama">
+                ««
+              </button>
+              <button onclick="goToPage(${currentPage - 1})" ${
+          currentPage === 1 ? "disabled" : ""
+        } title="Halaman Sebelumnya">
+                ‹
+              </button>
+        `;
+
+        // Show page numbers with smart truncation
+        if (totalPages <= 7) {
+          // Show all pages if 7 or fewer
+          for (let i = 1; i <= totalPages; i++) {
+            paginationHTML += `
+              <button onclick="goToPage(${i})" class="${
+              i === currentPage ? "active" : ""
+            }" title="Halaman ${i}">
+                ${i}
+              </button>
+            `;
+          }
+        } else {
+          // Smart pagination with ellipsis
+          if (currentPage <= 3) {
+            // Show: 1 2 3 4 ... last
+            for (let i = 1; i <= 4; i++) {
+              paginationHTML += `
+                <button onclick="goToPage(${i})" class="${
+                i === currentPage ? "active" : ""
+              }" title="Halaman ${i}">
+                  ${i}
+                </button>
+              `;
+            }
+            paginationHTML += `<span style="padding: 8px;">...</span>`;
+            paginationHTML += `
+              <button onclick="goToPage(${totalPages})" title="Halaman ${totalPages}">
+                ${totalPages}
+              </button>
+            `;
+          } else if (currentPage >= totalPages - 2) {
+            // Show: 1 ... last-3 last-2 last-1 last
+            paginationHTML += `
+              <button onclick="goToPage(1)" title="Halaman 1">1</button>
+            `;
+            paginationHTML += `<span style="padding: 8px;">...</span>`;
+            for (let i = totalPages - 3; i <= totalPages; i++) {
+              paginationHTML += `
+                <button onclick="goToPage(${i})" class="${
+                i === currentPage ? "active" : ""
+              }" title="Halaman ${i}">
+                  ${i}
+                </button>
+              `;
+            }
+          } else {
+            // Show: 1 ... current-1 current current+1 ... last
+            paginationHTML += `
+              <button onclick="goToPage(1)" title="Halaman 1">1</button>
+            `;
+            paginationHTML += `<span style="padding: 8px;">...</span>`;
+            for (let i = currentPage - 1; i <= currentPage + 1; i++) {
+              paginationHTML += `
+                <button onclick="goToPage(${i})" class="${
+                i === currentPage ? "active" : ""
+              }" title="Halaman ${i}">
+                  ${i}
+                </button>
+              `;
+            }
+            paginationHTML += `<span style="padding: 8px;">...</span>`;
+            paginationHTML += `
+              <button onclick="goToPage(${totalPages})" title="Halaman ${totalPages}">
+                ${totalPages}
+              </button>
+            `;
+          }
+        }
+
+        paginationHTML += `
+              <button onclick="goToPage(${currentPage + 1})" ${
+          currentPage === totalPages ? "disabled" : ""
+        } title="Halaman Berikutnya">
+                ›
+              </button>
+              <button onclick="goToPage(${totalPages})" ${
+          currentPage === totalPages ? "disabled" : ""
+        } title="Halaman Terakhir">
+                »»
+              </button>
+            </div>
+
+            <!-- Jump to page -->
+            <div class="page-input-group">
+              <span>Ke halaman:</span>
+              <input 
+                type="number" 
+                class="page-input" 
+                min="1" 
+                max="${totalPages}" 
+                value="${currentPage}"
+                onkeypress="handlePageInputKeypress(event, ${totalPages})"
+                onchange="handlePageInputChange(event, ${totalPages})"
+                title="Masukkan nomor halaman (1-${totalPages})"
+              >
+              <button onclick="goToPageFromInput(${totalPages})" title="Pergi ke halaman">
+                Go
+              </button>
+            </div>
+          </div>
+        `;
+
+        paginationContainer.innerHTML = paginationHTML;
+        paginationContainer.style.display = "flex";
+      }
+
+      // Change items per page
+      function changeItemsPerPage(newItemsPerPage) {
+        itemsPerPage = parseInt(newItemsPerPage);
+        currentPage = 1; // Reset to first page
+        loadRekapData();
+      }
+
+      // Handle page input keypress (Enter key)
+      function handlePageInputKeypress(event, maxPages) {
+        if (event.key === "Enter") {
+          goToPageFromInput(maxPages);
+        }
+      }
+
+      // Handle page input change
+      function handlePageInputChange(event, maxPages) {
+        const input = event.target;
+        let value = parseInt(input.value);
+
+        if (isNaN(value) || value < 1) {
+          input.value = 1;
+        } else if (value > maxPages) {
+          input.value = maxPages;
+        }
+      }
+
+      // Go to page from input
+      function goToPageFromInput(maxPages) {
+        const input = document.querySelector(".page-input");
+        let page = parseInt(input.value);
+
+        if (isNaN(page) || page < 1) {
+          page = 1;
+          input.value = 1;
+        } else if (page > maxPages) {
+          page = maxPages;
+          input.value = maxPages;
+        }
+
+        if (page !== currentPage) {
+          goToPage(page);
+        }
+      }
+
+      // Go to specific page
+      function goToPage(page) {
+        if (page < 1 || page > totalPages || page === currentPage) return;
+        currentPage = page;
+        loadRekapData();
+      }
+
+      // Handle search
+      function handleSearch() {
+        const newSearchQuery = searchInput.value.trim();
+
+        // Log search activity for debugging
+        console.log("🔍 Search triggered:", {
+          previousQuery: searchQuery,
+          newQuery: newSearchQuery,
+          searchFields: ["PERNER", "NAMA", "NIP", "BIDANG_UNIT"],
+        });
+
+        searchQuery = newSearchQuery;
+        currentPage = 1; // Reset to first page when searching
+
+        // Show loading state immediately for better UX
+        if (searchQuery) {
+          showAlert(
+            `🔍 Mencari "${searchQuery}" di PERNER, NIP, Nama, dan Bidang...`,
+            "info"
+          );
+        }
+
+        loadRekapData();
+      }
+
+      // Show loading state
+      function showLoading(show) {
+        loadingContainer.style.display = show ? "block" : "none";
+      }
+
+      // Show alert messages
+      function showAlert(message, type) {
+        const alertClass =
+          type === "success"
+            ? "alert-success"
+            : type === "error"
+            ? "alert-error"
+            : "alert-info";
+
+        const alertHTML = `<div class="alert ${alertClass}">${message}</div>`;
+        alertContainer.innerHTML = alertHTML;
+
+        // Auto hide after 5 seconds
+        setTimeout(() => {
+          alertContainer.innerHTML = "";
+        }, 5000);
+      }
+
+      // Debounce function
+      function debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+          const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+          };
+          clearTimeout(timeout);
+          timeout = setTimeout(later, wait);
+        };
+      }
+
+      // Show scroll indicator
+      function showScrollIndicator() {
+        // Only show if table is wider than container
+        const table = tableScrollWrapper.querySelector("table");
+        if (table && table.scrollWidth > tableScrollWrapper.clientWidth) {
+          scrollIndicator.style.display = "block";
+          // Auto hide after 3 seconds
+          setTimeout(() => {
+            scrollIndicator.style.display = "none";
+          }, 3000);
+        }
       }
 
       // Initialize
       document.addEventListener("DOMContentLoaded", () => {
-        console.log("Upload Data Pegawai page initialized");
-        console.log("Using BASE_URL:", BASE_URL);
+        loadRekapData();
       });
     </script>
+    <script src="script.js?v=20250825"></script>
   </body>
 </html>

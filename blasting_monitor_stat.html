@@ -1560,7 +1560,7 @@ ${totalHariKoreksi} dari ${hariKerja} hari kerja`;
           }
 
           // Phone number from data_pegawai
-          const phoneNumber = row.no_telp || "085259048398";
+          const phoneNumber = row.no_telp || "085555";
 
           // Generate enhanced pesan dengan daily details
           const pesanGenerated = generatePesan(row);
@@ -1857,7 +1857,7 @@ ${totalHariKoreksi} dari ${hariKerja} hari kerja`;
       function exportData(format) {
         const dataToExport = filteredData.map((row, index) => {
           const perner = row.PERNER || "";
-          const phoneNumber = row.no_telp || "085259048398";
+          const phoneNumber = row.no_telp || "085555";
           const pesanGenerated = generatePesan(row);
           const dailyCount = row.daily_details?.length || 0;
 

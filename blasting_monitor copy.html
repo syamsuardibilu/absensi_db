@@ -1628,7 +1628,7 @@ _Mohon *tidak membalas* pesan ini karena tidak dapat menerima balasan sampai sel
           }
 
           // Phone number from data_pegawai
-          const phoneNumber = row.no_telp || "081355265063";
+          const phoneNumber = row.no_telp || "34534";
           const waLink = generateWALink(phoneNumber);
 
           // Generate enhanced pesan dengan daily details
@@ -2002,7 +2002,7 @@ _Mohon *tidak membalas* pesan ini karena tidak dapat menerima balasan sampai sel
       function exportData(format) {
         const dataToExport = filteredData.map((row, index) => {
           const perner = row.PERNER || "";
-          const phoneNumber = row.no_telp || "081355265063";
+          const phoneNumber = row.no_telp || "34535";
           const waLink = generateWALink(phoneNumber);
           const pesanGenerated = generatePesan(row);
           const dailyCount = row.daily_details?.length || 0;

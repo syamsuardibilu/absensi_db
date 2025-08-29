@@ -1058,10 +1058,18 @@
         // Generate summary message
         let pesanTemplate = `Yth Bpk/Ibu ${nama} / ${nip}
 
-Berikut kami sampaikan data absensi Bulan ${periodeBulan} ${periodeTahun} :
+Perkenalkan Kami dari Pelayanan HC Denpasar, Divisi Pelayanan HC Kantor Pusat
 
--> Perolehan JKP Bulanan :
-${jamRealisasi} / ${jamSeharusnya} jam (${persentaseJKP}%)
+Sehubungan dengan perubahan ketentuan PLN Click yang berlaku mulai tgl 01 September 2025
+
+Kami mengingatkan kembali agar dapat memastikan seluruh absensi Bulan ${periodeBulan} ${periodeTahun} telah sesuai, 
+
+Berikut kami informasikan absensi Bpk/Ibu tanggal 1-28 Agustus 2025 :
+
+=========
+
+-> Perolehan total Jam Kerja Pegawai (JKP) Bulanan :
+${jamRealisasi} / ${jamSeharusnya} jam *(${persentaseJKP}%)*
 
 -> Jumlah Absen tidak lengkap :
 ${jumlahAbsenTidakLengkap} hari
@@ -1124,18 +1132,19 @@ ${totalHariKoreksi} dari ${hariKerja} hari kerja`;
 -----------------------
 Catatan Penting:
 - Pengiriman informasi absensi akan dilakukan secara rutin selama masa transisi
-- Bagi pegawai yang melaksanakan SPPD namun belum tercatat karena proses di Bagian Umum masih tertunda, agar sementara melakukan input “Tugas di Luar Kantor” pada PLN Click dan memastikan persetujuan atasan telah diperoleh.
-- Pegawai dengan status piket dan/atau lembur tetap wajib absen pada jam kerja normal, kemudian melanjutkan absen pada jam kerja piket/lembur.
-- Pegawai dengan pola kerja shift (pagi/siang/malam/Off) wajib mengajukan jadwal shift melalui PLN Click dan melakukan absen sesuai jadwal yang disetujui.
-- Seluruh pengajuan, koreksi, dan persetujuan (approval) pada PLN Click untuk bulan Agustus paling lambat 31 Agustus 2025.
-- *Mulai 01 September 2025*, pengajuan shift/cuti/izin/tugas luar, koreksi clock-in/clock-out, serta proses persetujuan wajib diselesaikan paling lambat *7 (tujuh)* hari kalender sejak tanggal yang akan diajukan/dikoreksi (Misal pengajuan/koreksi tanggal 1 maksimal dilakukan tanggal 8).
+- Jika ada SPPD yg belum tercatat di atas krn pending maka input "Tugas di Luar Kantor" di PLN Click, pastikan approved atasan.
+- Piket/lembur, tetap bekerja dan absen jam kerja normal lalu lanjut absen piket/lembur.
+- Pegawai shift (pagi/siang/malam/off) wajib ajukan jadwal di PLN Click (termasuk jika off) dan absen sesuai jadwal tersebut.
+- Batas akhir pengajuan (shift/cuti/tugas luar/izin), koreksi, & approval PLN Click bulan Agustus adalah *31 Agustus 2025*.
+- Mulai *1 Sept 2025*, pengajuan shift/cuti/izin/tugas luar & koreksi absensi wajib selesai max 7 hari kalender sejak tanggal terkait _(cth: tgl 1 → batas 8)_.
 
 
 Demikian disampaikan.
 
 Apabila ada pertanyaan agar mengajukan pada kontak khusus pelayanan SDM UID Bali di : 081524577930 (Pelayanan HC Denpasar).
 
-Terima Kasih
+Terima Kasih 🙏
+_Pelayanan HC Denpasar_
 
 
 _Mohon *tidak membalas* pesan ini karena tidak dapat menerima balasan sampai selesai pengiriman massal, mohon gunakan nomor WA di atas jika ada pertanyaan_
@@ -1628,7 +1637,7 @@ _Mohon *tidak membalas* pesan ini karena tidak dapat menerima balasan sampai sel
           }
 
           // Phone number from data_pegawai
-          const phoneNumber = row.no_telp || "085259048398";
+          const phoneNumber = row.no_telp || "085555";
           const waLink = generateWALink(phoneNumber);
 
           // Generate enhanced pesan dengan daily details
@@ -2002,7 +2011,7 @@ _Mohon *tidak membalas* pesan ini karena tidak dapat menerima balasan sampai sel
       function exportData(format) {
         const dataToExport = filteredData.map((row, index) => {
           const perner = row.PERNER || "";
-          const phoneNumber = row.no_telp || "085259048398";
+          const phoneNumber = row.no_telp || "085555";
           const waLink = generateWALink(phoneNumber);
           const pesanGenerated = generatePesan(row);
           const dailyCount = row.daily_details?.length || 0;
