@@ -941,10 +941,13 @@
         /^(10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+)$/.test(
           host
         );
-
       const BASE_URL =
         (window.BASE_URL && window.BASE_URL.trim()) ||
-        (isLocalHost || isPrivateLAN ? LOCAL_API : PROD_API);
+        (isLocalHost
+          ? LOCAL_API
+          : isPrivateLAN
+          ? `http://${host}:8080`
+          : PROD_API);
 
       const api = (path, opts = {}) => {
         const p = path.startsWith("/") ? path : `/${path}`;

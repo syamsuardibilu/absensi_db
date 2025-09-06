@@ -946,7 +946,11 @@
 
       const BASE_URL =
         (window.BASE_URL && window.BASE_URL.trim()) ||
-        (isLocalHost || isPrivateLAN ? LOCAL_API : PROD_API);
+        (isLocalHost
+          ? LOCAL_API
+          : isPrivateLAN
+          ? `http://${host}:8080`
+          : PROD_API);
 
       const api = (path, opts = {}) => {
         const p = path.startsWith("/") ? path : `/${path}`;
@@ -1036,110 +1040,134 @@
       // ======================================================
 
       function generatePesan(row) {
-        // PART 1: Summary message (existing logic)
-        const periodeBulan = row.periode_bulan || "Tidak Diketahui";
-        const periodeTahun = row.periode_tahun || new Date().getFullYear();
-
         const perner = row.PERNER || "[PERNER]";
         const nama = row.nama || "[Nama Belum Diisi]";
         const nip = row.nip || "[NIP Belum Diisi]";
-        const bidang = row.bidang || "[Bidang Belum Diisi]";
-        const jamRealisasi = parseFloat(row.JAM_REALISASI || 0).toFixed(2);
-        const jamSeharusnya = parseFloat(row.JAM_SEHARUSNYA || 0).toFixed(2);
-        const persentaseJKP = parseFloat(row.PERSENTASE_JKP || 0).toFixed(2);
         const absensiTidakLengkap = parseInt(row.ABSEN_TIDAK_LENGKAP || 0);
 
-        // Calculate jumlah absen tidak lengkap
-        const jumlahAbsenTidakLengkap = absensiTidakLengkap;
-        // Get koreksi dan hari kerja
-        const totalHariKoreksi = parseInt(row.TOTAL_HARI_KOREKSI || 0);
-        const hariKerja = parseInt(row.HARI_KERJA || 0);
+        // Get period information dynamically
+        const periodeBulan = row.periode_bulan || "Tidak Diketahui";
+        const periodeTahun = row.periode_tahun || new Date().getFullYear();
 
-        // Generate summary message
-        let pesanTemplate = `Yth Bpk/Ibu ${nama} / ${nip}
+        // Get current date for timestamp
+        const now = new Date();
+        const timestamp = `${String(now.getDate()).padStart(2, "0")}/${String(
+          now.getMonth() + 1
+        ).padStart(2, "0")}/${now.getFullYear()}, ${String(
+          now.getHours()
+        ).padStart(2, "0")}.${String(now.getMinutes()).padStart(2, "0")} WITA`;
 
-Berikut kami sampaikan data absensi Bulan ${periodeBulan} ${periodeTahun} :
+        // Generate header message
+        let pesanTemplate = `[Terakhir Hari ini],
+        
+Yth Bpk/Ibu ${nama} / ${nip},
 
--> Perolehan JKP Bulanan :
-${jamRealisasi} / ${jamSeharusnya} jam (${persentaseJKP}%)
+Perkenalkan kami dari Pelayanan HC Denpasar, Divisi Pelayanan HC Kantor Pusat,
 
--> Jumlah Absen tidak lengkap :
-${jumlahAbsenTidakLengkap} hari
+Sehubungan dengan perubahan ketentuan PLN Click yang berlaku mulai tgl _01 September 2025_, maka absen Bulan ${periodeBulan} ${periodeTahun} harus sudah selesai selambat-lambatnya tanggal *31 Agustus 2025*.
 
--> Jumlah Koreksi in/out :
-${totalHariKoreksi} dari ${hariKerja} hari kerja`;
+Berikut kami sampaikan informasikan absensi Bpk/Ibu tanggal 1-29 ${periodeBulan} ${periodeTahun}
+(_data ditarik tanggal 31 Agustus 2025 / 09.30 WITA_) :
 
-        // PART 2: Daily details (NEW)
-        if (row.daily_details && row.daily_details.length > 0) {
-          pesanTemplate += "\n\ndengan rincian :\n\n";
++++++++++++++++++++++++++++++`;
 
-          // Sort daily details by date to ensure chronological order
-          const sortedDailyDetails = row.daily_details.sort((a, b) => {
-            return new Date(a.tanggal) - new Date(b.tanggal);
-          });
+        // Check if there are incomplete attendance records
+        if (
+          absensiTidakLengkap > 0 &&
+          row.daily_details &&
+          row.daily_details.length > 0
+        ) {
+          // Debug logging
+          console.log(`🔍 Debug PERNER ${perner}:`);
+          console.log(`   - ABSEN_TIDAK_LENGKAP: ${absensiTidakLengkap}`);
+          console.log(`   - daily_details length: ${row.daily_details.length}`);
+          console.log(
+            `   - Sample daily_details:`,
+            row.daily_details.slice(0, 3)
+          );
 
-          sortedDailyDetails.forEach((day, index) => {
+          // Filter only incomplete attendance days - check if starts with "Tidak lengkap"
+          const incompleteDays = row.daily_details.filter(
+            (day) =>
+              day.status_absen && day.status_absen.startsWith("Tidak lengkap")
+          );
+
+          console.log(`   - Found incomplete days: ${incompleteDays.length}`);
+          console.log(`   - Status values found:`, [
+            ...new Set(row.daily_details.map((d) => d.status_absen)),
+          ]);
+
+          if (incompleteDays.length > 0) {
+            pesanTemplate += `\nTerdapat absensi tidak lengkap sebanyak *${absensiTidakLengkap} hari* 
++++++++++++++++++++++++++++++
+            
+dengan rincian sebagai berikut : \n\n`;
+
+            // Sort incomplete days by date
+            const sortedIncompleteDays = incompleteDays.sort((a, b) => {
+              return new Date(a.tanggal) - new Date(b.tanggal);
+            });
+
+            sortedIncompleteDays.forEach((day) => {
+              pesanTemplate += "===================\n";
+              pesanTemplate += `Tanggal : ${formatTanggalHarian(
+                day.tanggal,
+                day.nama_hari
+              )}\n`;
+              pesanTemplate += `Jenis hari\t: ${formatJenisHari(
+                day.jenis_hari
+              )}\n`;
+              pesanTemplate += `Pola jam kerja\t: ${
+                day.status_jam_kerja || "-"
+              }\n`;
+              pesanTemplate += `Clock in\t: ${formatClockInOut(
+                day.daily_in_cleansing,
+                day.correction_in
+              )}\n`;
+              pesanTemplate += `Clock out\t: ${formatClockInOut(
+                day.daily_out_cleansing,
+                day.correction_out
+              )}\n`;
+              pesanTemplate += `Ket. Absen\t: ${formatKetAbsen(
+                day.value_att_abs
+              )}\n`;
+              pesanTemplate += `Status absen\t: ${day.status_absen || "-"}\n`;
+              pesanTemplate += `Status in/out\t: ${day.status_in_out || "-"}\n`;
+            });
+
             pesanTemplate += "===================\n";
-            pesanTemplate += `Tanggal : ${formatTanggalHarian(
-              day.tanggal,
-              day.nama_hari
-            )}\n`;
-            pesanTemplate += `Jenis hari\t: ${formatJenisHari(
-              day.jenis_hari
-            )}\n`;
-            pesanTemplate += `Pola jam kerja\t: ${
-              day.status_jam_kerja || "-"
-            }\n`;
-            pesanTemplate += `Clock in\t: ${formatClockInOut(
-              day.daily_in_cleansing,
-              day.correction_in
-            )}\n`;
-            pesanTemplate += `Clock out\t: ${formatClockInOut(
-              day.daily_out_cleansing,
-              day.correction_out
-            )}\n`;
-            pesanTemplate += `Ket. Absen\t: ${formatKetAbsen(
-              day.value_att_abs
-            )}\n`;
-            pesanTemplate += `Status absen\t: ${day.status_absen || "-"}\n`;
-            pesanTemplate += `Status in/out\t: ${day.status_in_out || "-"}\n`;
-            pesanTemplate += `Jam kerja pegawai\t: ${formatJamKerjaPegawai(
-              day.jam_kerja_pegawai_cleansing,
-              day.jam_kerja_seharusnya
-            )}\n`;
-
-            // Add separator except for the last item
-            if (index < sortedDailyDetails.length - 1) {
-              pesanTemplate += "\n";
-            }
-          });
+          } else {
+            // If filter found no matching days, show alternative message
+            console.warn(
+              `⚠️ PERNER ${perner}: Summary says ${absensiTidakLengkap} incomplete, but no matching daily records found`
+            );
+            pesanTemplate += `\nTerdapat absensi tidak lengkap sebanyak ${absensiTidakLengkap} hari (detail sedang diproses) \n\n`;
+          }
         } else {
-          // Fallback jika tidak ada daily details
-          pesanTemplate += "\n\n(Detail harian tidak tersedia)";
+          // If attendance is complete
+          pesanTemplate += `\n================
+Absen pada bulan ${periodeBulan} ${periodeTahun} sudah lengkap
+================\n`;
         }
 
-        // Tambahan pesan penting di bawah detail harian
+        // Add footer with important notes
         pesanTemplate += `
-
------------------------
 Catatan Penting:
 - Pengiriman informasi absensi akan dilakukan secara rutin selama masa transisi
-- Bagi pegawai yang melaksanakan SPPD namun belum tercatat karena proses di Bagian Umum masih tertunda, agar sementara melakukan input “Tugas di Luar Kantor” pada PLN Click dan memastikan persetujuan atasan telah diperoleh.
-- Pegawai dengan status piket dan/atau lembur tetap wajib absen pada jam kerja normal, kemudian melanjutkan absen pada jam kerja piket/lembur.
-- Pegawai dengan pola kerja shift (pagi/siang/malam/Off) wajib mengajukan jadwal shift melalui PLN Click dan melakukan absen sesuai jadwal yang disetujui.
-- Seluruh pengajuan, koreksi, dan persetujuan (approval) pada PLN Click untuk bulan Agustus paling lambat 31 Agustus 2025.
-- *Mulai 01 September 2025*, pengajuan shift/cuti/izin/tugas luar, koreksi clock-in/clock-out, serta proses persetujuan wajib diselesaikan paling lambat *7 (tujuh)* hari kalender sejak tanggal yang akan diajukan/dikoreksi (Misal pengajuan/koreksi tanggal 1 maksimal dilakukan tanggal 8).
-
+- Jika ada SPPD yg belum tercatat di atas krn pending dibagian Umum, maka input "Tugas di Luar Kantor" di PLN Click, pastikan approved atasan.
+- Piket/lembur, tetap bekerja dan absen jam kerja normal lalu lanjut absen piket/lembur.
+- Pegawai shift (pagi/siang/malam/off) wajib ajukan jadwal di PLN Click (termasuk jika off) dan absen sesuai jadwal tersebut.
+- Batas akhir pengajuan (shift/cuti/tugas luar/izin), koreksi, & approval PLN Click bulan Agustus adalah *31 Agustus 2025*.
+- Mulai *1 Sept 2025*, pengajuan shift/cuti/izin/tugas luar & koreksi absensi wajib selesai max 7 hari kalender sejak tanggal terkait *(cth: tgl 1 → batas tgl 8)*.
 
 Demikian disampaikan.
-
 Apabila ada pertanyaan agar mengajukan pada kontak khusus pelayanan SDM UID Bali di : 081524577930 (Pelayanan HC Denpasar).
 
-Terima Kasih
+Terima Kasih 🙏
+*Pelayanan HC Denpasar*
 
 
-_Mohon *tidak membalas* pesan ini karena tidak dapat menerima balasan sampai selesai pengiriman massal, gunakan nomor WA di atas jika ada pertanyaan_
-      `;
+Mohon *tidak membalas* pesan ini karena tidak dapat menerima balasan sampai selesai pengiriman massal, gunakan nomor WA di atas jika ada pertanyaan.`;
 
         return pesanTemplate;
       }
@@ -1628,7 +1656,7 @@ _Mohon *tidak membalas* pesan ini karena tidak dapat menerima balasan sampai sel
           }
 
           // Phone number from data_pegawai
-          const phoneNumber = row.no_telp || "34534";
+          const phoneNumber = row.no_telp || "085555";
           const waLink = generateWALink(phoneNumber);
 
           // Generate enhanced pesan dengan daily details
@@ -2002,7 +2030,7 @@ _Mohon *tidak membalas* pesan ini karena tidak dapat menerima balasan sampai sel
       function exportData(format) {
         const dataToExport = filteredData.map((row, index) => {
           const perner = row.PERNER || "";
-          const phoneNumber = row.no_telp || "34535";
+          const phoneNumber = row.no_telp || "085555";
           const waLink = generateWALink(phoneNumber);
           const pesanGenerated = generatePesan(row);
           const dailyCount = row.daily_details?.length || 0;

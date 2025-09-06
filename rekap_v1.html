@@ -1,0 +1,1026 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Matrix Absensi - Tampilan Kalender</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        color: #333;
+        line-height: 1.4;
+        margin: 15px;
+        min-height: calc(100vh - 30px);
+      }
+
+      .container {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        overflow: hidden;
+        max-width: calc(100vw - 30px);
+        margin: 0 auto;
+      }
+
+      .header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 20px 25px;
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        border-bottom: 3px solid #5a67d8;
+      }
+
+      .header h1 {
+        font-size: 24px;
+        font-weight: 600;
+        margin-bottom: 8px;
+      }
+
+      .controls {
+        background: white;
+        padding: 20px 25px;
+        border-bottom: 1px solid #e2e8f0;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 15px;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .period-selector {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+
+      .period-selector select {
+        padding: 10px 15px;
+        border: 2px solid #e2e8f0;
+        border-radius: 8px;
+        font-size: 14px;
+        background: white;
+        cursor: pointer;
+        min-width: 120px;
+      }
+
+      .search-section {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+
+      .search-input {
+        padding: 10px 15px;
+        border: 2px solid #e2e8f0;
+        border-radius: 8px;
+        font-size: 14px;
+        min-width: 200px;
+      }
+
+      .btn {
+        padding: 10px 15px;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        transition: all 0.2s ease;
+      }
+
+      .btn-primary {
+        background: #667eea;
+        color: white;
+      }
+
+      .btn-primary:hover {
+        background: #5a67d8;
+        transform: translateY(-1px);
+      }
+
+      .loading {
+        text-align: center;
+        padding: 40px;
+        font-size: 18px;
+        color: #666;
+      }
+
+      .loading::after {
+        content: "";
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 2px solid #ddd;
+        border-radius: 50%;
+        border-top-color: #667eea;
+        animation: spin 1s ease-in-out infinite;
+        margin-left: 10px;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      .matrix-container {
+        overflow: auto;
+        max-height: calc(100vh - 200px);
+        border: 1px solid #e2e8f0;
+        margin: 0;
+      }
+
+      .matrix-table {
+        width: 100%;
+        border-collapse: collapse;
+        min-width: 1400px;
+        font-size: 12px;
+      }
+
+      .matrix-table thead th {
+        background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%);
+        color: white;
+        padding: 8px 4px;
+        text-align: center;
+        font-weight: 600;
+        border: 1px solid #718096;
+        position: sticky;
+        top: 0;
+        z-index: 50;
+        white-space: nowrap;
+        font-size: 11px;
+        vertical-align: middle;
+      }
+
+      .matrix-table thead th.employee-info {
+        min-width: 80px;
+        text-align: left;
+        padding: 8px;
+      }
+
+      .matrix-table thead th.date-header {
+        width: 35px;
+        min-width: 35px;
+        font-size: 10px;
+      }
+
+      .matrix-table tbody td {
+        border: 1px solid #e2e8f0;
+        padding: 4px;
+        text-align: center;
+        vertical-align: middle;
+        height: 30px;
+        font-size: 11px;
+        font-weight: 600;
+      }
+
+      .matrix-table tbody td.employee-info {
+        text-align: left;
+        padding: 8px;
+        background: #f8fafc;
+        position: sticky;
+        left: 0;
+        z-index: 10;
+        border-right: 2px solid #e2e8f0;
+        min-width: 80px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .matrix-table tbody tr:nth-child(even) {
+        background-color: rgba(248, 250, 252, 0.5);
+      }
+
+      .matrix-table tbody tr:hover {
+        background-color: #edf2f7;
+      }
+
+      /* Status attendance styling */
+      .status-l {
+        background-color: #c6f6d5;
+        color: #22543d;
+      } /* Lengkap - Green */
+      .status-tl {
+        background-color: #fed7d7;
+        color: #742a2a;
+      } /* Tidak Lengkap - Red */
+      .status-ci {
+        background-color: #bee3f8;
+        color: #2a4365;
+      } /* Cuti/Ijin - Blue */
+      .status-hl {
+        background-color: #fbb6ce;
+        color: #702459;
+      } /* Hari Libur - Pink */
+      .status-empty {
+        background-color: #f7fafc;
+        color: #a0aec0;
+      } /* Empty - Gray */
+
+      .legend {
+        background: #f8fafc;
+        padding: 15px 25px;
+        border-top: 1px solid #e2e8f0;
+        display: flex;
+        gap: 20px;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+
+      .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+      }
+
+      .legend-color {
+        width: 16px;
+        height: 16px;
+        border-radius: 3px;
+        border: 1px solid #e2e8f0;
+      }
+
+      .info-panel {
+        background: #f0f8f0;
+        padding: 10px 25px;
+        margin: 0;
+        font-size: 14px;
+        color: #2f855a;
+        border-left: 4px solid #48bb78;
+      }
+
+      .stats-row {
+        display: flex;
+        gap: 20px;
+        flex-wrap: wrap;
+        margin-top: 10px;
+      }
+
+      .stat-item {
+        font-size: 12px;
+        color: #4a5568;
+      }
+
+      /* Responsive design */
+      @media (max-width: 768px) {
+        .matrix-table {
+          font-size: 10px;
+          min-width: 1200px;
+        }
+
+        .matrix-table thead th.date-header {
+          width: 30px;
+          min-width: 30px;
+          font-size: 9px;
+        }
+
+        .matrix-table tbody td {
+          font-size: 10px;
+          height: 25px;
+        }
+      }
+
+      .no-data {
+        text-align: center;
+        padding: 60px 20px;
+        color: #718096;
+        font-size: 16px;
+      }
+
+      .error-message {
+        background: #fed7d7;
+        color: #742a2a;
+        padding: 15px 25px;
+        border-left: 4px solid #e53e3e;
+        margin: 20px 25px;
+        border-radius: 6px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <!-- Header -->
+      <div class="header">
+        <h1>📊 Matrix Absensi</h1>
+        <div>
+          Tampilan kalender absensi bulanan berdasarkan data olah_absensi
+        </div>
+      </div>
+
+      <!-- Controls -->
+      <div class="controls">
+        <div class="period-selector">
+          <label for="monthSelect" style="font-weight: 600">Bulan:</label>
+          <select id="monthSelect">
+            <option value="1">Januari</option>
+            <option value="2">Februari</option>
+            <option value="3">Maret</option>
+            <option value="4">April</option>
+            <option value="5">Mei</option>
+            <option value="6">Juni</option>
+            <option value="7">Juli</option>
+            <option value="8">Agustus</option>
+            <option value="9">September</option>
+            <option value="10">Oktober</option>
+            <option value="11">November</option>
+            <option value="12">Desember</option>
+          </select>
+
+          <label for="yearSelect" style="font-weight: 600">Tahun:</label>
+          <select id="yearSelect">
+            <option value="2023">2023</option>
+            <option value="2024">2024</option>
+            <option value="2025">2025</option>
+          </select>
+
+          <button class="btn btn-primary" onclick="loadMatrixData()">
+            📅 Load Data
+          </button>
+        </div>
+
+        <div class="search-section">
+          <input
+            type="text"
+            id="searchInput"
+            class="search-input"
+            placeholder="🔍 Cari PERNER atau Nama..."
+            onkeyup="filterMatrix()"
+          />
+          <button class="btn btn-primary" onclick="exportMatrix()">
+            📊 Export
+          </button>
+        </div>
+      </div>
+
+      <!-- Info Panel -->
+      <div id="infoPanel" class="info-panel" style="display: none">
+        <div id="matrixInfo"></div>
+        <div class="stats-row" id="matrixStats"></div>
+      </div>
+
+      <!-- Loading State -->
+      <div id="loading" class="loading" style="display: none">
+        Memuat data matrix absensi...
+      </div>
+
+      <!-- Error State -->
+      <div id="errorMessage" class="error-message" style="display: none"></div>
+
+      <!-- Matrix Container -->
+      <div id="matrixContainer" class="matrix-container" style="display: none">
+        <table class="matrix-table" id="matrixTable">
+          <thead id="matrixHead"></thead>
+          <tbody id="matrixBody"></tbody>
+        </table>
+      </div>
+
+      <!-- No Data -->
+      <div id="noData" class="no-data" style="display: none">
+        <div style="font-size: 48px; margin-bottom: 20px">📊</div>
+        <div>Tidak ada data untuk periode yang dipilih</div>
+        <div style="font-size: 14px; margin-top: 10px; color: #a0aec0">
+          Pilih bulan dan tahun, kemudian klik "Load Data"
+        </div>
+      </div>
+
+      <!-- Legend -->
+      <div class="legend">
+        <div style="font-weight: 600; margin-right: 10px">Keterangan:</div>
+        <div class="legend-item">
+          <div class="legend-color status-l"></div>
+          <span>L = Lengkap</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color status-tl"></div>
+          <span>TL = Tidak Lengkap</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color status-ci"></div>
+          <span>C/I = Cuti/Ijin</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color status-hl"></div>
+          <span>HL = Hari Libur</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color status-empty"></div>
+          <span>- = Tidak Ada Data</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Load external script first if available -->
+    <script>
+      // Try to load script.js but don't fail if not available
+      try {
+        const script = document.createElement("script");
+        script.src = "script.js?v=20250825";
+        script.onerror = function () {
+          console.warn("script.js not found, using fallback BASE_URL");
+        };
+        document.head.appendChild(script);
+      } catch (e) {
+        console.warn("Could not load script.js:", e.message);
+      }
+    </script>
+
+    <script>
+      window.addEventListener("DOMContentLoaded", () => {
+        const textarea = document.getElementById("matrix_textarea");
+        if (!textarea) {
+          // buat dummy otomatis kalau tidak ada
+          const dummy = document.createElement("textarea");
+          dummy.id = "matrix_textarea";
+          dummy.style.display = "none";
+          document.body.appendChild(dummy);
+        }
+      });
+    </script>
+
+    <script>
+      // Bungkus addEventListener agar tidak error kalau elemennya null
+      const oldGetElementById = document.getElementById;
+      document.getElementById = function (id) {
+        const el = oldGetElementById.call(document, id);
+        if (!el && id && id.endsWith("_textarea")) {
+          // buat dummy element supaya script.js tidak error
+          const dummy = document.createElement("textarea");
+          dummy.id = id;
+          dummy.style.display = "none";
+          document.body.appendChild(dummy);
+          console.warn("Dummy textarea dibuat untuk:", id);
+          return dummy;
+        }
+        return el;
+      };
+    </script>
+
+    <script>
+      // Global variables
+      let matrixData = [];
+      let filteredData = [];
+      let currentMonth = new Date().getMonth() + 1;
+      let currentYear = new Date().getFullYear();
+
+      // Initialize page
+      document.addEventListener("DOMContentLoaded", function () {
+        console.log("🚀 Matrix Absensi initialized");
+
+        // Set current month and year
+        document.getElementById("monthSelect").value = currentMonth;
+        document.getElementById("yearSelect").value = currentYear;
+
+        // Show initial state
+        showNoData();
+      });
+
+      // Load matrix data from server
+      // Load matrix data from server
+      // Load matrix data from server (FINAL PATCH)
+      // ===========================================
+      // FINAL loadMatrixData() (gunakan data.matrix)
+      // ===========================================
+      async function loadMatrixData() {
+        try {
+          const month = parseInt(document.getElementById("monthSelect").value);
+          const year = parseInt(document.getElementById("yearSelect").value);
+
+          console.log(`Loading matrix data for ${getMonthName(month)} ${year}`);
+
+          showLoading(true);
+          hideError();
+
+          // 🔹 Panggil endpoint baru
+          const res = await fetch(
+            `${BASE_URL}/getAttendanceMatrix?month=${month}&year=${year}`
+          );
+          const data = await res.json();
+
+          if (!data.success) {
+            console.warn(
+              "Optimized endpoint failed, trying fallback:",
+              data.error || data.message
+            );
+            // fallback ke getAllData (lama)
+            return loadMatrixDataFallback(month, year);
+          }
+
+          // 🔹 Ambil array data dari backend (key: matrix)
+          const rawData = data.matrix || [];
+          console.log("📊 Raw data length:", rawData.length);
+
+          if (rawData.length === 0) {
+            console.warn("⚠️ Data kosong dari backend (matrix)");
+            showNoData();
+            return;
+          }
+
+          // 🔹 Proses data → format per pegawai
+          matrixData = processMatrixData(rawData);
+          filteredData = [...matrixData];
+
+          // 🔹 Statistik & periode
+          matrixStatistics = data.statistics || {
+            totalEmployees: matrixData.length,
+            totalRecords: rawData.length,
+            coverage: 0,
+            statusBreakdown: {
+              lengkap: 0,
+              tidak_lengkap: 0,
+              cuti_ijin: 0,
+              hari_libur: 0,
+              no_data: 0,
+            },
+          };
+
+          matrixPeriod = data.period || {
+            month: month,
+            year: year,
+            monthName: getMonthName(month),
+            daysInMonth: getDaysInMonth(month, year),
+          };
+
+          console.log(
+            `✅ Matrix data loaded: ${matrixStatistics.totalRecords} records untuk ${matrixStatistics.totalEmployees} pegawai`
+          );
+
+          // 🔹 Render tabel
+          displayMatrix();
+        } catch (err) {
+          console.error("Error loading matrix:", err);
+          showError(`Error loading data: ${err.message}`);
+        } finally {
+          showLoading(false);
+        }
+      }
+
+      // Filter data by month and year
+      function filterDataByPeriod(data, month, year) {
+        return data.filter((record) => {
+          if (!record.tanggal) return false;
+
+          const recordDate = new Date(record.tanggal);
+          return (
+            recordDate.getMonth() + 1 === month &&
+            recordDate.getFullYear() === year
+          );
+        });
+      }
+
+      // Process data into matrix format
+      // ============================
+      // FINAL processMatrixData()
+      // ============================
+      function processMatrixData(data) {
+        console.log("🔄 Processing data into matrix format...");
+
+        // Group data per PERNER
+        const groupedByPerner = {};
+
+        data.forEach((record) => {
+          const perner = record.perner;
+          if (!groupedByPerner[perner]) {
+            groupedByPerner[perner] = {
+              perner: perner,
+              nama: record.nama || `Pegawai ${perner}`,
+              nip: record.nip || "",
+              bidang: record.bidang || "",
+              attendanceData: {},
+              summary: {
+                lengkap: 0,
+                tidak_lengkap: 0,
+                cuti_ijin: 0,
+                hari_libur: 0,
+                total_days: 0,
+              },
+            };
+          }
+
+          if (record.tanggal) {
+            const date = new Date(record.tanggal);
+            const day = date.getDate();
+
+            // Ambil status & cssClass langsung dari backend
+            const statusCode = record.status || "-";
+            const cssClass = record.cssClass || "status-empty";
+
+            // Simpan detail per hari
+            groupedByPerner[perner].attendanceData[day] = {
+              status: statusCode,
+              cssClass: cssClass,
+              tooltip: record.status_jam_kerja || "",
+              tanggal: record.tanggal,
+              daily_in_cleansing: record.daily_in_cleansing || "",
+              daily_out_cleansing: record.daily_out_cleansing || "",
+              keterangan: record.keterangan || "",
+            };
+
+            // Hitung ringkasan per pegawai
+            const s = groupedByPerner[perner].summary;
+            if (statusCode === "L") s.lengkap++;
+            else if (statusCode === "TL") s.tidak_lengkap++;
+            else if (statusCode === "C/I") s.cuti_ijin++;
+            else if (statusCode === "HL") s.hari_libur++;
+            s.total_days++;
+          }
+        });
+
+        const processedData = Object.values(groupedByPerner);
+        console.log(
+          `✅ Matrix data processed: ${processedData.length} employees`
+        );
+        return processedData;
+      }
+
+      // Display matrix table
+      // Display matrix table
+      // Display matrix table (versi baru, cocok dengan backend /getAttendanceMatrix)
+      // Display matrix table (final version, sesuai backend /getAttendanceMatrix)
+      // Display matrix table (final, fix attendanceData key string vs number)
+      // Display matrix table (final version dengan patch show/hide)
+      function displayMatrix() {
+        console.log("Rendering matrix table...");
+
+        const tableHead = document.getElementById("matrixHead");
+        const tableBody = document.getElementById("matrixBody");
+
+        // Clear isi lama
+        tableHead.innerHTML = "";
+        tableBody.innerHTML = "";
+
+        if (!matrixData || matrixData.length === 0) {
+          console.warn("Matrix data kosong, tidak ada yang dirender");
+          showNoData();
+          return;
+        }
+
+        // Ambil jumlah hari dari backend (period), fallback ke hitung manual
+        const daysInMonth = matrixPeriod
+          ? matrixPeriod.daysInMonth
+          : getDaysInMonth(currentMonth, currentYear);
+
+        // ===== HEADER TABEL =====
+        const headerRow = document.createElement("tr");
+        headerRow.innerHTML = `
+    <th class="employee-info" rowspan="2">No</th>
+    <th class="employee-info" rowspan="2">Perner</th>
+    <th class="employee-info" rowspan="2">NIP</th>
+    <th class="employee-info" rowspan="2">Nama</th>
+    <th class="employee-info" rowspan="2">Bidang</th>
+  `;
+
+        const monthHeader = document.createElement("th");
+        monthHeader.colSpan = daysInMonth;
+        monthHeader.textContent = `${matrixPeriod.monthName} ${matrixPeriod.year}`;
+        monthHeader.style.textAlign = "center";
+        headerRow.appendChild(monthHeader);
+
+        const keteranganHeader = document.createElement("th");
+        keteranganHeader.rowSpan = 2;
+        keteranganHeader.textContent = "KETERANGAN";
+        keteranganHeader.className = "employee-info";
+        headerRow.appendChild(keteranganHeader);
+
+        tableHead.appendChild(headerRow);
+
+        // Baris nomor tanggal
+        const dateRow = document.createElement("tr");
+        for (let day = 1; day <= daysInMonth; day++) {
+          const dayHeader = document.createElement("th");
+          dayHeader.className = "date-header";
+          dayHeader.textContent = day;
+          dateRow.appendChild(dayHeader);
+        }
+        tableHead.appendChild(dateRow);
+
+        // ===== BODY TABEL =====
+        matrixData.forEach((employee, index) => {
+          const row = document.createElement("tr");
+
+          // Info pegawai
+          row.innerHTML = `
+      <td class="employee-info">${index + 1}</td>
+      <td class="employee-info">${employee.perner}</td>
+      <td class="employee-info">${employee.nip || ""}</td>
+      <td class="employee-info" title="${employee.nama}">${employee.nama}</td>
+      <td class="employee-info" title="${employee.bidang}">${
+            employee.bidang
+          }</td>
+    `;
+
+          // Data absensi per hari
+          for (let day = 1; day <= daysInMonth; day++) {
+            const cell = document.createElement("td");
+            const attendance = employee.attendanceData
+              ? employee.attendanceData[day] ||
+                employee.attendanceData[String(day)]
+              : null;
+
+            if (attendance) {
+              cell.textContent = attendance.status || "-";
+              cell.className = attendance.cssClass || "status-empty";
+              cell.title = attendance.tooltip || "";
+
+              if (
+                attendance.daily_in_cleansing ||
+                attendance.daily_out_cleansing
+              ) {
+                const inTime = attendance.daily_in_cleansing || "-";
+                const outTime = attendance.daily_out_cleansing || "-";
+                cell.title += `\nMasuk: ${inTime}, Pulang: ${outTime}`;
+              }
+              if (attendance.keterangan) {
+                cell.title += `\nKeterangan: ${attendance.keterangan}`;
+              }
+            } else {
+              cell.textContent = "-";
+              cell.className = "status-empty";
+              cell.title = `${day}/${matrixPeriod.month}/${matrixPeriod.year}: Tidak ada data`;
+            }
+
+            row.appendChild(cell);
+          }
+
+          // Ringkasan per pegawai
+          const summaryCell = document.createElement("td");
+          summaryCell.className = "employee-info";
+          if (employee.summary) {
+            const s = employee.summary;
+            summaryCell.innerHTML = `
+        <small>
+          L:${s.lengkap} | TL:${s.tidak_lengkap}<br>
+          C/I:${s.cuti_ijin} | HL:${s.hari_libur}
+        </small>
+      `;
+            summaryCell.style.fontSize = "10px";
+            summaryCell.style.lineHeight = "1.2";
+          } else {
+            summaryCell.textContent = "-";
+          }
+          row.appendChild(summaryCell);
+
+          tableBody.appendChild(row);
+        });
+
+        // Update info panel (jika ada)
+        if (typeof updateInfoPanel === "function") {
+          updateInfoPanel();
+        }
+
+        // ✅ Paksa tampil tabel setelah selesai render
+        document.getElementById("matrixContainer").style.display = "block";
+        document.getElementById("infoPanel").style.display = "block";
+        document.getElementById("noData").style.display = "none";
+        document.getElementById("loading").style.display = "none";
+
+        console.log("Matrix table rendered successfully");
+      }
+
+      // Update info panel with statistics
+      function updateInfoPanel() {
+        if (!matrixStatistics || !matrixPeriod) {
+          console.warn("Info panel skipped: statistics/period not set");
+          return;
+        }
+
+        const infoPanel = document.getElementById("infoPanel");
+        infoPanel.innerHTML = `
+    <p><b>Periode:</b> ${matrixPeriod.monthName} ${matrixPeriod.year} 
+      (${matrixPeriod.daysInMonth} hari)</p>
+    <p><b>Total Pegawai:</b> ${matrixStatistics.totalEmployees}</p>
+    <p><b>Total Record:</b> ${matrixStatistics.totalRecords}</p>
+    <p><b>Coverage:</b> ${matrixStatistics.coverage}%</p>
+    <p><b>Status Breakdown:</b> 
+      L:${matrixStatistics.statusBreakdown.lengkap}, 
+      TL:${matrixStatistics.statusBreakdown.tidak_lengkap}, 
+      C/I:${matrixStatistics.statusBreakdown.cuti_ijin}, 
+      HL:${matrixStatistics.statusBreakdown.hari_libur}, 
+      -:${matrixStatistics.statusBreakdown.no_data}
+    </p>
+  `;
+      }
+
+      // Filter matrix by search term
+      // =======================
+      // FINAL filterMatrix()
+      // =======================
+      function filterMatrix() {
+        const searchTerm = document
+          .getElementById("searchInput")
+          .value.toLowerCase()
+          .trim();
+
+        if (!searchTerm) {
+          filteredData = [...matrixData];
+        } else {
+          filteredData = matrixData.filter(
+            (employee) =>
+              (employee.perner &&
+                employee.perner.toLowerCase().includes(searchTerm)) ||
+              (employee.nama &&
+                employee.nama.toLowerCase().includes(searchTerm)) ||
+              (employee.nip && employee.nip.toLowerCase().includes(searchTerm))
+          );
+        }
+
+        console.log(
+          `🔍 Search filtered: ${filteredData.length} employees match "${searchTerm}"`
+        );
+
+        if (filteredData.length > 0) {
+          displayMatrix(); // 🔹 render ulang pakai filteredData
+        } else {
+          showNoData();
+        }
+      }
+
+      // Export matrix data to CSV
+      function exportMatrix() {
+        console.log("Exporting matrix data...");
+
+        if (filteredData.length === 0) {
+          alert("Tidak ada data untuk diekspor");
+          return;
+        }
+
+        const period = matrixPeriod || {
+          daysInMonth: getDaysInMonth(currentMonth, currentYear),
+          monthName: getMonthName(currentMonth),
+          year: currentYear,
+        };
+
+        // Create CSV content with BOM for proper Excel UTF-8 support
+        let csvContent = "\uFEFF"; // BOM for UTF-8
+
+        // Header
+        let header = "No,Perner,NIP,Nama,Bidang";
+        for (let day = 1; day <= period.daysInMonth; day++) {
+          header += `,${day}`;
+        }
+        header += ",L,TL,C/I,HL,Total Hari\n";
+        csvContent += header;
+
+        // Data rows
+        filteredData.forEach((employee, index) => {
+          let row = `${index + 1},"${employee.perner}","${employee.nip}","${
+            employee.nama
+          }","${employee.bidang}"`;
+
+          // Daily attendance data
+          for (let day = 1; day <= period.daysInMonth; day++) {
+            const data = employee.attendanceData[day];
+            const status = data ? data.status : "-";
+            row += `,"${status}"`;
+          }
+
+          // Summary statistics
+          const summary = employee.summary || {
+            lengkap: 0,
+            tidak_lengkap: 0,
+            cuti_ijin: 0,
+            hari_libur: 0,
+            total_days: 0,
+          };
+          row += `,"${summary.lengkap}","${summary.tidak_lengkap}","${summary.cuti_ijin}","${summary.hari_libur}","${summary.total_days}"\n`;
+          csvContent += row;
+        });
+
+        // Add summary row if statistics available
+        if (matrixStatistics) {
+          csvContent += "\n";
+          csvContent += `"TOTAL",,,,`;
+          for (let day = 1; day <= period.daysInMonth; day++) {
+            csvContent += `,""`;
+          }
+          csvContent += `,"${matrixStatistics.statusBreakdown.lengkap}","${matrixStatistics.statusBreakdown.tidak_lengkap}","${matrixStatistics.statusBreakdown.cuti_ijin}","${matrixStatistics.statusBreakdown.hari_libur}","${matrixStatistics.totalRecords}"\n`;
+        }
+
+        // Download
+        const timestamp = new Date()
+          .toISOString()
+          .replace(/[:.]/g, "-")
+          .slice(0, -5);
+        const filename = `matrix_absensi_${period.monthName}_${period.year}_${timestamp}.csv`;
+
+        const blob = new Blob([csvContent], {
+          type: "text/csv;charset=utf-8;",
+        });
+        const link = document.createElement("a");
+        if (link.download !== undefined) {
+          const url = URL.createObjectURL(blob);
+          link.setAttribute("href", url);
+          link.setAttribute("download", filename);
+          link.style.visibility = "hidden";
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+
+          console.log(`Matrix exported as ${filename}`);
+        } else {
+          alert("Browser tidak mendukung download otomatis");
+        }
+      }
+
+      // Utility functions
+      function showLoading(show) {
+        document.getElementById("loading").style.display = show
+          ? "block"
+          : "none";
+        if (!show) {
+          document.getElementById("matrixContainer").style.display = "none";
+          document.getElementById("infoPanel").style.display = "none";
+        }
+      }
+
+      function showNoData() {
+        document.getElementById("noData").style.display = "block";
+        document.getElementById("matrixContainer").style.display = "none";
+        document.getElementById("infoPanel").style.display = "none";
+      }
+
+      function showError(message) {
+        const errorDiv = document.getElementById("errorMessage");
+        errorDiv.textContent = message;
+        errorDiv.style.display = "block";
+        document.getElementById("matrixContainer").style.display = "none";
+        document.getElementById("infoPanel").style.display = "none";
+        document.getElementById("noData").style.display = "none";
+      }
+
+      function hideError() {
+        document.getElementById("errorMessage").style.display = "none";
+      }
+
+      function getMonthName(month) {
+        const months = [
+          "",
+          "Januari",
+          "Februari",
+          "Maret",
+          "April",
+          "Mei",
+          "Juni",
+          "Juli",
+          "Agustus",
+          "September",
+          "Oktober",
+          "November",
+          "Desember",
+        ];
+        return months[month];
+      }
+
+      function getDaysInMonth(month, year) {
+        return new Date(year, month, 0).getDate();
+      }
+
+      async function loadMatrixDataFallback(month, year) {
+        try {
+          const res = await fetch(`${BASE_URL}/getAllData`);
+          if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+
+          const allData = await res.json();
+          console.log(`Raw data loaded: ${allData.length} records`);
+
+          // filter berdasarkan periode
+          const filtered = allData.filter((rec) => {
+            if (!rec.tanggal) return false;
+            const d = new Date(rec.tanggal);
+            return d.getMonth() + 1 === month && d.getFullYear() === year;
+          });
+
+          console.log(
+            `Filtered data: ${filtered.length} records for ${getMonthName(
+              month
+            )} ${year}`
+          );
+
+          if (filtered.length === 0) {
+            showNoData();
+            return;
+          }
+
+          // proses ke bentuk matrix
+          matrixData = processMatrixData(filtered);
+          filteredData = [...matrixData];
+
+          displayMatrix(matrixData, month, year);
+        } catch (err) {
+          console.error("Fallback error:", err);
+          showError(`Error loading fallback data: ${err.message}`);
+        }
+      }
+    </script>
+    <textarea id="matrix_textarea" style="display: none"></textarea>
+  </body>
+</html>

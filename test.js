@@ -1,385 +1,433 @@
-// ENHANCED BULK UPLOAD WITH DUPLICATE HANDLING OPTIONS
-app.post("/api/data_pegawai/bulk_upload", (req, res) => {
+// Tambahkan function helper yang mungkin missing
+function formatTanggalSafeMatrix(date) {
+  if (!date) return null;
+
+  // Convert to MySQL date format: YYYY-MM-DD
+  if (date instanceof Date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+
+  return date;
+}
+
+// Perbaikan endpoint dengan error handling yang lebih baik
+app.get("/getAttendanceMatrix", (req, res) => {
+  const { month, year } = req.query;
   const startTime = Date.now();
-  console.log(
-    "📁 Starting bulk upload data pegawai with duplicate handling..."
-  );
 
-  const {
-    data,
-    filename,
-    total_records,
-    duplicate_action = "overwrite",
-  } = req.body;
+  console.log(`🔄 Starting attendance matrix request for ${month}/${year}`);
 
-  console.log(`🔧 Duplicate handling mode: ${duplicate_action}`);
+  try {
+    // Validate required parameters
+    if (!month || !year) {
+      console.error("❌ Missing parameters:", { month, year });
+      return res.status(400).json({
+        success: false,
+        message: "Parameter month dan year wajib diisi",
+        error: "Missing required parameters",
+      });
+    }
 
-  // Input validation (same as before)
-  if (!data || !Array.isArray(data) || data.length === 0) {
-    return res.status(400).json({
-      success: false,
-      message: "❌ Data tidak valid atau kosong",
-      error: "No data provided",
-    });
-  }
+    const monthNum = parseInt(month);
+    const yearNum = parseInt(year);
 
-  if (data.length > 5000) {
-    return res.status(400).json({
-      success: false,
-      message: "❌ Terlalu banyak data. Maksimal 5000 records per upload",
-      error: "Record limit exceeded",
-    });
-  }
+    // Validate month range
+    if (monthNum < 1 || monthNum > 12 || isNaN(monthNum)) {
+      console.error("❌ Invalid month:", monthNum);
+      return res.status(400).json({
+        success: false,
+        message: "Month harus antara 1-12",
+        error: "Invalid month parameter",
+      });
+    }
 
-  // Validation logic (same as before)
-  const validatedData = [];
-  const errors = [];
-  const pernerSet = new Set();
-  const nipSet = new Set();
+    // Validate year range
+    if (yearNum < 2020 || yearNum > 2030 || isNaN(yearNum)) {
+      console.error("❌ Invalid year:", yearNum);
+      return res.status(400).json({
+        success: false,
+        message: "Year harus antara 2020-2030",
+        error: "Invalid year parameter",
+      });
+    }
 
-  const getFieldValue = (row, field) => {
-    const keys = Object.keys(row);
-    const matchingKey = keys.find(
-      (key) =>
-        key.toLowerCase().includes(field.toLowerCase()) ||
-        field.toLowerCase().includes(key.toLowerCase())
+    // Calculate date range for the month
+    const startDate = new Date(yearNum, monthNum - 1, 1);
+    const endDate = new Date(yearNum, monthNum, 0); // Last day of the month
+    const daysInMonth = endDate.getDate();
+
+    const startDateStr = formatTanggalSafeMatrix(startDate);
+    const endDateStr = formatTanggalSafeMatrix(endDate);
+
+    console.log(
+      `📅 Matrix period: ${startDateStr} to ${endDateStr} (${daysInMonth} days)`
     );
-    return matchingKey ? String(row[matchingKey] || "").trim() : "";
-  };
 
-  // Same validation logic as before...
-  data.forEach((row, index) => {
-    const rowNum = index + 1;
-    const errors_for_row = [];
-
-    const perner = getFieldValue(row, "perner");
-    const nip = getFieldValue(row, "nip");
-    const nama = getFieldValue(row, "nama");
-    const bidang = getFieldValue(row, "bidang");
-    const no_telp =
-      getFieldValue(row, "no_telp") ||
-      getFieldValue(row, "phone") ||
-      getFieldValue(row, "telp");
-
-    // Validation logic (same as before)
-    if (!perner) errors_for_row.push("PERNER kosong");
-    if (!nip) errors_for_row.push("NIP kosong");
-    if (!nama) errors_for_row.push("Nama kosong");
-    if (!bidang) errors_for_row.push("Bidang kosong");
-
-    // Phone number cleaning (same as before)
-    let final_no_telp = no_telp || "";
-    if (final_no_telp.trim()) {
-      let cleanPhone = final_no_telp.trim();
-      if (cleanPhone.startsWith("+62")) {
-        cleanPhone = "0" + cleanPhone.substring(3);
-      } else if (cleanPhone.startsWith("62") && cleanPhone.length > 10) {
-        cleanPhone = "0" + cleanPhone.substring(2);
-      }
-      cleanPhone = cleanPhone.replace(/[^\d]/g, "");
-      if (
-        cleanPhone.length >= 10 &&
-        cleanPhone.length <= 15 &&
-        (cleanPhone.startsWith("08") || cleanPhone.startsWith("628"))
-      ) {
-        if (cleanPhone.startsWith("628")) {
-          cleanPhone = "0" + cleanPhone.substring(3);
-        }
-        final_no_telp = cleanPhone;
-      } else {
-        final_no_telp = "-";
-      }
-    } else {
-      final_no_telp = "-";
-    }
-
-    // Check duplicates and other validations (same as before)
-    if (perner && pernerSet.has(perner)) {
-      errors_for_row.push(`PERNER "${perner}" duplikat dalam file`);
-    } else if (perner) {
-      pernerSet.add(perner);
-    }
-
-    if (nip && nipSet.has(nip)) {
-      errors_for_row.push(`NIP "${nip}" duplikat dalam file`);
-    } else if (nip) {
-      nipSet.add(nip);
-    }
-
-    if (errors_for_row.length > 0) {
-      errors.push({
-        row: rowNum,
-        perner: perner || "N/A",
-        message: errors_for_row.join(", "),
-      });
-    } else {
-      validatedData.push({
-        perner,
-        nip,
-        nama,
-        bidang,
-        no_telp: final_no_telp,
+    // Test database connection first
+    if (!conn) {
+      console.error("❌ Database connection not available");
+      return res.status(500).json({
+        success: false,
+        message: "Database connection error",
+        error: "Database not connected",
       });
     }
-  });
 
-  if (errors.length > 0) {
-    return res.status(400).json({
-      success: false,
-      message: `❌ Validasi gagal. ${errors.length} baris mengandung error`,
-      data: {
-        total_records: data.length,
-        valid_records: validatedData.length,
-        invalid_records: errors.length,
-        errors: errors.slice(0, 50),
-        validation_duration_ms: Date.now() - startTime,
-      },
-    });
-  }
-
-  // ENHANCED DATABASE OPERATIONS BASED ON DUPLICATE ACTION
-  console.log(
-    `💾 Starting database operations for ${validatedData.length} records with action: ${duplicate_action}`
-  );
-
-  // First, handle backup option
-  if (duplicate_action === "backup") {
-    // Create history table if it doesn't exist
-    const createHistorySQL = `
-      CREATE TABLE IF NOT EXISTS data_pegawai_history (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        perner VARCHAR(50),
-        nip VARCHAR(50),
-        nama VARCHAR(100),
-        bidang VARCHAR(100),
-        no_telp VARCHAR(20),
-        backup_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        backup_reason VARCHAR(100) DEFAULT 'bulk_upload_backup'
-      )
+    // Optimized SQL query with better error handling
+    const sql = `
+      SELECT 
+        oa.perner,
+        DATE(oa.tanggal) as tanggal_only,
+        DAY(oa.tanggal) as day_number,
+        oa.status_absen,
+        oa.daily_in_cleansing,
+        oa.daily_out_cleansing,
+        oa.value_att_abs,
+        oa.status_jam_kerja,
+        oa.jenis_hari,
+        oa.correction_in,
+        oa.correction_out,
+        COALESCE(dp.nama, CONCAT('Pegawai ', oa.perner)) as nama,
+        COALESCE(dp.nip, '') as nip,
+        COALESCE(dp.bidang, 'Belum Diisi') as bidang,
+        dp.no_telp
+      FROM olah_absensi oa
+      LEFT JOIN data_pegawai dp ON oa.perner = dp.perner
+      WHERE oa.tanggal >= ? AND oa.tanggal <= ?
+        AND oa.perner IS NOT NULL
+      ORDER BY oa.perner ASC, oa.tanggal ASC
     `;
 
-    conn.query(createHistorySQL, (createErr) => {
-      if (createErr) {
-        console.warn(
-          "⚠️ Warning: Could not create history table:",
-          createErr.message
-        );
-      }
-      handleDuplicates();
-    });
-  } else {
-    handleDuplicates();
-  }
+    console.log("🔍 Executing SQL query...");
 
-  function handleDuplicates() {
-    // Check for existing records
-    const pernerList = validatedData.map((item) => item.perner);
-    const pernerCheckSQL = `
-      SELECT perner, nip, nama, bidang, no_telp FROM data_pegawai 
-      WHERE perner IN (${pernerList.map(() => "?").join(",")})
-    `;
-
-    conn.query(pernerCheckSQL, pernerList, (checkErr, existingRecords) => {
-      if (checkErr) {
-        console.error("❌ Error checking existing PERNER:", checkErr);
+    conn.query(sql, [startDateStr, endDateStr], (err, results) => {
+      if (err) {
+        console.error("❌ Database query error:", err);
         return res.status(500).json({
           success: false,
-          message: "❌ Gagal mengecek data yang sudah ada",
-          error: checkErr.message,
+          message: "Gagal mengambil data matrix absensi",
+          error: err.message,
+          sqlError: err.code,
         });
       }
 
-      const existingMap = new Map();
-      existingRecords.forEach((record) => {
-        existingMap.set(record.perner, record);
-      });
-
-      console.log(`🔍 Found ${existingMap.size} existing PERNER in database`);
-
-      let newInserts = [];
-      let updates = [];
-      let skipped = [];
-      let backedUp = [];
-
-      // Process each record based on duplicate action
-      validatedData.forEach((item) => {
-        if (existingMap.has(item.perner)) {
-          switch (duplicate_action) {
-            case "skip":
-              skipped.push(item);
-              break;
-            case "overwrite":
-            case "backup":
-              updates.push(item);
-              break;
-            case "merge":
-              // Merge: only update non-empty fields
-              const existing = existingMap.get(item.perner);
-              const mergedItem = {
-                perner: item.perner,
-                nip: item.nip || existing.nip,
-                nama: item.nama || existing.nama,
-                bidang: item.bidang || existing.bidang,
-                no_telp: item.no_telp || existing.no_telp,
-              };
-              updates.push(mergedItem);
-              break;
-            default:
-              updates.push(item);
-          }
-        } else {
-          newInserts.push(item);
-        }
-      });
-
+      const queryDuration = Date.now() - startTime;
       console.log(
-        `📊 Operations planned: ${newInserts.length} inserts, ${updates.length} updates, ${skipped.length} skipped`
+        `✅ Query completed: ${results.length} records in ${queryDuration}ms`
       );
 
-      // Execute operations
-      executeOperations();
+      if (results.length === 0) {
+        console.log("⚠️ No data found for the period");
+        return res.json({
+          success: true,
+          message: `Tidak ada data absensi untuk ${getMonthName(
+            monthNum
+          )} ${yearNum}`,
+          period: {
+            month: monthNum,
+            year: yearNum,
+            monthName: getMonthName(monthNum),
+            daysInMonth: daysInMonth,
+            dateRange: `${startDateStr} - ${endDateStr}`,
+          },
+          matrix: [],
+          statistics: {
+            totalEmployees: 0,
+            totalRecords: 0,
+            coverage: 0,
+            statusBreakdown: {
+              lengkap: 0,
+              tidak_lengkap: 0,
+              cuti_ijin: 0,
+              hari_libur: 0,
+              no_data: 0,
+            },
+          },
+          performance: {
+            queryDuration: queryDuration,
+            processingDuration: 0,
+            totalDuration: queryDuration,
+          },
+          generatedAt: new Date().toISOString(),
+        });
+      }
 
-      function executeOperations() {
-        let completedOperations = 0;
-        let successfulInserts = 0;
-        let updatedRecords = 0;
-        let skippedRecords = skipped.length;
-        let failedInserts = 0;
-        const operationErrors = [];
+      try {
+        // Process the matrix data
+        console.log("🔄 Processing matrix data...");
+        const processStart = Date.now();
+        const { matrixData, statistics } = processAttendanceMatrix(
+          results,
+          daysInMonth
+        );
+        const processingDuration = Date.now() - processStart;
 
-        const totalOperations = newInserts.length + updates.length;
+        const totalDuration = Date.now() - startTime;
 
-        const checkComplete = () => {
-          if (completedOperations === totalOperations) {
-            const endTime = Date.now();
-            const duration = endTime - startTime;
-            const successfulOperations = successfulInserts + updatedRecords;
+        console.log(
+          `✅ Matrix processing completed: ${matrixData.length} employees, ${statistics.totalRecords} records`
+        );
+        console.log(
+          `⚡ Performance: Query=${queryDuration}ms, Processing=${processingDuration}ms, Total=${totalDuration}ms`
+        );
 
-            console.log(`🎉 Bulk upload completed in ${duration}ms`);
-            console.log(
-              `📊 Results: ${successfulInserts} inserted, ${updatedRecords} updated, ${skippedRecords} skipped, ${failedInserts} failed`
-            );
+        res.json({
+          success: true,
+          message: `Data matrix absensi berhasil diambil untuk ${getMonthName(
+            monthNum
+          )} ${yearNum}`,
+          period: {
+            month: monthNum,
+            year: yearNum,
+            monthName: getMonthName(monthNum),
+            daysInMonth: daysInMonth,
+            dateRange: `${startDateStr} - ${endDateStr}`,
+          },
+          matrix: matrixData,
+          statistics: statistics,
+          performance: {
+            queryDuration: queryDuration,
+            processingDuration: processingDuration,
+            totalDuration: totalDuration,
+            recordsPerSecond: Math.round(
+              results.length / (totalDuration / 1000)
+            ),
+          },
+          generatedAt: new Date().toISOString(),
+        });
+      } catch (processError) {
+        console.error("❌ Matrix processing error:", processError);
+        return res.status(500).json({
+          success: false,
+          message: "Error processing matrix data",
+          error: processError.message,
+          phase: "data_processing",
+        });
+      }
+    });
+  } catch (generalError) {
+    console.error("❌ General error in getAttendanceMatrix:", generalError);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: generalError.message,
+      phase: "general",
+    });
+  }
+});
 
-            res.json({
-              success: true,
-              message: `✅ Upload berhasil dengan mode "${duplicate_action}"! ${successfulOperations} dari ${totalOperations} records berhasil diproses`,
-              data: {
-                filename: filename || "pasted_data",
-                total_records: data.length,
-                successful_inserts: successfulInserts,
-                updated_records: updatedRecords,
-                skipped_records: skippedRecords,
-                failed_inserts: failedInserts,
-                duplicate_action: duplicate_action,
-                errors: operationErrors.slice(0, 20),
-                processing_duration_ms: duration,
-                success_rate: Math.round(
-                  (successfulOperations / validatedData.length) * 100
-                ),
-                method: "bulk_upload_with_duplicate_handling",
-              },
-              timestamp: new Date().toISOString(),
-            });
-          }
-        };
+// Helper function dengan error handling
+function processAttendanceMatrix(rawData, daysInMonth) {
+  try {
+    console.log(
+      `🔄 Processing ${rawData.length} raw records for ${daysInMonth} days`
+    );
 
-        // Handle backup before updates
-        if (duplicate_action === "backup" && updates.length > 0) {
-          const backupSQL = `
-            INSERT INTO data_pegawai_history (perner, nip, nama, bidang, no_telp, backup_reason)
-            SELECT perner, nip, nama, bidang, no_telp, 'pre_bulk_update'
-            FROM data_pegawai
-            WHERE perner IN (${updates.map(() => "?").join(",")})
-          `;
+    const employeeMap = new Map();
+    const statistics = {
+      totalEmployees: 0,
+      totalRecords: rawData.length,
+      coverage: 0,
+      statusBreakdown: {
+        lengkap: 0,
+        tidak_lengkap: 0,
+        cuti_ijin: 0,
+        hari_libur: 0,
+        no_data: 0,
+      },
+    };
 
-          const backupParams = updates.map((item) => item.perner);
+    // Group data by employee
+    rawData.forEach((record, index) => {
+      try {
+        const perner = record.perner;
 
-          conn.query(backupSQL, backupParams, (backupErr, backupResult) => {
-            if (backupErr) {
-              console.error("❌ Backup error:", backupErr);
-              operationErrors.push(`Backup failed: ${backupErr.message}`);
-            } else {
-              console.log(`💾 Backed up ${backupResult.affectedRows} records`);
-            }
-            proceedWithOperations();
-          });
-        } else {
-          proceedWithOperations();
+        if (!perner) {
+          console.warn(`⚠️ Record ${index} has no perner, skipping`);
+          return;
         }
 
-        function proceedWithOperations() {
-          // Handle new inserts
-          if (newInserts.length > 0) {
-            const insertSQL = `
-              INSERT INTO data_pegawai (perner, nip, nama, bidang, no_telp) 
-              VALUES ${newInserts.map(() => "(?, ?, ?, ?, ?)").join(", ")}
-            `;
+        if (!employeeMap.has(perner)) {
+          employeeMap.set(perner, {
+            perner: perner,
+            nama: record.nama || `Pegawai ${perner}`,
+            nip: record.nip || "",
+            bidang: record.bidang || "Belum Diisi",
+            no_telp: record.no_telp || "",
+            attendanceData: {},
+            summary: {
+              total_days: 0,
+              lengkap: 0,
+              tidak_lengkap: 0,
+              cuti_ijin: 0,
+              hari_libur: 0,
+              no_data: 0,
+            },
+          });
+        }
 
-            const insertParams = [];
-            newInserts.forEach((item) => {
-              insertParams.push(
-                item.perner,
-                item.nip,
-                item.nama,
-                item.bidang,
-                item.no_telp
-              );
-            });
+        const employee = employeeMap.get(perner);
+        const day = record.day_number;
 
-            conn.query(insertSQL, insertParams, (insertErr, insertResult) => {
-              if (insertErr) {
-                console.error("❌ Bulk insert error:", insertErr);
-                operationErrors.push(
-                  `Bulk insert failed: ${insertErr.message}`
-                );
-                failedInserts += newInserts.length;
-              } else {
-                successfulInserts = insertResult.affectedRows;
-                console.log(`✅ Inserted ${successfulInserts} new records`);
-              }
+        if (!day || day < 1 || day > 31) {
+          console.warn(`⚠️ Invalid day number ${day} for record ${index}`);
+          return;
+        }
 
-              completedOperations += newInserts.length;
-              checkComplete();
-            });
-          }
+        // Map status_absen to display codes
+        let statusCode = "-";
+        let cssClass = "status-empty";
+        const statusAbsen = record.status_absen;
 
-          // Handle updates
-          if (updates.length === 0) {
-            completedOperations += 0;
-            checkComplete();
-          } else {
-            updates.forEach((item) => {
-              const updateSQL = `
-                UPDATE data_pegawai 
-                SET nip = ?, nama = ?, bidang = ?, no_telp = ?
-                WHERE perner = ?
-              `;
+        if (statusAbsen === "-") {
+          statusCode = "C/I";
+          cssClass = "status-ci";
+          statistics.statusBreakdown.cuti_ijin++;
+          employee.summary.cuti_ijin++;
+        } else if (statusAbsen === "Bukan hari kerja") {
+          statusCode = "HL";
+          cssClass = "status-hl";
+          statistics.statusBreakdown.hari_libur++;
+          employee.summary.hari_libur++;
+        } else if (statusAbsen === "Lengkap") {
+          statusCode = "L";
+          cssClass = "status-l";
+          statistics.statusBreakdown.lengkap++;
+          employee.summary.lengkap++;
+        } else if (
+          statusAbsen &&
+          statusAbsen.toLowerCase().includes("tidak lengkap")
+        ) {
+          statusCode = "TL";
+          cssClass = "status-tl";
+          statistics.statusBreakdown.tidak_lengkap++;
+          employee.summary.tidak_lengkap++;
+        } else {
+          statistics.statusBreakdown.no_data++;
+          employee.summary.no_data++;
+        }
 
-              conn.query(
-                updateSQL,
-                [item.nip, item.nama, item.bidang, item.no_telp, item.perner],
-                (updateErr, updateResult) => {
-                  if (updateErr) {
-                    console.error(
-                      `❌ Update error for PERNER ${item.perner}:`,
-                      updateErr
-                    );
-                    operationErrors.push(
-                      `Update failed for PERNER ${item.perner}: ${updateErr.message}`
-                    );
-                    failedInserts++;
-                  } else if (updateResult.affectedRows > 0) {
-                    updatedRecords++;
-                  }
+        // Store attendance data for this day
+        employee.attendanceData[day] = {
+          status: statusCode,
+          cssClass: cssClass,
+          originalStatus: statusAbsen,
+          tanggal: record.tanggal_only,
+          daily_in_cleansing: record.daily_in_cleansing,
+          daily_out_cleansing: record.daily_out_cleansing,
+          keterangan: record.value_att_abs,
+          jenis_hari: record.jenis_hari,
+          status_jam_kerja: record.status_jam_kerja,
+          correction_in: record.correction_in,
+          correction_out: record.correction_out,
+          tooltip: `${day}: ${statusAbsen || "Tidak ada data"}`,
+        };
 
-                  completedOperations++;
-                  checkComplete();
-                }
-              );
-            });
-          }
+        employee.summary.total_days++;
+      } catch (recordError) {
+        console.error(`❌ Error processing record ${index}:`, recordError);
+      }
+    });
+
+    // Fill missing days with empty status
+    employeeMap.forEach((employee) => {
+      for (let day = 1; day <= daysInMonth; day++) {
+        if (!employee.attendanceData[day]) {
+          employee.attendanceData[day] = {
+            status: "-",
+            cssClass: "status-empty",
+            originalStatus: null,
+            tanggal: null,
+            daily_in_cleansing: null,
+            daily_out_cleansing: null,
+            keterangan: null,
+            jenis_hari: null,
+            status_jam_kerja: null,
+            correction_in: null,
+            correction_out: null,
+            tooltip: `${day}: Tidak ada data`,
+          };
         }
       }
     });
+
+    // Convert to array and sort
+    const matrixData = Array.from(employeeMap.values()).sort((a, b) =>
+      a.perner.localeCompare(b.perner)
+    );
+
+    // Calculate final statistics
+    statistics.totalEmployees = matrixData.length;
+    const totalPossibleRecords = statistics.totalEmployees * daysInMonth;
+    statistics.coverage =
+      totalPossibleRecords > 0
+        ? Math.round(
+            ((totalPossibleRecords - statistics.statusBreakdown.no_data) /
+              totalPossibleRecords) *
+              100
+          )
+        : 0;
+
+    console.log(
+      `✅ Processing complete: ${statistics.totalEmployees} employees processed`
+    );
+
+    return { matrixData, statistics };
+  } catch (error) {
+    console.error("❌ Critical error in processAttendanceMatrix:", error);
+    throw new Error(`Matrix processing failed: ${error.message}`);
   }
+}
+
+// Helper function for month names
+function getMonthName(month) {
+  const months = [
+    "",
+    "Januari",
+    "Februari",
+    "Maret",
+    "April",
+    "Mei",
+    "Juni",
+    "Juli",
+    "Agustus",
+    "September",
+    "Oktober",
+    "November",
+    "Desember",
+  ];
+  return months[month] || `Month ${month}`;
+}
+
+// Test endpoint untuk debugging
+app.get("/test-db", (req, res) => {
+  if (!conn) {
+    return res.status(500).json({
+      success: false,
+      error: "Database connection not available",
+    });
+  }
+
+  conn.query(
+    "SELECT COUNT(*) as count FROM olah_absensi LIMIT 1",
+    (err, results) => {
+      if (err) {
+        return res.status(500).json({
+          success: false,
+          error: err.message,
+          sqlError: err.code,
+        });
+      }
+
+      res.json({
+        success: true,
+        message: "Database connection OK",
+        totalRecords: results[0].count,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  );
 });
