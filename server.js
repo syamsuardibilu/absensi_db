@@ -1,5 +1,6 @@
 // server.unified.js — single source for Local & Render
 require("dotenv").config();
+const tables = require("./table_list");
 
 const express = require("express");
 const mysql = require("mysql2");
@@ -7,6 +8,7 @@ const cors = require("cors");
 const fs = require("fs");
 const path = require("path");
 const DIR = __dirname;
+const { exec } = require("child_process");
 
 const app = express();
 
@@ -231,7 +233,7 @@ app.post("/update-perner-tanggal", (req, res) => {
           const namaHari = hariList[tgl.getDay()];
 
           const sql = `
-          INSERT INTO olah_absensi (perner, tanggal, is_jumat, nama_hari)
+          INSERT INTO ${tables.OLAH_ABSEN} (perner, tanggal, is_jumat, nama_hari)
           VALUES (?, ?, ?, ?)
           ON DUPLICATE KEY UPDATE 
             is_jumat = VALUES(is_jumat),
@@ -268,7 +270,7 @@ app.post("/update-perner-tanggal", (req, res) => {
 });
 
 app.post("/hapus-semua-data", (req, res) => {
-  const sql = "DELETE FROM olah_absensi";
+  const sql = `DELETE FROM ${tables.OLAH_ABSEN}`;
 
   conn.query(sql, (err, result) => {
     if (err) {
@@ -300,7 +302,7 @@ app.post("/update-hari-libur", (req, res) => {
   // STEP 1: Batch update hari libur
   if (liburData.length > 0) {
     const batchLiburSQL = `
-      UPDATE olah_absensi 
+      UPDATE ${tables.OLAH_ABSEN} 
       SET jenis_hari = CASE 
         ${liburData.map(() => `WHEN tanggal = ? THEN ?`).join(" ")}
         ELSE jenis_hari
@@ -332,7 +334,7 @@ app.post("/update-hari-libur", (req, res) => {
   // STEP 2: Update tanggal lain jadi "HARI KERJA"
   // Hanya update yang belum ada jenis_hari atau kosong
   const updateHariKerjaSQL = `
-    UPDATE olah_absensi
+    UPDATE ${tables.OLAH_ABSEN}
     SET jenis_hari = 'HARI KERJA'
     WHERE (jenis_hari IS NULL OR jenis_hari = '' OR jenis_hari = 'HARI KERJA')
       AND tanggal IS NOT NULL
@@ -416,7 +418,7 @@ app.post("/update-ci-co", (req, res) => {
   // Batch update for CLOCK_IN
   if (inUpdates.length > 0) {
     const batchInSQL = `
-      UPDATE olah_absensi 
+      UPDATE ${tables.OLAH_ABSEN} 
       SET daily_in = CASE 
         ${inUpdates
           .map(() => `WHEN perner = ? AND tanggal = ? THEN ?`)
@@ -458,7 +460,7 @@ app.post("/update-ci-co", (req, res) => {
   // Batch update for CLOCK_OUT
   if (outUpdates.length > 0) {
     const batchOutSQL = `
-      UPDATE olah_absensi 
+      UPDATE ${tables.OLAH_ABSEN} 
       SET daily_out = CASE 
         ${outUpdates
           .map(() => `WHEN perner = ? AND tanggal = ? THEN ?`)
@@ -524,7 +526,7 @@ app.post("/update-ci-co", (req, res) => {
 });
 app.get("/getAllData", (req, res) => {
   conn.query(
-    "SELECT * FROM olah_absensi ORDER BY tanggal DESC",
+    `SELECT * FROM ${tables.OLAH_ABSEN} ORDER BY tanggal DESC`,
     (err, result) => {
       if (err) return res.status(500).json({ error: "Gagal mengambil data" });
       res.json(result);
@@ -537,7 +539,7 @@ app.post("/hapus-data-db", (req, res) => {
   let kolom = "";
 
   switch (jenis) {
-    case "data_pegawai":
+    case `${tables.DATA_PEGAWAI}`:
       kolom = "is_jumat = NULL, nama_hari = NULL";
       break;
     case "data_hari_libur":
@@ -768,7 +770,7 @@ app.post("/hapus-data-db", (req, res) => {
       .json({ message: "⚠️ Kolom belum ditentukan untuk jenis ini." });
   }
 
-  const sql = `UPDATE olah_absensi SET ${kolom}`;
+  const sql = `UPDATE ${tables.OLAH_ABSEN} SET ${kolom}`;
   conn.query(sql, (err, result) => {
     if (err) {
       console.error("❌ Gagal hapus data:", err);
@@ -826,7 +828,7 @@ app.post("/update-att-abs-daily", (req, res) => {
 
     attChunks.forEach((chunk, chunkIndex) => {
       const batchAttSQL = `
-        UPDATE olah_absensi 
+        UPDATE ${tables.OLAH_ABSEN} 
         SET att_daily = CASE 
           ${chunk.map(() => `WHEN perner = ? AND tanggal = ? THEN ?`).join(" ")}
           ELSE att_daily
@@ -879,7 +881,7 @@ app.post("/update-att-abs-daily", (req, res) => {
 
     absChunks.forEach((chunk, chunkIndex) => {
       const batchAbsSQL = `
-        UPDATE olah_absensi 
+        UPDATE ${tables.OLAH_ABSEN} 
         SET abs_daily = CASE 
           ${chunk.map(() => `WHEN perner = ? AND tanggal = ? THEN ?`).join(" ")}
           ELSE abs_daily
@@ -1005,7 +1007,7 @@ app.post("/update-att-sap", (req, res) => {
 
   const tasks = chunks.map((chunk, chunkIndex) => {
     const batchSQL = `
-      UPDATE olah_absensi 
+      UPDATE ${tables.OLAH_ABSEN} 
       SET att_sap = CASE 
         ${chunk.map(() => `WHEN perner = ? AND tanggal = ? THEN ?`).join(" ")}
         ELSE att_sap
@@ -1079,7 +1081,7 @@ app.post("/update-abs-sap", (req, res) => {
 
   const tasks = chunks.map((chunk, chunkIndex) => {
     const batchSQL = `
-      UPDATE olah_absensi 
+      UPDATE ${tables.OLAH_ABSEN} 
       SET abs_sap = CASE 
         ${chunk.map(() => `WHEN perner = ? AND tanggal = ? THEN ?`).join(" ")}
         ELSE abs_sap
@@ -1132,7 +1134,7 @@ app.post("/update-abs-sap", (req, res) => {
 });
 
 app.get("/get-lastdate", (req, res) => {
-  const sql = "SELECT MAX(tanggal) AS lastdate FROM olah_absensi";
+  const sql = `SELECT MAX(tanggal) AS lastdate FROM ${tables.OLAH_ABSEN}`;
 
   conn.query(sql, (err, result) => {
     if (err) {
@@ -1314,7 +1316,7 @@ app.post("/update-sppd-umum", (req, res) => {
 
   const tasks = chunks.map((chunk, chunkIndex) => {
     const batchSQL = `
-      UPDATE olah_absensi 
+      UPDATE ${tables.OLAH_ABSEN} 
       SET sppd_umum = CASE 
         ${chunk.map(() => `WHEN perner = ? AND tanggal = ? THEN ?`).join(" ")}
         ELSE sppd_umum
@@ -1439,7 +1441,7 @@ app.post("/update-work-schedule", (req, res) => {
 
   const tasks = chunks.map((chunk, chunkIndex) => {
     const batchSQL = `
-      UPDATE olah_absensi 
+      UPDATE ${tables.OLAH_ABSEN} 
       SET ws_rule = CASE 
         ${chunk.map(() => `WHEN perner = ? AND tanggal = ? THEN ?`).join(" ")}
         ELSE ws_rule
@@ -1541,7 +1543,7 @@ app.post("/update-substitution-daily", (req, res) => {
 
   // Single batch update
   const batchSQL = `
-    UPDATE olah_absensi 
+    UPDATE ${tables.OLAH_ABSEN} 
     SET jenis_jam_kerja_shift_daily = CASE 
       ${data.map(() => `WHEN perner = ? AND tanggal = ? THEN ?`).join(" ")}
       ELSE jenis_jam_kerja_shift_daily
@@ -1776,7 +1778,7 @@ app.post("/update-substitution-sap", (req, res) => {
 
   const tasks = chunks.map((chunk, chunkIndex) => {
     const batchSQL = `
-      UPDATE olah_absensi 
+      UPDATE ${tables.OLAH_ABSEN} 
       SET jenis_jam_kerja_shift_sap = CASE 
         ${chunk.map(() => `WHEN perner = ? AND tanggal = ? THEN ?`).join(" ")}
         ELSE jenis_jam_kerja_shift_sap
@@ -1866,7 +1868,7 @@ app.get("/get-ganda", (req, res) => {
        att_daily_new, abs_daily_new, att_sap_new, abs_sap_new, sppd_umum_new
 
 
-    FROM olah_absensi
+    FROM ${tables.OLAH_ABSEN}
     WHERE status_ganda_att_abs = 'Ganda'
   `;
   conn.query(sql, (err, result) => {
@@ -1884,14 +1886,14 @@ app.post("/update-status-ganda", (req, res) => {
 
   // STEP 1: Reset (same as before)
   const resetSQL = `
-    UPDATE olah_absensi SET
+    UPDATE ${tables.OLAH_ABSEN} SET
       status_ganda_att_abs = NULL, status_ganda_ws_rule = NULL,
       att_daily_new = NULL, abs_daily_new = NULL, att_sap_new = NULL, abs_sap_new = NULL, sppd_umum_new = NULL,
       value_att_abs = NULL, is_att_abs = NULL, value_shift_daily_sap = NULL, is_shift_daily_sap = NULL,
       jenis_jam_kerja_shift_daily_new = NULL, jenis_jam_kerja_shift_sap_new = NULL,
       status_jam_kerja = NULL, kategori_jam_kerja = NULL, komponen_perhitungan_jkp = NULL,
       status_absen = NULL, status_in_out = NULL, ket_in_out = NULL, kategori_hit_jkp = NULL,
-      jam_kerja_pegawai = NULL, jam_kerja_pegawai_cleansing = NULL, jam_kerja_seharusnya = NULL
+      jam_kerja_pegawai = NULL, jam_kerja_pegawai_cleansing = NULL, jam_kerja_seharusnya = NULL, jenis_hari_realisasi = NULL
     WHERE tanggal IS NOT NULL
   `;
 
@@ -1907,7 +1909,7 @@ app.post("/update-status-ganda", (req, res) => {
     const ambilSQL = `
       SELECT perner, tanggal, att_daily, abs_daily, att_sap, abs_sap, sppd_umum,
              jenis_jam_kerja_shift_daily, jenis_jam_kerja_shift_sap, ws_rule, jenis_hari
-      FROM olah_absensi WHERE tanggal IS NOT NULL ORDER BY perner, tanggal
+      FROM ${tables.OLAH_ABSEN} WHERE tanggal IS NOT NULL ORDER BY perner, tanggal
     `;
 
     conn.query(ambilSQL, (err, rows) => {
@@ -1947,9 +1949,16 @@ app.post("/update-status-ganda", (req, res) => {
           .filter((v) => v && v.trim() !== "")
           .map((v) => v.trim());
         let status = "Normal";
+
+        // Jika ada lebih dari 1 sumber dan berbeda → Ganda
         if (nilaiIsi.length > 1) {
           const unik = new Set(nilaiIsi);
           if (unik.size > 1) status = "Ganda";
+        }
+
+        // Jika ada "||" di salah satu sumber → Ganda
+        if (nilaiIsi.some((v) => v.includes("||"))) {
+          status = "Ganda";
         }
 
         // 2. Status ganda ws_rule
@@ -2174,7 +2183,7 @@ app.post("/update-status-ganda", (req, res) => {
             });
 
             const batchSQL = `
-              UPDATE olah_absensi SET
+              UPDATE ${tables.OLAH_ABSEN} SET
               ${group.fields
                 .map((field, i) => `${field} = ${setClauses[i]}`)
                 .join(", ")}
@@ -2302,7 +2311,7 @@ app.post("/reset-pilihan-new", (req, res) => {
   ];
 
   const setClause = kolomNew.map((k) => `${k} = NULL`).join(", ");
-  const sql = `UPDATE olah_absensi SET ${setClause}`;
+  const sql = `UPDATE ${tables.OLAH_ABSEN} SET ${setClause}`;
 
   conn.query(sql, (err, result) => {
     if (err) {
@@ -2330,7 +2339,7 @@ app.post("/update-ganda-pilihan", (req, res) => {
     const is_att_abs = "true";
 
     const sql = `
-      UPDATE olah_absensi
+      UPDATE ${tables.OLAH_ABSEN}
       SET ${kolomBaru} = ?, value_att_abs = ?, is_att_abs = ?
       WHERE perner = ? AND tanggal = ?
     `;
@@ -2366,7 +2375,7 @@ app.get("/get-ganda-shift", (req, res) => {
            jenis_jam_kerja_shift_sap,
            jenis_jam_kerja_shift_daily_new,
            jenis_jam_kerja_shift_sap_new
-    FROM olah_absensi
+    FROM ${tables.OLAH_ABSEN}
     WHERE status_ganda_ws_rule = 'Ganda'
     ORDER BY perner, tanggal
   `;
@@ -2395,8 +2404,7 @@ app.post("/update-ganda-shift-pilihan", async (req, res) => {
   // Helper function untuk mendapatkan jenis_hari dari database
   const getJenisHari = (perner, tanggal) => {
     return new Promise((resolve, reject) => {
-      const sql =
-        "SELECT jenis_hari FROM olah_absensi WHERE perner = ? AND tanggal = ? LIMIT 1";
+      const sql = `SELECT jenis_hari FROM ${tables.OLAH_ABSEN} WHERE perner = ? AND tanggal = ? LIMIT 1`;
       conn.query(sql, [perner, tanggal], (err, results) => {
         if (err) return reject(err);
 
@@ -2514,7 +2522,7 @@ app.post("/update-ganda-shift-pilihan", async (req, res) => {
 
         // WHERE clause
         const sql = `
-      UPDATE olah_absensi
+      UPDATE ${tables.OLAH_ABSEN}
       SET ${kolomSet.join(", ")}
       WHERE perner = ? AND tanggal = ?
     `;
@@ -2556,7 +2564,7 @@ app.post("/reset-shift-ganda", (req, res) => {
   ];
 
   const setClause = kolomShift.map((k) => `${k} = NULL`).join(", ");
-  const sql = `UPDATE olah_absensi SET ${setClause} WHERE status_ganda_ws_rule = 'Ganda'`;
+  const sql = `UPDATE ${tables.OLAH_ABSEN} SET ${setClause} WHERE status_ganda_ws_rule = 'Ganda'`;
 
   conn.query(sql, (err, result) => {
     if (err) {
@@ -2580,7 +2588,7 @@ app.post("/ambil-data-absensi-untuk-jkp", (req, res) => {
            daily_in_default, daily_out_default,
            jenis_jam_kerja_shift_daily_new, jenis_jam_kerja_shift_sap_new,
            status_jam_kerja, status_absen, value_att_abs
-    FROM olah_absensi
+    FROM ${tables.OLAH_ABSEN}
   `;
 
   // ... rest of function
@@ -2597,7 +2605,7 @@ app.post("/ambil-data-absensi-untuk-jkp", (req, res) => {
 });
 
 app.post("/reset-jkp", (req, res) => {
-  const sql = "UPDATE olah_absensi SET jam_kerja_pegawai = NULL";
+  const sql = `UPDATE ${tables.OLAH_ABSEN} SET jam_kerja_pegawai = NULL`;
 
   conn.query(sql, (err, result) => {
     if (err) {
@@ -2618,7 +2626,7 @@ app.post("/update-jkp", (req, res) => {
   }
 
   const sql = `
-    UPDATE olah_absensi
+    UPDATE ${tables.OLAH_ABSEN}
     SET jam_kerja_pegawai = ?
     WHERE perner = ? AND tanggal = ?
   `;
@@ -2739,7 +2747,7 @@ app.post("/proses-kalkulasi-jkp-backend", async (req, res) => {
     }
 
     const sql = `
-      UPDATE olah_absensi
+      UPDATE ${tables.OLAH_ABSEN}
       SET jam_kerja_pegawai = ?, 
           daily_in_cleansing = ?, 
           daily_out_cleansing = ?, 
@@ -2782,7 +2790,7 @@ Values: ${JSON.stringify(values)}
 
       return new Promise((resolve, reject) => {
         const cekQuery = `
-          SELECT perner, tanggal FROM olah_absensi WHERE perner = ? AND tanggal = ?
+          SELECT perner, tanggal FROM ${tables.OLAH_ABSEN} WHERE perner = ? AND tanggal = ?
         `;
 
         conn.query(cekQuery, [perner, tanggal], (cekErr, cekRows) => {
@@ -3438,7 +3446,7 @@ app.post("/proses-kalkulasi-jkp-backend-selective", async (req, res) => {
           });
 
           const sql = `
-            UPDATE olah_absensi SET
+            UPDATE ${tables.OLAH_ABSEN} SET
             ${setClauses.join(",\n            ")}
             WHERE (perner, DATE(tanggal)) IN (${chunk
               .map(() => "(?, ?)")
@@ -3668,7 +3676,7 @@ app.post("/update-status-absen-cleansing", (req, res) => {
   const ambilSQL = `
     SELECT perner, tanggal, daily_in_cleansing, daily_out_cleansing,
            status_jam_kerja, jenis_hari, value_att_abs
-    FROM olah_absensi
+    FROM ${tables.OLAH_ABSEN}
     WHERE tanggal IS NOT NULL
   `;
 
@@ -3733,7 +3741,7 @@ app.post("/update-status-absen-cleansing", (req, res) => {
       }
 
       const sqlUpdate = `
-        UPDATE olah_absensi
+        UPDATE ${tables.OLAH_ABSEN}
         SET status_absen = ?, jenis_hari_realisasi = ?
         WHERE perner = ? AND tanggal = ?
       `;
@@ -3770,7 +3778,7 @@ app.post("/update-jenis-hari-realisasi", (req, res) => {
   // STEP 1: Ambil data yang diperlukan untuk cekWajibKerja
   const ambilSQL = `
     SELECT perner, tanggal, status_jam_kerja, jenis_hari
-    FROM olah_absensi
+    FROM ${tables.OLAH_ABSEN}
     WHERE tanggal IS NOT NULL
   `;
 
@@ -3811,7 +3819,7 @@ app.post("/update-jenis-hari-realisasi", (req, res) => {
 
       // STEP 3: Query update hanya jenis_hari_realisasi
       const sqlUpdate = `
-        UPDATE olah_absensi
+        UPDATE ${tables.OLAH_ABSEN}
         SET jenis_hari_realisasi = ?
         WHERE perner = ? AND tanggal = ?
       `;
@@ -4002,7 +4010,7 @@ app.post("/update-status-in-out", (req, res) => {
     SELECT perner, tanggal, 
            daily_in_cleansing, daily_out_cleansing,
            status_jam_kerja, status_absen
-    FROM olah_absensi
+    FROM ${tables.OLAH_ABSEN}
     WHERE tanggal IS NOT NULL
   `;
 
@@ -4069,7 +4077,7 @@ app.post("/update-status-in-out", (req, res) => {
 
       // Query update
       const sqlUpdate = `
-        UPDATE olah_absensi
+        UPDATE ${tables.OLAH_ABSEN}
         SET status_in_out = ?
         WHERE perner = ? AND tanggal = ?
       `;
@@ -4101,7 +4109,7 @@ app.post("/update-status-in-out", (req, res) => {
 
 // Endpoint untuk reset status_in_out
 app.post("/reset-status-in-out", (req, res) => {
-  const sql = "UPDATE olah_absensi SET status_in_out = NULL";
+  const sql = `UPDATE ${tables.OLAH_ABSEN} SET status_in_out = NULL`;
 
   conn.query(sql, (err, result) => {
     if (err) {
@@ -4122,7 +4130,7 @@ app.post("/reset-status-in-out", (req, res) => {
 app.post("/reset-rekap-absensi", (req, res) => {
   console.log("🔄 Starting reset rekap absensi...");
 
-  const sql = "DELETE FROM rekap_absensi";
+  const sql = `DELETE FROM ${tables.REKAP_ABSENSI}`;
 
   conn.query(sql, (err, result) => {
     if (err) {
@@ -4596,7 +4604,7 @@ app.post("/proses-status-in-out", async (req, res) => {
 
     // SQL Update
     const sql = `
-      UPDATE olah_absensi
+      UPDATE ${tables.OLAH_ABSEN}
       SET status_in_out = ?
       WHERE perner = ? AND (
         DATE(tanggal) = ? OR
@@ -4631,7 +4639,7 @@ app.post("/proses-status-in-out", async (req, res) => {
         // Ambil nilai sebelum update untuk debug
         const cekQuery = `
           SELECT perner, tanggal, status_in_out
-          FROM olah_absensi
+          FROM ${tables.OLAH_ABSEN}
           WHERE perner = ? AND (
             DATE(tanggal) = ? OR
             DATE(CONVERT_TZ(tanggal, '+00:00', '+07:00')) = ? OR
@@ -4765,7 +4773,7 @@ app.post("/generate-rekap-absensi", (req, res) => {
 
   // STEP 1: Clear existing data
   console.log("🗑️ Clearing existing rekap data...");
-  const clearSQL = "DELETE FROM rekap_absensi";
+  const clearSQL = `DELETE FROM ${tables.REKAP_ABSENSI}`;
 
   conn.query(clearSQL, (clearErr, clearResult) => {
     if (clearErr) {
@@ -4782,7 +4790,7 @@ app.post("/generate-rekap-absensi", (req, res) => {
 
     const getPernersSQL = `
       SELECT DISTINCT perner, COUNT(*) as record_count
-      FROM olah_absensi 
+      FROM ${tables.OLAH_ABSEN} 
       WHERE perner IS NOT NULL 
       GROUP BY perner 
       ORDER BY perner
@@ -4972,8 +4980,8 @@ app.post("/generate-rekap-absensi", (req, res) => {
                 )
               END as PERSENTASE_JKP
               
-            FROM olah_absensi o
-            LEFT JOIN data_pegawai dp ON o.perner = dp.perner
+            FROM ${tables.OLAH_ABSEN} o
+            LEFT JOIN ${tables.DATA_PEGAWAI} dp ON o.perner = dp.perner
             WHERE o.perner IN (${chunk.map(() => "?").join(", ")})
             GROUP BY o.perner, dp.nama, dp.nip, dp.bidang
             ORDER BY o.perner
@@ -5000,7 +5008,7 @@ app.post("/generate-rekap-absensi", (req, res) => {
 
             // Batch insert chunk results sesuai struktur tabel rekap_absensi
             const insertSQL = `
-              INSERT INTO rekap_absensi (
+              INSERT INTO ${tables.REKAP_ABSENSI} (
                 PERNER, NAMA, BIDANG_UNIT,
                 TOTAL_HARI_REGULER, HARI_KERJA_REGULER, HARI_LIBUR_REGULER,
                 TOTAL_HARI_REALISASI, HARI_KERJA_REALISASI, HARI_LIBUR_REALISASI,
@@ -5133,7 +5141,7 @@ app.post("/generate-rekap-absensi", (req, res) => {
               ROUND(SUM(JAM_SEHARUSNYA), 2) as total_jam_seharusnya,
               MIN(PERSENTASE_JKP) as min_persentase,
               MAX(PERSENTASE_JKP) as max_persentase
-            FROM rekap_absensi
+            FROM ${tables.REKAP_ABSENSI}
           `;
 
           conn.query(finalStatsSQL, (statsErr, statsResult) => {
@@ -5263,8 +5271,8 @@ app.get("/get-rekap-absensi", (req, res) => {
   // Count query dengan JOIN
   const countSQL = `
     SELECT COUNT(*) as total 
-    FROM rekap_absensi r
-    LEFT JOIN data_pegawai dp ON r.PERNER = dp.perner
+    FROM ${tables.REKAP_ABSENSI} r
+    LEFT JOIN ${tables.DATA_PEGAWAI} dp ON r.PERNER = dp.perner
     ${whereClause}
   `;
 
@@ -5284,8 +5292,8 @@ app.get("/get-rekap-absensi", (req, res) => {
       r.SPPD_TUGAS_LUAR_DLL, r.CUTI_IJIN,
       r.JAM_REALISASI, r.JAM_SEHARUSNYA, r.PERSENTASE_JKP,
       r.RESULT_BLASTING
-    FROM rekap_absensi r
-    LEFT JOIN data_pegawai dp ON r.PERNER = dp.perner
+    FROM ${tables.REKAP_ABSENSI} r
+    LEFT JOIN ${tables.DATA_PEGAWAI} dp ON r.PERNER = dp.perner
     ${whereClause}
     ORDER BY r.PERNER 
     LIMIT ? OFFSET ?
@@ -5360,15 +5368,15 @@ app.get("/get-rekap-absensi", (req, res) => {
 // 🔧 FIXED ENDPOINT - Pastikan return format array
 // 🗄️ DATABASE REAL ENDPOINT (gunakan setelah dummy berhasil)
 // ======================================================
-// CORRECT ENDPOINT: getRekapAbsensi dengan JOIN ke data_pegawai
+// CORRECT ENDPOINT: getRekapAbsensi dengan JOIN ke ${tables.DATA_PEGAWAI}
 // ======================================================
 
-// 📊 GET: Ambil data rekap_absensi dengan JOIN ke data_pegawai
+// 📊 GET: Ambil data rekap_absensi dengan JOIN ke ${tables.DATA_PEGAWAI}
 // ======================================================
 // CORRECT ENDPOINT: getRekapAbsensi dengan JOIN + Periode Bulan
 // ======================================================
 
-// 📊 GET: Ambil data rekap_absensi dengan JOIN ke data_pegawai + periode bulan
+// 📊 GET: Ambil data rekap_absensi dengan JOIN ke ${tables.DATA_PEGAWAI} + periode bulan
 app.get("/getRekapAbsensi", (req, res) => {
   const startTime = Date.now();
   const { search = "", search_fields = "PERNER,NAMA,NIP,BIDANG_UNIT" } =
@@ -5379,7 +5387,7 @@ app.get("/getRekapAbsensi", (req, res) => {
   // Step 1: Get periode info
   const periodeSQL = `
     SELECT tanggal 
-    FROM olah_absensi 
+    FROM ${tables.OLAH_ABSEN} 
     WHERE tanggal IS NOT NULL 
     ORDER BY tanggal DESC 
     LIMIT 1
@@ -5501,7 +5509,7 @@ app.get("/getRekapAbsensi", (req, res) => {
     r.JAM_SEHARUSNYA, 
     r.PERSENTASE_JKP,
     r.RESULT_BLASTING
-  FROM rekap_absensi r
+  FROM ${tables.REKAP_ABSENSI} r
   ${whereClause}
   ORDER BY r.PERNER ASC
 `;
@@ -5588,19 +5596,18 @@ app.get("/getRekapAbsensi", (req, res) => {
 });
 
 // ======================================================
-// BONUS: Test Endpoint untuk data_pegawai saja
+// BONUS: Test Endpoint untuk ${tables.DATA_PEGAWAI} saja
 // ======================================================
 
-// 📊 GET: Test endpoint untuk lihat data_pegawai
+// 📊 GET: Test endpoint untuk lihat ${tables.DATA_PEGAWAI}
 app.get("/testDataPegawai", (req, res) => {
-  console.log("🧪 Testing data_pegawai table...");
+  console.log("🧪 Testing ${tables.DATA_PEGAWAI} table...");
 
-  const sql =
-    "SELECT perner, nama, nip, bidang, no_telp FROM data_pegawai ORDER BY perner ASC";
+  const sql = `SELECT perner, nama, nip, bidang, no_telp FROM ${tables.DATA_PEGAWAI} ORDER BY perner ASC`;
 
   conn.query(sql, (err, results) => {
     if (err) {
-      console.error("❌ Error fetching data_pegawai:", err);
+      console.error("❌ Error fetching ${tables.DATA_PEGAWAI}:", err);
       return res.status(500).json({
         success: false,
         message: "❌ Gagal mengambil data pegawai",
@@ -5608,7 +5615,7 @@ app.get("/testDataPegawai", (req, res) => {
       });
     }
 
-    console.log(`✅ data_pegawai fetched: ${results.length} records`);
+    console.log(`✅ ${tables.DATA_PEGAWAI} fetched: ${results.length} records`);
 
     res.json({
       success: true,
@@ -5620,12 +5627,12 @@ app.get("/testDataPegawai", (req, res) => {
 });
 
 // ======================================================
-// BONUS: Check PERNER yang tidak ada di data_pegawai
+// BONUS: Check PERNER yang tidak ada di ${tables.DATA_PEGAWAI}
 // ======================================================
 
 // 📊 GET: Check PERNER yang missing
 app.get("/checkMissingPERNER", (req, res) => {
-  console.log("🔍 Checking missing PERNER in data_pegawai...");
+  console.log("🔍 Checking missing PERNER in ${tables.DATA_PEGAWAI}...");
 
   const sql = `
     SELECT 
@@ -5636,8 +5643,8 @@ app.get("/checkMissingPERNER", (req, res) => {
       END as status,
       dp.nama,
       dp.bidang
-    FROM rekap_absensi r
-    LEFT JOIN data_pegawai dp ON r.PERNER = dp.perner
+    FROM ${tables.REKAP_ABSENSI} r
+    LEFT JOIN ${tables.DATA_PEGAWAI} dp ON r.PERNER = dp.perner
     ORDER BY status DESC, r.PERNER ASC
   `;
 
@@ -5676,19 +5683,18 @@ app.get("/checkMissingPERNER", (req, res) => {
 });
 
 // ======================================================
-// BONUS: Test Endpoint untuk data_pegawai saja
+// BONUS: Test Endpoint untuk ${tables.DATA_PEGAWAI} saja
 // ======================================================
 
-// 📊 GET: Test endpoint untuk lihat data_pegawai
+// 📊 GET: Test endpoint untuk lihat ${tables.DATA_PEGAWAI}
 app.get("/testDataPegawai", (req, res) => {
-  console.log("🧪 Testing data_pegawai table...");
+  console.log("🧪 Testing ${tables.DATA_PEGAWAI} table...");
 
-  const sql =
-    "SELECT perner, nama, nip, bidang, no_telp FROM data_pegawai ORDER BY perner ASC";
+  const sql = `SELECT perner, nama, nip, bidang, no_telp FROM ${tables.DATA_PEGAWAI} ORDER BY perner ASC`;
 
   conn.query(sql, (err, results) => {
     if (err) {
-      console.error("❌ Error fetching data_pegawai:", err);
+      console.error("❌ Error fetching ${tables.DATA_PEGAWAI}:", err);
       return res.status(500).json({
         success: false,
         message: "❌ Gagal mengambil data pegawai",
@@ -5696,7 +5702,7 @@ app.get("/testDataPegawai", (req, res) => {
       });
     }
 
-    console.log(`✅ data_pegawai fetched: ${results.length} records`);
+    console.log(`✅ ${tables.DATA_PEGAWAI} fetched: ${results.length} records`);
 
     res.json({
       success: true,
@@ -5708,12 +5714,12 @@ app.get("/testDataPegawai", (req, res) => {
 });
 
 // ======================================================
-// BONUS: Check PERNER yang tidak ada di data_pegawai
+// BONUS: Check PERNER yang tidak ada di ${tables.DATA_PEGAWAI}
 // ======================================================
 
 // 📊 GET: Check PERNER yang missing
 app.get("/checkMissingPERNER", (req, res) => {
-  console.log("🔍 Checking missing PERNER in data_pegawai...");
+  console.log("🔍 Checking missing PERNER in ${tables.DATA_PEGAWAI}...");
 
   const sql = `
     SELECT 
@@ -5724,8 +5730,8 @@ app.get("/checkMissingPERNER", (req, res) => {
       END as status,
       dp.nama,
       dp.bidang
-    FROM rekap_absensi r
-    LEFT JOIN data_pegawai dp ON r.PERNER = dp.perner
+    FROM ${tables.REKAP_ABSENSI} r
+    LEFT JOIN ${tables.DATA_PEGAWAI} dp ON r.PERNER = dp.perner
     ORDER BY status DESC, r.PERNER ASC
   `;
 
@@ -5814,7 +5820,7 @@ app.put("/updateResultBlasting", (req, res) => {
   // console.log(`🔄 Processing update for PERNER: ${perner} → ${actionType}`);
 
   // STEP 1: Check if table exists
-  const checkTableSQL = "SHOW TABLES LIKE 'rekap_absensi'";
+  const checkTableSQL = `SHOW TABLES LIKE '${tables.REKAP_ABSENSI}'`;
 
   conn.query(checkTableSQL, (checkTableErr, tableResults) => {
     if (checkTableErr) {
@@ -5838,8 +5844,7 @@ app.put("/updateResultBlasting", (req, res) => {
     }
 
     // STEP 2: Check if RESULT_BLASTING column exists
-    const checkColumnSQL =
-      "SHOW COLUMNS FROM rekap_absensi LIKE 'RESULT_BLASTING'";
+    const checkColumnSQL = `SHOW COLUMNS FROM ${tables.REKAP_ABSENSI} LIKE 'RESULT_BLASTING'`;
 
     conn.query(checkColumnSQL, (checkColumnErr, columnResults) => {
       if (checkColumnErr) {
@@ -5855,8 +5860,7 @@ app.put("/updateResultBlasting", (req, res) => {
       if (columnResults.length === 0) {
         console.log("⚠️ RESULT_BLASTING column not found, creating it...");
 
-        const addColumnSQL =
-          "ALTER TABLE rekap_absensi ADD COLUMN RESULT_BLASTING VARCHAR(10) DEFAULT NULL";
+        const addColumnSQL = `ALTER TABLE ${tables.REKAP_ABSENSI} ADD COLUMN RESULT_BLASTING VARCHAR(10) DEFAULT NULL`;
 
         conn.query(addColumnSQL, (addColumnErr) => {
           if (addColumnErr) {
@@ -5886,7 +5890,7 @@ app.put("/updateResultBlasting", (req, res) => {
   // Function to perform the actual update
   function performUpdate() {
     // STEP 3: Check if PERNER exists
-    const checkPERNERSQL = "SELECT PERNER FROM rekap_absensi WHERE PERNER = ?";
+    const checkPERNERSQL = `SELECT PERNER FROM ${tables.REKAP_ABSENSI} WHERE PERNER = ?`;
 
     conn.query(checkPERNERSQL, [perner], (checkErr, checkResults) => {
       if (checkErr) {
@@ -5909,8 +5913,7 @@ app.put("/updateResultBlasting", (req, res) => {
       console.log(`✅ PERNER ${perner} found, proceeding with update...`);
 
       // STEP 4: Update RESULT_BLASTING (support NULL for reset)
-      const updateSQL =
-        "UPDATE rekap_absensi SET RESULT_BLASTING = ? WHERE PERNER = ?";
+      const updateSQL = `UPDATE ${tables.REKAP_ABSENSI} SET RESULT_BLASTING = ? WHERE PERNER = ?`;
 
       // Handle NULL value properly
       const updateValue =
@@ -5989,7 +5992,7 @@ app.get("/getBlastingStats", (req, res) => {
       ROUND(
         (SUM(CASE WHEN RESULT_BLASTING = 'Terkirim' THEN 1 ELSE 0 END) * 100.0 / COUNT(*)), 2
       ) as success_rate
-    FROM rekap_absensi
+    FROM ${tables.REKAP_ABSENSI}
   `;
 
   conn.query(sql, (err, results) => {
@@ -6071,7 +6074,7 @@ app.post("/bulkUpdateResultBlasting", (req, res) => {
 
   // Build batch update SQL
   const batchSQL = `
-    UPDATE rekap_absensi 
+    UPDATE ${tables.REKAP_ABSENSI} 
     SET RESULT_BLASTING = CASE 
       ${updates.map(() => `WHEN PERNER = ? THEN ?`).join(" ")}
       ELSE RESULT_BLASTING
@@ -6143,7 +6146,7 @@ app.delete("/resetResultBlasting", (req, res) => {
   if (perner) {
     console.log(`🗑️ Resetting RESULT_BLASTING for specific PERNER: ${perner}`);
     sql = `
-      UPDATE rekap_absensi 
+      UPDATE ${tables.REKAP_ABSENSI} 
       SET RESULT_BLASTING = NULL,
           updated_at = NOW()
       WHERE PERNER = ?
@@ -6152,7 +6155,7 @@ app.delete("/resetResultBlasting", (req, res) => {
   } else {
     console.log("🗑️ Resetting ALL RESULT_BLASTING records...");
     sql = `
-      UPDATE rekap_absensi 
+      UPDATE ${tables.REKAP_ABSENSI} 
       SET RESULT_BLASTING = NULL,
           updated_at = NOW()
       WHERE RESULT_BLASTING IS NOT NULL
@@ -6208,7 +6211,7 @@ app.delete("/resetResultBlasting", (req, res) => {
 // 📊 GET: Ambil semua data pegawai
 app.get("/getDataPegawai", (req, res) => {
   const startTime = Date.now();
-  console.log("🚀 Fetching data_pegawai...");
+  console.log("🚀 Fetching ${tables.DATA_PEGAWAI}...");
 
   const sql = `
     SELECT 
@@ -6217,13 +6220,13 @@ app.get("/getDataPegawai", (req, res) => {
       nama,
       bidang,
       no_telp
-    FROM data_pegawai 
+    FROM ${tables.DATA_PEGAWAI} 
     ORDER BY perner ASC
   `;
 
   conn.query(sql, (err, results) => {
     if (err) {
-      console.error("❌ Error fetching data_pegawai:", err);
+      console.error("❌ Error fetching ${tables.DATA_PEGAWAI}:", err);
       return res.status(500).json({
         message: "❌ Gagal mengambil data pegawai",
         error: err.message,
@@ -6241,12 +6244,12 @@ app.get("/getDataPegawai", (req, res) => {
   });
 });
 
-// 📊 GET: Check matching PERNER antara rekap_absensi dan data_pegawai
+// 📊 GET: Check matching PERNER antara ${tables.REKAP_ABSENSI} dan ${tables.DATA_PEGAWAI}
 app.get("/checkPERNERMatch", (req, res) => {
   const startTime = Date.now();
   console.log("🔍 Checking PERNER match between tables...");
 
-  // Query untuk check PERNER yang ada di rekap_absensi tapi tidak ada di data_pegawai
+  // Query untuk check PERNER yang ada di rekap_absensi tapi tidak ada di ${tables.DATA_PEGAWAI}
   const checkSQL = `
     SELECT 
       r.PERNER,
@@ -6258,8 +6261,8 @@ app.get("/checkPERNERMatch", (req, res) => {
       dp.nip,
       dp.bidang,
       dp.no_telp
-    FROM rekap_absensi r
-    LEFT JOIN data_pegawai dp ON r.PERNER = dp.perner
+    FROM ${tables.REKAP_ABSENSI} r
+    LEFT JOIN ${tables.DATA_PEGAWAI} dp ON r.PERNER = dp.perner
     ORDER BY status DESC, r.PERNER ASC
   `;
 
@@ -6322,7 +6325,7 @@ app.post("/addDataPegawai", (req, res) => {
 
   // Insert atau update jika sudah ada
   const sql = `
-    INSERT INTO data_pegawai (perner, nip, nama, bidang, no_telp) 
+    INSERT INTO ${tables.DATA_PEGAWAI} (perner, nip, nama, bidang, no_telp) 
     VALUES (?, ?, ?, ?, ?)
     ON DUPLICATE KEY UPDATE
       nip = VALUES(nip),
@@ -6405,7 +6408,7 @@ app.post("/bulkAddDataPegawai", (req, res) => {
   // Build bulk insert SQL dengan ON DUPLICATE KEY UPDATE
   const placeholders = pegawai_data.map(() => "(?, ?, ?, ?, ?)").join(", ");
   const sql = `
-    INSERT INTO data_pegawai (perner, nip, nama, bidang, no_telp) 
+    INSERT INTO ${tables.DATA_PEGAWAI} (perner, nip, nama, bidang, no_telp) 
     VALUES ${placeholders}
     ON DUPLICATE KEY UPDATE
       nip = VALUES(nip),
@@ -6461,7 +6464,7 @@ app.delete("/deleteDataPegawai/:perner", (req, res) => {
 
   console.log(`🗑️ Deleting data pegawai: ${perner}`);
 
-  const sql = "DELETE FROM data_pegawai WHERE perner = ?";
+  const sql = `DELETE FROM ${tables.DATA_PEGAWAI} WHERE perner = ?`;
 
   conn.query(sql, [perner], (err, result) => {
     if (err) {
@@ -6504,8 +6507,8 @@ app.post("/generateMissingDataPegawai", (req, res) => {
   // Get PERNER yang ada di rekap_absensi tapi tidak ada di data_pegawai
   const findMissingSQL = `
     SELECT DISTINCT r.PERNER
-    FROM rekap_absensi r
-    LEFT JOIN data_pegawai dp ON r.PERNER = dp.perner
+    FROM ${tables.REKAP_ABSENSI} r
+    LEFT JOIN ${tables.DATA_PEGAWAI} dp ON r.PERNER = dp.perner
     WHERE dp.perner IS NULL
     ORDER BY r.PERNER
   `;
@@ -6550,7 +6553,7 @@ app.post("/generateMissingDataPegawai", (req, res) => {
     // Bulk insert
     const placeholders = insertData.map(() => "(?, ?, ?, ?, ?)").join(", ");
     const insertSQL = `
-      INSERT INTO data_pegawai (perner, nip, nama, bidang, no_telp) 
+      INSERT INTO ${tables.DATA_PEGAWAI} (perner, nip, nama, bidang, no_telp) 
       VALUES ${placeholders}
     `;
 
@@ -6601,8 +6604,8 @@ app.post("/autoPopulatePegawai", (req, res) => {
   // Step 1: Get semua PERNER dari rekap_absensi yang belum ada di data_pegawai
   const findMissingSQL = `
     SELECT DISTINCT r.PERNER
-    FROM rekap_absensi r
-    LEFT JOIN data_pegawai dp ON r.PERNER = dp.perner
+    FROM ${tables.REKAP_ABSENSI} r
+    LEFT JOIN ${tables.DATA_PEGAWAI} dp ON r.PERNER = dp.perner
     WHERE dp.perner IS NULL
     ORDER BY r.PERNER
   `;
@@ -6666,7 +6669,7 @@ app.post("/autoPopulatePegawai", (req, res) => {
     // Step 3: Bulk insert
     const placeholders = insertData.map(() => "(?, ?, ?, ?, ?)").join(", ");
     const insertSQL = `
-      INSERT INTO data_pegawai (perner, nip, nama, bidang, no_telp) 
+      INSERT INTO ${tables.DATA_PEGAWAI} (perner, nip, nama, bidang, no_telp) 
       VALUES ${placeholders}
     `;
 
@@ -6726,10 +6729,10 @@ app.get("/getRekapAbsensiWithDaily", (req, res) => {
     return `${y}-${m}-${day}`;
   };
 
-  // Step 1: Ambil periode bulan dari olah_absensi
+  // Step 1: Ambil periode bulan dari ${tables.OLAH_ABSEN}
   const periodeSQL = `
     SELECT tanggal
-    FROM olah_absensi
+    FROM ${tables.OLAH_ABSEN}
     WHERE tanggal IS NOT NULL
     ORDER BY tanggal DESC
     LIMIT 1
@@ -6853,16 +6856,16 @@ app.get("/getRekapAbsensiWithDaily", (req, res) => {
         r.JAM_REALISASI, r.JAM_SEHARUSNYA, r.PERSENTASE_JKP,
         r.RESULT_BLASTING,
 
-        -- Daily details dari olah_absensi
+        -- Daily details dari ${tables.OLAH_ABSEN}
         od.tanggal, od.nama_hari, od.jenis_hari, od.status_jam_kerja,
         od.daily_in_cleansing, od.daily_out_cleansing,
         od.correction_in, od.correction_out,
         od.value_att_abs, od.status_absen, od.status_in_out,
         od.jam_kerja_pegawai_cleansing, od.jam_kerja_seharusnya
 
-      FROM rekap_absensi r
-      LEFT JOIN data_pegawai dp ON r.PERNER = dp.perner
-      LEFT JOIN olah_absensi od ON r.PERNER = od.perner
+      FROM ${tables.REKAP_ABSENSI} r
+      LEFT JOIN ${tables.DATA_PEGAWAI} dp ON r.PERNER = dp.perner
+      LEFT JOIN ${tables.OLAH_ABSEN} od ON r.PERNER = od.perner
       WHERE od.tanggal IS NOT NULL
         ${dateClause}
         ${searchClause}
@@ -7008,16 +7011,16 @@ app.get("/getRekapAbsensi", (req, res) => {
 
 app.get("/getOlahAbsensiDateRange", (req, res) => {
   const startTime = Date.now();
-  // console.log("🚀 Fetching olah_absensi data for Date Range Converter...");
+  // console.log("🚀 Fetching ${tables.OLAH_ABSEN} data for Date Range Converter...");
 
-  // Step 1: Ambil periode bulan dari olah_absensi untuk menentukan range
+  // Step 1: Ambil periode bulan dari ${tables.OLAH_ABSEN} untuk menentukan range
   const periodeSQL = `
     SELECT 
       MIN(tanggal) as start_date,
       MAX(tanggal) as end_date,
       COUNT(DISTINCT perner) as total_perner,
       COUNT(*) as total_records
-    FROM olah_absensi 
+    FROM ${tables.OLAH_ABSEN} 
     WHERE tanggal IS NOT NULL 
       AND value_att_abs IS NOT NULL
       AND (
@@ -7037,7 +7040,7 @@ app.get("/getOlahAbsensiDateRange", (req, res) => {
     }
 
     if (periodeResults.length === 0 || !periodeResults[0].start_date) {
-      console.warn("⚠️ No data found in olah_absensi");
+      console.warn("⚠️ No data found in ${tables.OLAH_ABSEN}");
       return res.json([]);
     }
 
@@ -7064,7 +7067,7 @@ app.get("/getOlahAbsensiDateRange", (req, res) => {
         correction_out,
         status_absen,
         status_in_out
-      FROM olah_absensi 
+      FROM ${tables.OLAH_ABSEN} 
       WHERE tanggal IS NOT NULL 
         AND value_att_abs IS NOT NULL
         AND (
@@ -7077,10 +7080,10 @@ app.get("/getOlahAbsensiDateRange", (req, res) => {
 
     conn.query(sql, (err, results) => {
       if (err) {
-        console.error("❌ Error fetching olah_absensi data:", err);
+        console.error("❌ Error fetching ${tables.OLAH_ABSEN} data:", err);
         return res.status(500).json({
           success: false,
-          message: "❌ Gagal mengambil data olah_absensi",
+          message: "❌ Gagal mengambil data ${tables.OLAH_ABSEN}",
           error: err.message,
         });
       }
@@ -7230,7 +7233,7 @@ app.get("/getOlahAbsensiDateRange", (req, res) => {
 
 // Optional: Endpoint untuk mendapatkan statistik saja (lebih cepat)
 app.get("/getOlahAbsensiStats", (req, res) => {
-  console.log("📊 Fetching olah_absensi statistics...");
+  console.log("📊 Fetching ${tables.OLAH_ABSEN} statistics...");
 
   const statsSQL = `
     SELECT 
@@ -7241,7 +7244,7 @@ app.get("/getOlahAbsensiStats", (req, res) => {
       SUM(CASE WHEN value_att_abs LIKE 'abs_daily_%' THEN 1 ELSE 0 END) as abs_daily_count,
       SUM(CASE WHEN value_att_abs LIKE 'att_daily_%' THEN 1 ELSE 0 END) as att_daily_count,
       SUM(CASE WHEN value_att_abs LIKE 'sppd_umum%' THEN 1 ELSE 0 END) as sppd_umum_count
-    FROM olah_absensi 
+    FROM ${tables.OLAH_ABSEN} 
     WHERE tanggal IS NOT NULL 
       AND value_att_abs IS NOT NULL
       AND (
@@ -7332,8 +7335,8 @@ app.get("/getInputInOutSapData", (req, res) => {
   // Step 1: Get total count for pagination
   const countSQL = `
     SELECT COUNT(*) as total_count
-    FROM olah_absensi oa
-    LEFT JOIN data_pegawai dp ON oa.perner = dp.perner
+    FROM ${tables.OLAH_ABSEN} oa
+    LEFT JOIN ${tables.DATA_PEGAWAI} dp ON oa.perner = dp.perner
     ${whereClause}
   `;
 
@@ -7363,8 +7366,8 @@ app.get("/getInputInOutSapData", (req, res) => {
         oa.daily_out_cleansing,
         dp.nip,
         dp.nama
-      FROM olah_absensi oa
-      LEFT JOIN data_pegawai dp ON oa.perner = dp.perner
+      FROM ${tables.OLAH_ABSEN} oa
+      LEFT JOIN ${tables.DATA_PEGAWAI} dp ON oa.perner = dp.perner
       ${whereClause}
       ORDER BY oa.perner ASC, oa.tanggal ASC
       LIMIT ${limit} OFFSET ${offset}
@@ -7500,8 +7503,8 @@ app.get("/getInputInOutSapStats", (req, res) => {
       SUM(CASE WHEN (oa.daily_in_cleansing IS NOT NULL AND oa.daily_in_cleansing != '00:00:00') 
                 AND (oa.daily_out_cleansing IS NOT NULL AND oa.daily_out_cleansing != '00:00:00') THEN 1 ELSE 0 END) as records_complete,
       COUNT(CASE WHEN dp.perner IS NULL THEN 1 END) as records_without_employee_data
-    FROM olah_absensi oa
-    LEFT JOIN data_pegawai dp ON oa.perner = dp.perner
+    FROM ${tables.OLAH_ABSEN} oa
+    LEFT JOIN ${tables.DATA_PEGAWAI} dp ON oa.perner = dp.perner
     WHERE oa.tanggal IS NOT NULL
   `;
 
@@ -7597,7 +7600,7 @@ app.get("/debug-rekap-calculation/:perner", (req, res) => {
            THEN CAST(o.jam_kerja_seharusnya AS DECIMAL(10,2)) 
            ELSE 0 END as jam_seharusnya_counted
       
-    FROM olah_absensi o
+    FROM ${tables.OLAH_ABSEN} o
     WHERE o.perner = ?
     ORDER BY o.tanggal
   `;
@@ -7614,7 +7617,7 @@ app.get("/debug-rekap-calculation/:perner", (req, res) => {
 
     // Get actual rekap result for comparison
     const rekapSQL = `
-      SELECT * FROM rekap_absensi WHERE PERNER = ?
+      SELECT * FROM ${tables.REKAP_ABSENSI} WHERE PERNER = ?
     `;
 
     conn.query(rekapSQL, [perner], (rekapErr, rekapResults) => {
@@ -7722,8 +7725,8 @@ app.post("/bulk-fix-data-issues", (req, res) => {
     return new Promise((resolve) => {
       const findMissingSQL = `
         SELECT DISTINCT ra.PERNER
-        FROM rekap_absensi ra
-        LEFT JOIN data_pegawai dp ON ra.PERNER = dp.perner
+        FROM ${tables.REKAP_ABSENSI} ra
+        LEFT JOIN ${tables.DATA_PEGAWAI} dp ON ra.PERNER = dp.perner
         WHERE dp.perner IS NULL
         ORDER BY ra.PERNER
         LIMIT 100
@@ -7763,7 +7766,7 @@ app.post("/bulk-fix-data-issues", (req, res) => {
         }));
 
         const placeholders = insertData.map(() => "(?, ?, ?, ?, ?)").join(", ");
-        const insertSQL = `INSERT INTO data_pegawai (perner, nip, nama, bidang, no_telp) VALUES ${placeholders}`;
+        const insertSQL = `INSERT INTO ${tables.DATA_PEGAWAI} (perner, nip, nama, bidang, no_telp) VALUES ${placeholders}`;
 
         const params = [];
         insertData.forEach((item) => {
@@ -7794,12 +7797,12 @@ app.post("/bulk-fix-data-issues", (req, res) => {
     });
   };
 
-  // Fix 2: Update NAMA and BIDANG_UNIT in rekap_absensi from data_pegawai
+  // Fix 2: Update NAMA and BIDANG_UNIT in ${tables.REKAP_ABSENSI} from ${tables.DATA_PEGAWAI}
   const fixNameAndBidangMapping = () => {
     return new Promise((resolve) => {
       const updateSQL = `
-        UPDATE rekap_absensi ra
-        INNER JOIN data_pegawai dp ON ra.PERNER = dp.perner
+        UPDATE ${tables.REKAP_ABSENSI} ra
+        INNER JOIN ${tables.DATA_PEGAWAI} dp ON ra.PERNER = dp.perner
         SET ra.NAMA = dp.nama, ra.BIDANG_UNIT = dp.bidang
         WHERE ra.NAMA IS NULL OR ra.BIDANG_UNIT IS NULL OR ra.NAMA != dp.nama OR ra.BIDANG_UNIT != dp.bidang
       `;
@@ -7825,7 +7828,7 @@ app.post("/bulk-fix-data-issues", (req, res) => {
   const fixResultBlasting = () => {
     return new Promise((resolve) => {
       const updateSQL = `
-        UPDATE rekap_absensi 
+        UPDATE ${tables.REKAP_ABSENSI} 
         SET RESULT_BLASTING = NULL
         WHERE RESULT_BLASTING = '' OR RESULT_BLASTING = 'undefined'
       `;
@@ -7936,7 +7939,7 @@ app.get("/get-rekap-statistics", (req, res) => {
       COUNT(CASE WHEN RESULT_BLASTING = 'Gagal' THEN 1 END) as blasting_gagal,
       COUNT(CASE WHEN RESULT_BLASTING IS NULL THEN 1 END) as blasting_pending
       
-    FROM rekap_absensi
+    FROM ${tables.REKAP_ABSENSI}
   `;
 
   conn.query(statsSQL, (statsErr, statsResult) => {
@@ -7956,7 +7959,7 @@ app.get("/get-rekap-statistics", (req, res) => {
         COUNT(*) as jumlah_pegawai,
         ROUND(AVG(PERSENTASE_JKP), 2) as avg_jkp_bidang,
         ROUND(SUM(JAM_REALISASI), 2) as total_jam_bidang
-      FROM rekap_absensi
+      FROM ${tables.REKAP_ABSENSI}
       WHERE BIDANG_UNIT IS NOT NULL
       GROUP BY BIDANG_UNIT
       ORDER BY jumlah_pegawai DESC
@@ -8158,8 +8161,8 @@ app.get("/get-rekap-absensi-enhanced", (req, res) => {
         ELSE 'Complete'
       END as DATA_STATUS
       
-    FROM rekap_absensi r
-    LEFT JOIN data_pegawai dp ON r.PERNER = dp.perner
+    FROM ${tables.REKAP_ABSENSI} r
+    LEFT JOIN ${tables.DATA_PEGAWAI} dp ON r.PERNER = dp.perner
     ${whereClause}
     ORDER BY r.PERNER 
     LIMIT ? OFFSET ?
@@ -8168,8 +8171,8 @@ app.get("/get-rekap-absensi-enhanced", (req, res) => {
   // Count query
   const countSQL = `
     SELECT COUNT(*) as total 
-    FROM rekap_absensi r
-    LEFT JOIN data_pegawai dp ON r.PERNER = dp.perner
+    FROM ${tables.REKAP_ABSENSI} r
+    LEFT JOIN ${tables.DATA_PEGAWAI} dp ON r.PERNER = dp.perner
     ${whereClause}
   `;
 
@@ -8299,8 +8302,8 @@ app.get("/validate-rekap-consistency", (req, res) => {
             WHEN COUNT(DISTINCT oa.perner) = COUNT(DISTINCT ra.PERNER) THEN 'PASS'
             ELSE 'FAIL'
           END as status
-        FROM olah_absensi oa
-        CROSS JOIN rekap_absensi ra
+        FROM ${tables.OLAH_ABSEN} oa
+        CROSS JOIN ${tables.REKAP_ABSENSI} ra
       `,
     },
     {
@@ -8316,8 +8319,8 @@ app.get("/validate-rekap-consistency", (req, res) => {
             WHEN COUNT(ra.PERNER) = COUNT(dp.perner) THEN 'PASS'
             ELSE 'FAIL'
           END as status
-        FROM rekap_absensi ra
-        LEFT JOIN data_pegawai dp ON ra.PERNER = dp.perner
+        FROM ${tables.REKAP_ABSENSI} ra
+        LEFT JOIN ${tables.DATA_PEGAWAI} dp ON ra.PERNER = dp.perner
       `,
     },
     {
@@ -8335,7 +8338,7 @@ app.get("/validate-rekap-consistency", (req, res) => {
             THEN 'PASS'
             ELSE 'FAIL'
           END as status
-        FROM rekap_absensi
+        FROM ${tables.REKAP_ABSENSI}
       `,
     },
     {
@@ -8357,7 +8360,7 @@ app.get("/validate-rekap-consistency", (req, res) => {
             THEN 'PASS'
             ELSE 'FAIL'
           END as status
-        FROM rekap_absensi
+        FROM ${tables.REKAP_ABSENSI}
       `,
     },
   ];
@@ -8440,27 +8443,27 @@ app.get("/get-missing-perner-details", (req, res) => {
   console.log("🔍 Getting detailed missing PERNER analysis...");
   const startTime = Date.now();
 
-  // Check PERNER that exist in olah_absensi but missing in rekap_absensi
+  // Check PERNER that exist in ${tables.OLAH_ABSEN} but missing in rekap_absensi
   const missingInRekapSQL = `
     SELECT DISTINCT
       oa.perner,
       COUNT(oa.tanggal) as total_days_in_olah,
       'MISSING_IN_REKAP' as issue_type
-    FROM olah_absensi oa
-    LEFT JOIN rekap_absensi ra ON oa.perner = ra.PERNER
+    FROM ${tables.OLAH_ABSEN} oa
+    LEFT JOIN ${tables.REKAP_ABSENSI} ra ON oa.perner = ra.PERNER
     WHERE ra.PERNER IS NULL
     GROUP BY oa.perner
     ORDER BY oa.perner
   `;
 
-  // Check PERNER that exist in rekap_absensi but missing in olah_absensi
+  // Check PERNER that exist in rekap_absensi but missing in ${tables.OLAH_ABSEN}
   const missingInOlahSQL = `
     SELECT DISTINCT
       ra.PERNER as perner,
       0 as total_days_in_olah,
       'MISSING_IN_OLAH' as issue_type
-    FROM rekap_absensi ra
-    LEFT JOIN olah_absensi oa ON ra.PERNER = oa.perner
+    FROM ${tables.REKAP_ABSENSI} ra
+    LEFT JOIN ${tables.OLAH_ABSEN} oa ON ra.PERNER = oa.perner
     WHERE oa.perner IS NULL
     ORDER BY ra.PERNER
   `;
@@ -8472,8 +8475,8 @@ app.get("/get-missing-perner-details", (req, res) => {
       ra.NAMA,
       ra.BIDANG_UNIT,
       'MISSING_DATA_PEGAWAI' as issue_type
-    FROM rekap_absensi ra
-    LEFT JOIN data_pegawai dp ON ra.PERNER = dp.perner
+    FROM ${tables.REKAP_ABSENSI} ra
+    LEFT JOIN ${tables.DATA_PEGAWAI} dp ON ra.PERNER = dp.perner
     WHERE dp.perner IS NULL
     ORDER BY ra.PERNER
   `;
@@ -8556,8 +8559,8 @@ app.post("/fix-missing-data-pegawai", (req, res) => {
   // Step 1: Find missing PERNER in data_pegawai
   const findMissingSQL = `
     SELECT DISTINCT ra.PERNER
-    FROM rekap_absensi ra
-    LEFT JOIN data_pegawai dp ON ra.PERNER = dp.perner
+    FROM ${tables.REKAP_ABSENSI} ra
+    LEFT JOIN ${tables.DATA_PEGAWAI} dp ON ra.PERNER = dp.perner
     WHERE dp.perner IS NULL
     ORDER BY ra.PERNER
   `;
@@ -8621,7 +8624,7 @@ app.post("/fix-missing-data-pegawai", (req, res) => {
     // Step 3: Bulk insert
     const placeholders = insertData.map(() => "(?, ?, ?, ?, ?)").join(", ");
     const insertSQL = `
-      INSERT INTO data_pegawai (perner, nip, nama, bidang, no_telp) 
+      INSERT INTO ${tables.DATA_PEGAWAI} (perner, nip, nama, bidang, no_telp) 
       VALUES ${placeholders}
     `;
 
@@ -8850,7 +8853,7 @@ app.post("/api/data_pegawai/bulk_upload", (req, res) => {
     // Check for existing records
     const pernerList = validatedData.map((item) => item.perner);
     const pernerCheckSQL = `
-      SELECT perner, nip, nama, bidang, no_telp FROM data_pegawai 
+      SELECT perner, nip, nama, bidang, no_telp FROM ${tables.DATA_PEGAWAI} 
       WHERE perner IN (${pernerList.map(() => "?").join(",")})
     `;
 
@@ -8963,7 +8966,7 @@ app.post("/api/data_pegawai/bulk_upload", (req, res) => {
           const backupSQL = `
             INSERT INTO data_pegawai_history (perner, nip, nama, bidang, no_telp, backup_reason)
             SELECT perner, nip, nama, bidang, no_telp, 'pre_bulk_update'
-            FROM data_pegawai
+            FROM ${tables.DATA_PEGAWAI}
             WHERE perner IN (${updates.map(() => "?").join(",")})
           `;
 
@@ -8986,7 +8989,9 @@ app.post("/api/data_pegawai/bulk_upload", (req, res) => {
           // Handle new inserts
           if (newInserts.length > 0) {
             const insertSQL = `
-              INSERT INTO data_pegawai (perner, nip, nama, bidang, no_telp) 
+              INSERT INTO ${
+                tables.DATA_PEGAWAI
+              } (perner, nip, nama, bidang, no_telp) 
               VALUES ${newInserts.map(() => "(?, ?, ?, ?, ?)").join(", ")}
             `;
 
@@ -9025,7 +9030,7 @@ app.post("/api/data_pegawai/bulk_upload", (req, res) => {
           } else {
             updates.forEach((item) => {
               const updateSQL = `
-                UPDATE data_pegawai 
+                UPDATE ${tables.DATA_PEGAWAI} 
                 SET nip = ?, nama = ?, bidang = ?, no_telp = ?
                 WHERE perner = ?
               `;
@@ -9348,8 +9353,8 @@ app.get("/getAttendanceMatrix", (req, res) => {
         COALESCE(dp.nip, '') as nip,
         COALESCE(dp.bidang, 'Belum Diisi') as bidang,
         dp.no_telp
-      FROM olah_absensi oa
-      LEFT JOIN data_pegawai dp ON oa.perner = dp.perner
+      FROM ${tables.OLAH_ABSEN} oa
+      LEFT JOIN ${tables.DATA_PEGAWAI} dp ON oa.perner = dp.perner
       WHERE oa.tanggal >= ? AND oa.tanggal <= ?
         AND oa.perner IS NOT NULL
       ORDER BY oa.perner ASC, oa.tanggal ASC
@@ -9667,7 +9672,7 @@ app.get("/getAvailablePeriods", (req, res) => {
       COUNT(DISTINCT perner) as employee_count,
       MIN(tanggal) as start_date,
       MAX(tanggal) as end_date
-    FROM olah_absensi 
+    FROM ${tables.OLAH_ABSEN} 
     WHERE tanggal IS NOT NULL 
       AND perner IS NOT NULL
     GROUP BY YEAR(tanggal), MONTH(tanggal)
@@ -9721,7 +9726,7 @@ app.get("/test-db", (req, res) => {
   }
 
   conn.query(
-    "SELECT COUNT(*) as count FROM olah_absensi LIMIT 1",
+    `SELECT COUNT(*) as count FROM ${tables.OLAH_ABSEN} LIMIT 1`,
     (err, results) => {
       if (err) {
         return res.status(500).json({
@@ -9757,6 +9762,16 @@ app.listen(PORT, HOST, () => {
       console.log(
         `📟 LAN (akses dari device lain) untuk beranda: http://${lan}:${PORT}/`
       );
+
+      const urlBeranda = `http://${lan}:${PORT}/`;
+
+      console.log(
+        `📟 LAN (akses dari device lain) untuk beranda: ${urlBeranda}`
+      );
+
+      exec(`start ${urlBeranda}`); // otomatis buka di browser default Windows
+
+      // langsung buka browser ke URL tersebut
     } else {
       console.log(
         "⚠️ Tidak menemukan IP LAN. Pastikan terhubung ke Wi-Fi/LAN."

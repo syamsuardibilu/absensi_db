@@ -721,13 +721,13 @@
 
     <script>
       // BASE URL untuk API calls - pastikan mengarah ke server Express.js
-      const BASE_URL = "http://127.0.0.1:3000";
+      // const BASE_URL = "http://127.0.0.1:3000";
 
-      // Helper fetch function
-      const api = (path, opts) => {
-        const p = path.startsWith("/") ? path : `/${path}`;
-        return fetch(`${BASE_URL}${p}`, opts);
-      };
+      // // Helper fetch function
+      // const api = (path, opts) => {
+      //   const p = path.startsWith("/") ? path : `/${path}`;
+      //   return fetch(`${BASE_URL}${p}`, opts);
+      // };
 
       // Global Variables
       let inputData = [];
@@ -2735,5 +2735,6 @@
         "⌨️ Keyboard shortcuts: Ctrl+R (refresh), Ctrl+E (export excel)"
       );
     </script>
+    <script src="script.js?v=20250825"></script>
   </body>
 </html>
